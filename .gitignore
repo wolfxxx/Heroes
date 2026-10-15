@@ -1,0 +1,6 @@
+.godot/
+shots/
+*.import.tmp
+tools/**/__pycache__/
+tools/**/raw/
+
