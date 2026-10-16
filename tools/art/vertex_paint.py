@@ -4,7 +4,7 @@ python tools/art/vertex_paint.py [names...] [--model M] [--batch DIR] [--force]
 Reads <batch>/in/<name>.png, sends it with the prompt from PROMPTS.md, writes <batch>/out/<name>.png.
 Existing outputs are skipped unless --force. Needs Application Default Credentials for the Vertex project.
 Then run tools/art/imagegen_ingest.py to bring the results into the game."""
-import os, sys, io, glob, argparse, time
+import os, sys, io, glob, argparse, time, json
 from PIL import Image
 from google import genai
 from google.genai import types
@@ -41,6 +41,56 @@ CREATURE = ("Repaint this image as a creature portrait for a fantasy strategy ga
 CREATURE_NOTES = {
     "zombie": "Make it a medieval fantasy zombie: dress it in torn, rotting peasant rags and a ragged tunic (no modern "
               "clothes), with grey-green decaying skin.",
+    "dread_knight": "A sinister undead death knight: keep the armour and horse barding blackened dark steel with a cold "
+                    "violet sheen, as dark as in the original, with faint purple-green glints. Not bronze or gold.",
+}
+
+SPRITE = ("Repaint this object as a hand-painted {what} for a fantasy strategy game, seen from the same high "
+          "three-quarter angle. " + STYLE + "\n"
+          "VERY IMPORTANT: keep exactly the same object with the same outline, silhouette, proportions, size and position "
+          "in the frame and the same camera angle. Do not add, remove or move any part. Only improve the painting: "
+          "detailed materials (stone, timber, roof tiles, bark, leaves, rock, metal, cloth), crisp highlights, rich colour.\n"
+          "Keep the background a perfectly plain, flat grey-beige colour exactly like the original: no ground, grass, "
+          "cast shadows, scenery, frame or text.")
+
+SPRITE_NOTES = {
+    "town_haven": "A noble castle of white stone with blue roofs and gold trim.",
+    "town_necropolis": "A dark necromancer citadel of black stone with green ghost-light in the windows.",
+    "res_gold": "A pile of gold coins and ingots.", "res_wood": "A stack of cut logs.", "res_ore": "A heap of iron ore.",
+    "res_crystal": "Glowing red crystals.", "res_gems": "Colourful cut gemstones.", "res_mercury": "A flask of mercury.",
+    "res_sulfur": "A heap of yellow sulfur.", "artifact": "A treasure artifact on a small pedestal.",
+}
+
+UNIT = ("Repaint this figure as a hand-painted {what} for a fantasy strategy game, in exactly the same view and pose. "
+        + STYLE + "\n"
+        "VERY IMPORTANT: keep exactly the same character with the same outline, silhouette, pose, proportions, weapon, "
+        "size and position in the frame. Do not add, remove or move any part, and do not change its colours much. Only "
+        "improve the painting: detailed armour, cloth folds, fur, feathers, bone, a characterful face, crisp highlights.\n"
+        "Keep the background a perfectly plain, flat grey-beige colour exactly like the original: no ground, grass, "
+        "cast shadows, scenery, frame or text.")
+
+HERO_NOTES = {
+    "haven": "A noble knight in polished steel plate on an armoured warhorse.",
+    "necropolis": "A sinister undead death knight in blackened steel with a cold violet sheen on a dark armoured horse; "
+                  "keep it as dark as in the original, not bronze or gold.",
+}
+
+BATTLE_BG = ("Repaint this as the battlefield background of a fantasy strategy game; armies and the hex grid are drawn "
+             "on top of it later. " + STYLE + "\n"
+             "Keep the same camera, the horizon at the same height and the same kind of terrain and sky. Make it a rich, "
+             "detailed painting: {terrain}. Everything below the upper fifth of the image is the battlefield, across the FULL "
+             "width from the left edge to the right edge: keep it open, fairly flat and evenly lit, with only small, low "
+             "painted detail (grass tufts, pebbles, soil patches). No trees, bushes, rocks or tall plants anywhere in it, "
+             "not even at the left and right sides, because the armies stand there. Trees, hills and scenery only in the "
+             "distance along the horizon.\n"
+             "16:9. No creatures, no people, no text, no border.")
+
+BG_TERRAIN = {
+    "grass": "lush green meadow under a bright blue sky with white clouds, distant snowy peaks and oak trees",
+    "dirt": "dry brown earth and rough trodden ground, distant hills and sparse trees under a warm hazy sky",
+    "sand": "golden desert sand with dunes and wind ripples, distant rocky mesas under a hot pale sky",
+    "snow": "snowy tundra with drifts and icy patches, distant frozen peaks and snow-covered pines under a cold sky",
+    "swamp": "murky green-brown marsh with reeds, small dark pools and dead trees under a gloomy overcast sky",
 }
 
 TOWN_BG = ("Repaint this as the background landscape of a fantasy town screen in a strategy game. " + STYLE + "\n"
@@ -67,9 +117,24 @@ GROUP_STYLE = ("\nThe second image is the same town already painted: match its p
                "any building from it: paint only the buildings that are in the first image, and keep every empty part of "
                "the town square and landscape empty.")
 
+def _sprite_ratio(name):
+    return json.load(open("imagegen/batch4/in/sprites.json"))[name]["ratio"]
+
 def prompt_for(name):
     if name.startswith("portrait_"):
         return PORTRAIT, "1:1"
+    if name.startswith("bg__"):  # batch 4: battle backgrounds
+        return BATTLE_BG.format(terrain=BG_TERRAIN[name[4:]]), "16:9"
+    if name.startswith(("creatures__", "heroes__")):  # batch 4 (1c): battle units and mounted heroes
+        kind, obj = name.split("__", 1)
+        what = "battle unit sprite" if kind == "creatures" else "mounted hero sprite"
+        note = CREATURE_NOTES.get(obj, "") or HERO_NOTES.get(obj.split("_")[-1], "")
+        return UNIT.format(what=what) + ("\n" + note if note else ""), _sprite_ratio(name)
+    if name.startswith(("map__", "battle__")):  # batch 4: transparent sprites on a flat backdrop
+        kind, obj = name.split("__", 1)
+        what = "battlefield obstacle" if kind == "battle" else "adventure-map object"
+        note = SPRITE_NOTES.get(obj, "")
+        return SPRITE.format(what=what) + ("\n" + note if note else ""), _sprite_ratio(name)
     if name.startswith("creature_"):
         cid = name[len("creature_"):]
         return CREATURE + ("\n" + CREATURE_NOTES[cid] if cid in CREATURE_NOTES else ""), "1:1"
