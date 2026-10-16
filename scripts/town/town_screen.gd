@@ -316,10 +316,29 @@ func _open_building(id: String) -> void:
 # ---------------------------------------------------------------------------------------------
 # Dialogs
 # ---------------------------------------------------------------------------------------------
+## Building picture for dialogs (tools/art/building_cards.py), falling back to the town sprite.
+func _building_pic(id: String) -> Texture2D:
+	var sid := TownLayout.sprite_id(id)
+	var p := "icons/building_%s_%s.png" % [town["faction"], sid]
+	return Assets.tex(p if Assets.has(p) else "town/%s_%s.png" % [town["faction"], sid])
+
+## Status of a building for this player: [label, colour]. Colours follow the classic hall screen.
+func _build_status(id: String) -> Array:
+	if TownLogic.has_building(town, id):
+		return ["Built", Color(0.85, 0.68, 0.22)]
+	var reason := TownLogic.build_block_reason(town, player, id)
+	if reason == "":
+		return ["Can build", Color(0.25, 0.62, 0.22)]
+	if reason == "Not enough resources":
+		return ["Need resources", Color(0.75, 0.55, 0.15)]
+	if reason == "Already built today":
+		return ["Built today", Color(0.4, 0.4, 0.45)]
+	return [reason, Color(0.62, 0.2, 0.16)]
+
 func _open_build() -> void:
 	var m := Modal.custom(self, "Build in %s" % town["name"], 1660)
 	var g := GridContainer.new()
-	g.columns = 5
+	g.columns = 6
 	g.add_theme_constant_override("h_separation", 10)
 	g.add_theme_constant_override("v_separation", 10)
 	m.body.add_child(g)
@@ -338,77 +357,93 @@ func _open_build() -> void:
 		var rb: int = rank.call(b)
 		return ra < rb if ra != rb else GameData.BUILDINGS.keys().find(a) < GameData.BUILDINGS.keys().find(b))
 	for id in ids:
-		var b: Dictionary = GameData.BUILDINGS[id]
-		var built: bool = id in town["buildings"]
-		var reason := "Built" if built else TownLogic.build_block_reason(town, player, id)
-		var card := Button.new()
-		card.custom_minimum_size = Vector2(312, 196)
-		card.focus_mode = Control.FOCUS_NONE
-		var v := VBoxContainer.new()
-		v.position = Vector2(10, 10)
-		v.size = Vector2(292, 178)
-		v.add_theme_constant_override("separation", 2)
-		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.add_child(v)
-		var thumb := "icons/building_%s_%s.png" % [town["faction"], TownLayout.sprite_id(id)]
-		if not Assets.has(thumb):
-			thumb = "town/%s_%s.png" % [town["faction"], TownLayout.sprite_id(id)]
-		var ic := UI.icon(Assets.tex(thumb), Vector2(292, 70))
-		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(ic)
-		var nm := UI.label(GameData.building_name(town["faction"], id), 19, UI.GOLD)
-		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(nm)
-		var cost := UI.label(UI.format_cost(b["cost"]) if not built else "", 16)
-		cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		cost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		cost.custom_minimum_size = Vector2(292, 0)
-		cost.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(cost)
-		var col := Color(0.55, 1.0, 0.5)
-		if built:
-			col = UI.GOLD
-		elif reason == "Not enough resources":
-			col = Color(1.0, 0.8, 0.35)
-		elif reason != "":
-			col = Color(1.0, 0.5, 0.42)
-		var st := UI.label("Can build" if reason == "" else reason, 17, col)
-		st.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-		st.add_theme_constant_override("outline_size", 5)
-		st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		st.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(st)
+		var st := _build_status(id)
+		var card := _BuildCard.new()
+		card.pic = _building_pic(id)
+		card.title = GameData.building_name(town["faction"], id)
+		card.status = st[0]
+		card.status_col = st[1]
+		card.custom_minimum_size = Vector2(262, 226)
+		card.tooltip_text = GameData.BUILDINGS[id].get("desc", "")
 		var bid: String = id
-		card.tooltip_text = b.get("desc", "Produces %s." % GameData.CREATURES[GameData.faction_creature(town["faction"], b.get("dwelling_tier", 1))]["plural"])
 		card.pressed.connect(func(): m.close(bid))
-		if built:
-			ic.modulate = Color(0.75, 0.72, 0.65)
-		elif reason == "":
-			card.modulate = Color(0.9, 1.12, 0.88)
-		elif reason != "Not enough resources":
-			card.modulate = Color(1.0, 0.78, 0.74)
 		g.add_child(card)
 	m.add_buttons([["Close", ""]])
 	m.set_meta("cancel", "")
 	var r = await m.closed
 	if r == null or r == "":
 		return
-	var reason := TownLogic.build_block_reason(town, player, r)
-	if reason != "":
-		Audio.sfx("error")
-		await Modal.message(self, GameData.building_name(town["faction"], r), reason).closed
+	await _building_detail(r)
+
+## Detail panel: big picture, what it does, requirements, cost against what you have, and a Build button.
+func _building_detail(id: String) -> void:
+	var b: Dictionary = GameData.BUILDINGS[id]
+	var m := Modal.custom(self, GameData.building_name(town["faction"], id), 980)
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 24)
+	m.body.add_child(h)
+	var frame := PanelContainer.new()
+	h.add_child(frame)
+	frame.add_child(UI.icon(_building_pic(id), Vector2(448, 280)))
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 10)
+	v.custom_minimum_size = Vector2(440, 0)
+	h.add_child(v)
+	if b.has("dwelling_tier"):
+		var cid := GameData.faction_creature(town["faction"], b["dwelling_tier"])
+		var c: Dictionary = GameData.CREATURES[cid]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		row.add_child(UI.icon(Assets.creature_portrait(cid), Vector2(72, 72)))
+		row.add_child(UI.label("Recruits %s.\n+%d per week." % [c["plural"], c["growth"]], 21))
+		v.add_child(row)
+	elif b.get("desc", "") != "":
+		var dl := UI.label(b["desc"], 21)
+		dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(dl)
+	if b["requires"].size() > 0:
+		v.add_child(UI.label("Requires", 21, UI.GOLD))
+		for req in b["requires"]:
+			var ok := TownLogic.has_building(town, req)
+			v.add_child(UI.label(("+  " if ok else "-  ") + GameData.building_name(town["faction"], req), 19,
+				Color(0.6, 0.9, 0.55) if ok else Color(1, 0.55, 0.45)))
+	if not TownLogic.has_building(town, id):
+		v.add_child(UI.label("Cost", 21, UI.GOLD))
+		var cost := GridContainer.new()
+		cost.columns = 4
+		cost.add_theme_constant_override("h_separation", 14)
+		v.add_child(cost)
+		if b["cost"].is_empty():
+			cost.add_child(UI.label("Free", 19))
+		for r in GameData.RESOURCES:
+			var need: int = b["cost"].get(r, 0)
+			if need <= 0:
+				continue
+			var have: int = player["resources"].get(r, 0)
+			var cell := HBoxContainer.new()
+			cell.add_child(UI.icon(Assets.res_icon(r), Vector2(30, 30)))
+			cell.add_child(UI.label(str(need), 20, UI.TEXT if have >= need else Color(1, 0.5, 0.4)))
+			cell.tooltip_text = "%s: need %d, have %d" % [GameData.RESOURCE_NAMES[r], need, have]
+			cost.add_child(cell)
+	var st := _build_status(id)
+	v.add_child(UI.label(st[0], 22, st[1].lightened(0.35)))
+	var reason := TownLogic.build_block_reason(town, player, id)
+	var btns := m.add_buttons([["Build", "build"], ["Close", ""]])
+	btns.get_child(0).disabled = reason != ""
+	m.set_meta("cancel", "")
+	if reason == "":
+		m.set_meta("default", "build")
+	var res = await m.closed
+	if res != "build":
 		return
-	var ok = await Modal.confirm(self, GameData.building_name(town["faction"], r), "Build %s for %s?" % [GameData.building_name(town["faction"], r), UI.format_cost(GameData.BUILDINGS[r]["cost"])], "Build", "Cancel").closed
-	if ok:
-		TownLogic.build(town, player, r)
+	if TownLogic.build(town, player, id):
 		Audio.sfx("build")
-		if hero.size() > 0 and r.begins_with("mage_guild"):
-			for s in town["mage_spells"]:
-				if not s in hero["spells"] and GameData.SPELLS[s]["level"] <= 2 + int(hero["skills"].get("wisdom", 0)):
-					hero["spells"].append(s)
+		if hero.size() > 0 and id.begins_with("mage_guild"):
+			for sp in town["mage_spells"]:
+				if not sp in hero["spells"] and GameData.SPELLS[sp]["level"] <= 2 + int(hero["skills"].get("wisdom", 0)):
+					hero["spells"].append(sp)
 		refresh()
-		_flash_building(r)
+		_flash_building(id)
 
 func _flash_building(id: String) -> void:
 	for b in _bld_nodes:
@@ -424,7 +459,7 @@ func _recruit_tier(tier: int) -> void:
 	refresh()
 
 func _open_recruit_all() -> void:
-	var m := Modal.custom(self, "Creature Dwellings", 1500)
+	var m := Modal.custom(self, "Creature Dwellings", 1560)
 	var g := GridContainer.new()
 	g.columns = 4
 	g.add_theme_constant_override("h_separation", 12)
@@ -432,34 +467,16 @@ func _open_recruit_all() -> void:
 	m.body.add_child(g)
 	for tier in range(1, 8):
 		var cid := GameData.faction_creature(town["faction"], tier)
-		var c: Dictionary = GameData.CREATURES[cid]
 		var built := TownLogic.has_building(town, "dwelling_%d" % tier)
-		var card := Button.new()
-		card.custom_minimum_size = Vector2(360, 250)
-		card.focus_mode = Control.FOCUS_NONE
+		var card := _DwellingCard.new()
+		card.pic = _building_pic("dwelling_%d" % tier)
+		card.creature = Assets.creature(cid)
+		card.anchor = Assets.anchor("creatures/%s.png" % cid)
+		card.title = GameData.dwelling_name(town["faction"], tier)
+		card.c = GameData.CREATURES[cid]
+		card.available = town["available"][tier - 1] if built else -1
+		card.custom_minimum_size = Vector2(372, 262)
 		card.disabled = not built
-		var v := VBoxContainer.new()
-		v.position = Vector2(8, 6)
-		v.size = Vector2(344, 238)
-		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.add_child(v)
-		var nm := UI.label("%s" % GameData.dwelling_name(town["faction"], tier), 20, UI.GOLD)
-		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(nm)
-		var ic := UI.icon(Assets.creature(cid), Vector2(344, 140))
-		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		if not built:
-			ic.modulate = Color(0.4, 0.4, 0.4)
-		v.add_child(ic)
-		var l := UI.label("%s — %s" % [c["plural"], ("available: %d" % town["available"][tier - 1]) if built else "not built"], 18)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(l)
-		var cl := UI.label(UI.format_cost(c["cost"]), 16)
-		cl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		cl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		v.add_child(cl)
 		var t := tier
 		card.pressed.connect(func(): m.close(t))
 		g.add_child(card)
@@ -700,3 +717,81 @@ class _Banner extends Control:
 		outline.append(pts[0])
 		draw_polyline(outline, UI.GOLD, 2.0)
 		draw_rect(Rect2(Vector2.ZERO, size), UI.GOLD_DARK, false, 2.0)
+
+
+## Hall-screen card: building picture, name, and a coloured status bar.
+class _BuildCard extends Button:
+	var pic: Texture2D
+	var title := ""
+	var status := ""
+	var status_col := Color.GRAY
+	func _ready() -> void:
+		focus_mode = Control.FOCUS_NONE
+		flat = true
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color(0.07, 0.05, 0.03))
+		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - 66))
+		if pic:
+			var ts := Vector2(pic.get_size())
+			var sc := maxf(pr.size.x / ts.x, pr.size.y / ts.y)
+			draw_texture_rect_region(pic, pr, Rect2((ts - pr.size / sc) * 0.5, pr.size / sc),
+				Color(1.15, 1.12, 1.05) if is_hovered() else Color.WHITE)
+		var f := UI.font()
+		draw_rect(Rect2(Vector2(5, size.y - 61), Vector2(size.x - 10, 30)), Color(0.12, 0.09, 0.06))
+		draw_string(f, Vector2(5, size.y - 39), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, UI.GOLD)
+		var sb := Rect2(Vector2(5, size.y - 31), Vector2(size.x - 10, 26))
+		draw_rect(sb, status_col)
+		draw_rect(sb, Color(0, 0, 0, 0.5), false, 1.0)
+		var txt := status
+		while txt.length() > 4 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x > sb.size.x - 10:
+			txt = txt.left(txt.length() - 2)
+		if txt != status:
+			txt += "..."
+		draw_string(f, Vector2(5, size.y - 12), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 17, Color(1, 0.97, 0.9))
+		draw_rect(r, UI.GOLD if is_hovered() else UI.GOLD_DARK, false, 2.0 if is_hovered() else 1.5)
+
+## Dwelling card: the building as backdrop, the creature standing in front, availability and cost.
+class _DwellingCard extends Button:
+	var pic: Texture2D
+	var creature: Texture2D
+	var anchor := Vector2(0.5, 0.9)
+	var title := ""
+	var c: Dictionary
+	var available := -1
+	func _ready() -> void:
+		focus_mode = Control.FOCUS_NONE
+		flat = true
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
+	func _draw() -> void:
+		var r := Rect2(Vector2.ZERO, size)
+		var dim := Color.WHITE if available >= 0 else Color(0.38, 0.36, 0.36)
+		draw_rect(r, Color(0.07, 0.05, 0.03))
+		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - 64))
+		if pic:
+			var ts := Vector2(pic.get_size())
+			var sc := maxf(pr.size.x / ts.x, pr.size.y / ts.y)
+			draw_texture_rect_region(pic, pr, Rect2((ts - pr.size / sc) * 0.5, pr.size / sc), dim * Color(0.78, 0.78, 0.78))
+		if creature:
+			var cs := Vector2(creature.get_size())
+			var sc2 := minf(pr.size.y * 0.95 / cs.y, pr.size.x * 0.8 / cs.x)
+			var feet := Vector2(pr.position.x + pr.size.x * 0.5, pr.end.y - 4)
+			draw_texture_rect(creature, Rect2(feet - anchor * cs * sc2, cs * sc2), false, dim)
+		var f := UI.font()
+		draw_rect(Rect2(Vector2(5, 5), Vector2(size.x - 10, 28)), Color(0, 0, 0, 0.55))
+		draw_string(f, Vector2(5, 26), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, UI.GOLD)
+		draw_rect(Rect2(Vector2(5, size.y - 59), Vector2(size.x - 10, 54)), Color(0.12, 0.09, 0.06))
+		var avail := ("Available: %d" % available) if available >= 0 else "Not built"
+		draw_string(f, Vector2(14, size.y - 36), c.get("plural", ""), HORIZONTAL_ALIGNMENT_LEFT, 200, 18, UI.TEXT)
+		draw_string(f, Vector2(size.x - 214, size.y - 36), avail, HORIZONTAL_ALIGNMENT_RIGHT, 200, 18,
+			UI.GOLD if available > 0 else Color(0.75, 0.7, 0.6))
+		var x := 14.0
+		for res in c.get("cost", {}):
+			draw_texture_rect(Assets.res_icon(res), Rect2(Vector2(x, size.y - 30), Vector2(22, 22)), false)
+			var amt := str(c["cost"][res])
+			draw_string(f, Vector2(x + 26, size.y - 12), amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UI.TEXT)
+			x += 34 + f.get_string_size(amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		draw_rect(r, UI.GOLD if is_hovered() and available >= 0 else UI.GOLD_DARK, false, 1.5)

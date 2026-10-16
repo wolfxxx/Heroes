@@ -194,6 +194,17 @@ def _sprite_ratio(name):
 def prompt_for(name):
     if name.startswith("portrait_"):
         return PORTRAIT, "1:1"
+    if name.startswith("card__"):  # batch 9: building pictures for buildings cut off by the town screen edge
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("bc", "tools/art/building_cards.py")
+        bc = importlib.util.module_from_spec(spec); spec.loader.exec_module(bc)
+        _, fac, sid = name.split("__")
+        return ("Paint a picture of a single town building for the building screen of a fantasy strategy game: " +
+                bc.DESC[(fac, sid)] + ". " + STYLE + NL +
+                "Use this image as the setting: same painted town square, landscape, lighting and style. The building in "
+                "it is cut off by the image edge - paint the WHOLE building fully visible, centred in the frame, seen "
+                "from the same high three-quarter angle, at a size that fills about half the picture. 16:10 landscape. "
+                "No people, no text, no border."), "16:9"
     if name.startswith("cycle__"):  # batch 8: battle movement cycles
         cid = name.split("__")[1]
         kd = json.load(open("imagegen/batch8/in/cycles.json"))[name]["kind"]
