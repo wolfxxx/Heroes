@@ -37,6 +37,7 @@ var units := {}            # uid -> Node2D
 var _field: Node2D
 var _grid: _Grid
 var _sorted: Node2D
+var _corpses: Node2D
 var _fx: Node2D
 var ui: CanvasLayer
 var _queue_box: HBoxContainer
@@ -128,6 +129,9 @@ func _build_scene() -> void:
 	_grid = _Grid.new()
 	_grid.b = self
 	_field.add_child(_grid)
+	_corpses = Node2D.new()  # dead stacks: above the ground and grid, below everything standing
+	_corpses.y_sort_enabled = true
+	_field.add_child(_corpses)
 	_sorted = Node2D.new()
 	_sorted.y_sort_enabled = true
 	_field.add_child(_sorted)
@@ -213,6 +217,8 @@ func _make_unit(st: Dictionary) -> void:
 	var base := s.scale
 	tw.tween_property(s, "scale", base * Vector2(1.0, 1.025), 0.9 + randf() * 0.4).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(s, "scale", base, 0.9 + randf() * 0.4).set_trans(Tween.TRANS_SINE)
+	n.set_meta("breath", tw)
+	n.set_meta("base_scale", base)
 
 func _unit(st: Dictionary) -> Node2D:
 	return units.get(st["uid"])
@@ -220,6 +226,32 @@ func _unit(st: Dictionary) -> Node2D:
 ## Height of the unit's figure on screen (for text and projectiles above it).
 func _top(st: Dictionary) -> float:
 	return _unit(st).get_meta("top", 150.0)
+
+## Swap a unit to one of its painted poses ("attack", "hit", "dead"; "" = idle), keeping its feet on the hex.
+## Poses come from tools/art/pose_paint.py; units without one simply keep their idle sprite.
+## With hold > 0 the unit returns to idle afterwards, unless a newer pose (e.g. death) replaced it meanwhile.
+func _pose(st: Dictionary, pose: String, hold := 0.0) -> bool:
+	var n := _unit(st)
+	if n == null:
+		return false
+	var rel := "creatures/%s.png" % st["id"] if pose == "" else "creatures/%s_%s.png" % [st["id"], pose]
+	if not Assets.has(rel) or Assets.anchor(rel).x < 0.0:
+		return false
+	var s: Sprite2D = n.get_node("Sprite")
+	var anc := Assets.anchor(rel)
+	s.texture = Assets.tex(rel)
+	var tsz := Vector2(s.texture.get_size())
+	s.offset = (Vector2(0.5, 0.5) - anc) * tsz
+	s.set_meta("anchor_x", (0.5 - anc.x) * tsz.x)
+	_set_flip(s, s.flip_h)
+	var token: int = n.get_meta("pose_token", 0) + 1
+	n.set_meta("pose_token", token)
+	n.set_meta("pose", pose)
+	if hold > 0.0:
+		get_tree().create_timer(hold).timeout.connect(func():
+			if is_instance_valid(n) and n.get_meta("pose_token", 0) == token and st.get("alive", false):
+				_pose(st, ""))
+	return true
 
 # ---------------------------------------------------------------------------------------------
 # UI
@@ -673,6 +705,9 @@ func _anim_move(st: Dictionary, path: Array) -> void:
 			Audio.sfx("move_step", -10, 0.15)
 			var tw := n.create_tween()
 			tw.tween_property(n, "position", target, 0.13)
+			var bob := spr.create_tween()  # a small step bob per hex so walkers don't glide
+			bob.tween_property(spr, "position:y", -7.0, 0.065).set_ease(Tween.EASE_OUT)
+			bob.tween_property(spr, "position:y", 0.0, 0.065).set_ease(Tween.EASE_IN)
 			await tw.finished
 	_set_flip(spr, st["side"] == 1)
 	_face_enemies(st)
@@ -697,6 +732,7 @@ func _anim_attack(ev: Dictionary) -> void:
 	var nd := _unit(d)
 	var spr: Sprite2D = na.get_node("Sprite")
 	_set_flip(spr, nd.position.x < na.position.x)
+	_pose(a, "attack", 0.55 if ev["ranged"] else 0.42)
 	if ev["ranged"]:
 		var proj := _Projectile.new()
 		proj.kind = "magic" if a["id"] in ["monk", "lich"] else "arrow"
@@ -729,6 +765,8 @@ func _anim_attack(ev: Dictionary) -> void:
 	await get_tree().create_timer(0.3).timeout
 
 func _hit_flash(d: Dictionary) -> void:
+	if d.get("alive", false):
+		_pose(d, "hit", 0.45)
 	var nd := _unit(d)
 	var s: Sprite2D = nd.get_node("Sprite")
 	var tw := s.create_tween()
@@ -747,11 +785,25 @@ func _anim_death(st: Dictionary) -> void:
 	var s: Sprite2D = n.get_node("Sprite")
 	n.get_node("Badge").visible = false
 	n.get_node("Shadow").visible = false
+	if n.has_meta("breath"):
+		n.get_meta("breath").kill()
+		s.scale = n.get_meta("base_scale")
+	# (a negative z_index would hide the body behind the battlefield background)
+	n.reparent(_corpses)
+	if _pose(st, "dead"):
+		# the corpse stays on its hex, a little darker, as in the classics
+		s.modulate = Color(1.6, 0.7, 0.7)
+		var tw0 := s.create_tween()
+		tw0.tween_property(s, "modulate", Color(0.78, 0.74, 0.72), 0.5)
+		var m: ShaderMaterial = s.material
+		if m:
+			m.set_shader_parameter("ink", Color(0.09, 0.06, 0.03, 0.95))
+			m.set_shader_parameter("width", 1.2)
+		return
 	var tw := s.create_tween().set_parallel(true)
 	tw.tween_property(s, "modulate", Color(0.35, 0.3, 0.3, 0.55), 0.5)
 	tw.tween_property(s, "rotation", (PI * 0.5) * (-1 if s.flip_h else 1), 0.45).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 	tw.tween_property(s, "position:y", 10.0, 0.45)
-	n.z_index = -1
 
 func _anim_spell(ev: Dictionary) -> void:
 	var sp: String = ev["spell"]

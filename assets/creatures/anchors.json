@@ -3,56 +3,224 @@
 0.5,
 0.8906
 ],
+"angel_attack.png": [
+0.3792,
+0.9439
+],
+"angel_dead.png": [
+0.4026,
+0.9391
+],
+"angel_hit.png": [
+0.3625,
+0.9388
+],
 "archer.png": [
 0.5,
 0.9046
+],
+"archer_attack.png": [
+0.2704,
+0.9318
+],
+"archer_dead.png": [
+0.3333,
+0.8667
+],
+"archer_hit.png": [
+0.4007,
+0.9286
 ],
 "bone_dragon.png": [
 0.5,
 0.8985
 ],
+"bone_dragon_attack.png": [
+0.3114,
+0.954
+],
+"bone_dragon_dead.png": [
+0.4362,
+0.9441
+],
+"bone_dragon_hit.png": [
+0.3752,
+0.9557
+],
 "cavalier.png": [
 0.5,
 0.9232
+],
+"cavalier_attack.png": [
+0.3975,
+0.9383
+],
+"cavalier_dead.png": [
+0.4159,
+0.9115
+],
+"cavalier_hit.png": [
+0.3743,
+0.9577
 ],
 "dread_knight.png": [
 0.5,
 0.9232
 ],
+"dread_knight_attack.png": [
+0.3434,
+0.9355
+],
+"dread_knight_dead.png": [
+0.4439,
+0.903
+],
+"dread_knight_hit.png": [
+0.3849,
+0.9551
+],
 "ghost.png": [
 0.5,
 0.901
+],
+"ghost_attack.png": [
+0.2558,
+0.9077
+],
+"ghost_dead.png": [
+0.4792,
+0.8596
+],
+"ghost_hit.png": [
+0.3279,
+0.9164
 ],
 "griffin.png": [
 0.5,
 0.8082
 ],
+"griffin_attack.png": [
+0.5,
+0.9492
+],
+"griffin_dead.png": [
+0.4177,
+0.903
+],
+"griffin_hit.png": [
+0.3208,
+0.9335
+],
 "lich.png": [
 0.5,
 0.8995
+],
+"lich_attack.png": [
+0.2282,
+0.9326
+],
+"lich_dead.png": [
+0.5045,
+0.8689
+],
+"lich_hit.png": [
+0.2697,
+0.9347
 ],
 "monk.png": [
 0.5,
 0.9006
 ],
+"monk_attack.png": [
+0.2827,
+0.9084
+],
+"monk_dead.png": [
+0.4735,
+0.8333
+],
+"monk_hit.png": [
+0.3853,
+0.9125
+],
 "pikeman.png": [
 0.5,
 0.8986
+],
+"pikeman_attack.png": [
+0.3125,
+0.9245
+],
+"pikeman_dead.png": [
+0.4469,
+0.8696
+],
+"pikeman_hit.png": [
+0.3801,
+0.9303
 ],
 "skeleton.png": [
 0.5,
 0.8678
 ],
+"skeleton_attack.png": [
+0.2218,
+0.9226
+],
+"skeleton_dead.png": [
+0.4951,
+0.875
+],
+"skeleton_hit.png": [
+0.3071,
+0.9265
+],
 "swordsman.png": [
 0.5,
 0.926
+],
+"swordsman_attack.png": [
+0.3022,
+0.9218
+],
+"swordsman_dead.png": [
+0.5082,
+0.8857
+],
+"swordsman_hit.png": [
+0.2915,
+0.9236
 ],
 "vampire.png": [
 0.5,
 0.8839
 ],
+"vampire_attack.png": [
+0.3805,
+0.9303
+],
+"vampire_dead.png": [
+0.4664,
+0.8879
+],
+"vampire_hit.png": [
+0.4569,
+0.9335
+],
 "zombie.png": [
 0.5,
 0.8992
+],
+"zombie_attack.png": [
+0.3019,
+0.9175
+],
+"zombie_dead.png": [
+0.3772,
+0.8273
+],
+"zombie_hit.png": [
+0.3446,
+0.9208
 ]
 }

@@ -85,6 +85,32 @@ BATTLE_BG = ("Repaint this as the battlefield background of a fantasy strategy g
              "distance along the horizon.\n"
              "16:9. No creatures, no people, no text, no border.")
 
+POSE = ("This is a battle unit sprite from a fantasy strategy game. Redraw exactly the SAME character - identical "
+        "armour, clothes, colours, weapon, proportions, hand-painted style and lighting from the upper left - in a new "
+        "pose: {pose}. Same side view facing right, the same size in the frame, standing on the same ground line at "
+        "the same spot. Keep the whole character inside the frame.\n"
+        "The background must stay a perfectly flat, pure magenta (#FF00FF) everywhere around the character: no ground, "
+        "no cast shadow, no scenery, no effects, no text.")
+
+POSE_TEXT = {
+    "attack": "attacking - lunging forward to the right and striking hard with its weapon (or claws, bite or spell), "
+              "full of motion",
+    "hit": "flinching from a heavy blow - recoiling backwards to the left, head turned away, guard up",
+    "dead": "lying dead on the ground, collapsed on its side, weapon dropped beside it; seen from the same angle",
+}
+
+POSE_NOTES = {  # how each creature attacks
+    "archer": "For the attack: drawing the bow and loosing an arrow to the right.",
+    "monk": "For the attack: thrusting both hands forward, casting a bolt of holy light.",
+    "lich": "For the attack: raising the staff and hurling a green necrotic bolt from its hand.",
+    "griffin": "For the attack: rearing up with wings spread, slashing with its talons.",
+    "bone_dragon": "For the attack: rearing up and snapping its jaws forward.",
+    "ghost": "For the attack: swooping forward, reaching out with clawed spectral hands.",
+    "vampire": "For the attack: lunging forward with wings spread and claws out.",
+    "cavalier": "For the attack: the horse charging forward, the knight's lance lowered and thrusting.",
+    "dread_knight": "For the attack: the horse charging forward, the knight's lance lowered and thrusting.",
+}
+
 MENU_BG = ("Repaint this as the title-screen backdrop of a fantasy strategy game. " + STYLE + "\n"
            "A majestic castle of white stone with blue slate roofs, gold trim and fluttering banners on a hill, at golden "
            "dusk: dramatic glowing sky with warm clouds, snowy peaks behind, rolling green hills, a winding road leading "
@@ -131,6 +157,12 @@ def _sprite_ratio(name):
 def prompt_for(name):
     if name.startswith("portrait_"):
         return PORTRAIT, "1:1"
+    if name.startswith("pose__"):  # batch 6: extra battle poses on a magenta backdrop
+        _, cid, pose = name.split("__")
+        note = POSE_NOTES.get(cid, "") if pose == "attack" else ""
+        extra = CREATURE_NOTES.get(cid, "")
+        r = json.load(open("imagegen/batch6/in/poses.json"))[name]["ratio"]
+        return POSE.format(pose=POSE_TEXT[pose]) + "".join("\n" + t for t in (note, extra) if t), r
     if name == "menu__bg":  # batch 5: title screen
         return MENU_BG, "16:9"
     if name.startswith("bg__"):  # batch 4: battle backgrounds

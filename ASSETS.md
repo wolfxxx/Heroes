@@ -23,6 +23,17 @@ in `tools/art/imported_specs.json`; the posed models are cached as `tools/art/ra
 Re-render everything with batch step `"imported"`, then the usual `postfx.py` + `portrait_bg.py`.
 `python tools/art/credits.py` regenerates `CREDITS.md`. The ghost model is CC-BY-NC (non-commercial only).
 
+**Painted over.** All renders are then painted over by Gemini image models on Vertex AI (`tools/art/vertex_paint.py`,
+project id from `GOOGLE_CLOUD_PROJECT` or `imagegen/vertex_project.txt`): portraits and towns via
+`imagegen_prep.py` / `town_groups.py` / `imagegen_ingest.py`, sprites and battlefields via `sprite_paint.py`
+(original alpha and soft shadows kept). `assets/creatures/sizes.json` (`tools/art/sprite_sizes.py`) holds each
+figure's solid size; battle scales units by tier from it.
+
+**Poses** — `creatures/<id>_attack.png`, `_hit.png`, `_dead.png` (optional; anchors in `creatures/anchors.json`).
+Drawn by the image model from the painted idle sprite on a magenta backdrop (`tools/art/pose_paint.py`), keyed,
+scaled to the idle figure, with a synthetic cast shadow. Battle swaps to them during attacks, on damage, and
+leaves the `_dead` sprite on the hex as a corpse.
+
 ## Heroes
 - `heroes/portraits/<hero_id>.png` — 256x256 painted portrait (ids in `GameData.HEROES`).
 - `heroes/map_<faction>.png` — mounted hero on horse, 3/4 top-down view for the adventure map, transparent, 160x160, facing right.
