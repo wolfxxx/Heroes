@@ -1,0 +1,542 @@
+{
+ "angel": {
+  "height": 2.7,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.6,
+    1.0
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 0.5,
+   "sprite": true
+  },
+  "sketchfab": "939d2410f96c4382bf4d803abc48bab5",
+  "tint": {
+   "metal": 0.25,
+   "mult": [
+    1.7,
+    1.55,
+    1.25
+   ],
+   "rough": 0.45,
+   "sat": 1.0
+  },
+  "turn_deg": 35.0
+ },
+ "archer": {
+  "height": 1.8,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.7,
+    1.0
+   ],
+   "pick": "top",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "47c311cb422a47d4a825b6832297607b",
+  "turn_deg": 50.0
+ },
+ "bone_dragon": {
+  "height": 3.3,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.6,
+    1.0
+   ],
+   "pick": "front",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 0.6,
+   "sprite": true
+  },
+  "sketchfab": "db50c4d1bcda463ca3acc185c0969acc",
+  "turn_deg": 55.0
+ },
+ "brother_tomas": {
+  "height": 1.8,
+  "hide": [],
+  "make_lit": true,
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.8,
+    0.99
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": "heroes/portraits/brother_tomas.png",
+   "portrait_turn": 40.0,
+   "radius": 0.55,
+   "sprite": false
+  },
+  "sketchfab": "36e72d20f4354cdc8de26c4aa8ef00bb",
+  "tint": {
+   "mult": [
+    1.5,
+    1.35,
+    1.15
+   ],
+   "sat": 0.7
+  },
+  "turn_deg": 50.0
+ },
+ "cavalier": {
+  "height": 3.4,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.48,
+    0.66
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "faca2ad557f64809b598c3a646a8804f",
+  "turn_deg": 38.0
+ },
+ "dread_knight": {
+  "height": 3.4,
+  "hide": [],
+  "offset": [
+   0,
+   0
+  ],
+  "render": {
+   "head": [
+    0.48,
+    0.66
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "faca2ad557f64809b598c3a646a8804f",
+  "tint": {
+   "mult": [
+    0.32,
+    0.27,
+    0.36
+   ],
+   "sat": 0.35
+  },
+  "turn_deg": 38.0
+ },
+ "ghost": {
+  "height": 1.8,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.65,
+    1
+   ],
+   "pick": "top",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "b8af50271d484548881fe61a06376142",
+  "tint": {
+   "mult": [
+    1.5,
+    1.7,
+    2.1
+   ],
+   "sat": 0.6
+  },
+  "turn_deg": 50.0
+ },
+ "griffin": {
+  "height": 1.6,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.6,
+    1
+   ],
+   "pick": "front",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 0.6,
+   "sprite": true
+  },
+  "sketchfab": "389459fd5d4e4793b217df27678f4815",
+  "turn_deg": 50.0
+ },
+ "ilsa_grimveil": {
+  "height": 1.9,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.78,
+    0.99
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": "heroes/portraits/ilsa_grimveil.png",
+   "portrait_turn": 40.0,
+   "radius": 0.55,
+   "sprite": false
+  },
+  "sketchfab": "e423e38bbd534db48af7b5463fc18efb",
+  "tint": {
+   "metal": 0.0,
+   "mult": [
+    0.62,
+    0.45,
+    0.8
+   ],
+   "rough": 0.6,
+   "sat": 0.4
+  },
+  "turn_deg": 50.0
+ },
+ "kragor_the_pale": {
+  "height": 1.9,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.78,
+    0.99
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": "heroes/portraits/kragor_the_pale.png",
+   "portrait_turn": 0,
+   "radius": 0.55,
+   "sprite": false
+  },
+  "sketchfab": "de1c1847fa45442e8e94b2e6a68d47e1",
+  "turn_deg": 50.0
+ },
+ "lady_seraphine": {
+  "height": 1.75,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.78,
+    0.99
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": "heroes/portraits/lady_seraphine.png",
+   "portrait_turn": 40.0,
+   "radius": 0.55,
+   "sprite": false
+  },
+  "sketchfab": "1e13605a47ff4e84846a21bf71431cac",
+  "turn_deg": 50.0
+ },
+ "lich": {
+  "height": 2.0,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.72,
+    1
+   ],
+   "pick": "top",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "164430e3ff18462eac550f26e70e0c05",
+  "turn_deg": 50.0
+ },
+ "lord_gareth": {
+  "height": 1.9,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.78,
+    0.99
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": "heroes/portraits/lord_gareth.png",
+   "portrait_turn": 40.0,
+   "radius": 0.55,
+   "sprite": false
+  },
+  "sketchfab": "f5a4479d211e49d49937b55fd9478e85",
+  "turn_deg": 50.0
+ },
+ "lord_morthis": {
+  "height": 1.9,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.78,
+    0.99
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": "heroes/portraits/lord_morthis.png",
+   "portrait_turn": 220,
+   "radius": 0.55,
+   "sprite": false
+  },
+  "sketchfab": "37fd804499614441a7996427a98ccc11",
+  "turn_deg": 50.0
+ },
+ "monk": {
+  "height": 1.8,
+  "hide": [],
+  "make_lit": true,
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.72,
+    1
+   ],
+   "pick": "top",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "36e72d20f4354cdc8de26c4aa8ef00bb",
+  "turn_deg": 50.0
+ },
+ "pikeman": {
+  "height": 1.95,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.72,
+    1
+   ],
+   "pick": "top",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "b7cc646a8d8d4e768d978eb4fa52804f",
+  "turn_deg": 50.0
+ },
+ "sir_aldric": {
+  "height": 1.0,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.6,
+    1.0
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": "heroes/portraits/sir_aldric.png",
+   "portrait_turn": -60,
+   "radius": 0.6,
+   "sprite": false
+  },
+  "sketchfab": "dbfeea7957a641329aed853150ce5576",
+  "tint": {
+   "metal": 0.35,
+   "mult": [
+    1.5,
+    1.45,
+    1.4
+   ],
+   "rough": 0.4,
+   "sat": 1.0
+  },
+  "turn_deg": 50.0
+ },
+ "skeleton": {
+  "height": 1.85,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.72,
+    1
+   ],
+   "pick": "top",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "808c0148d6514562a9cfae7bbde0869b",
+  "turn_deg": 50.0
+ },
+ "swordsman": {
+  "height": 1.95,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.7,
+    1
+   ],
+   "pick": "top",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "58fc98f3223f4036b5570ae296e1be5d",
+  "turn_deg": 50.0
+ },
+ "vampire": {
+  "height": 2.3,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.6,
+    1
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "4f574802e7384952a9546f20ea5f30df",
+  "turn_deg": 50.0
+ },
+ "vesna_nightshade": {
+  "height": 1.9,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.78,
+    0.99
+   ],
+   "pick": "median",
+   "portrait": true,
+   "portrait_path": "heroes/portraits/vesna_nightshade.png",
+   "portrait_turn": 40.0,
+   "radius": 0.55,
+   "sprite": false
+  },
+  "sketchfab": "6c506ca03faf4c4aa4cba1e18f3bbce7",
+  "turn_deg": 50.0
+ },
+ "zombie": {
+  "height": 1.75,
+  "hide": [],
+  "offset": [
+   0.0,
+   0.0
+  ],
+  "render": {
+   "head": [
+    0.7,
+    1
+   ],
+   "pick": "top",
+   "portrait": true,
+   "portrait_path": null,
+   "portrait_turn": 40.0,
+   "radius": 1.0,
+   "sprite": true
+  },
+  "sketchfab": "0541416bd635486f95cb3d44f8f676c1",
+  "turn_deg": 50.0
+ }
+}

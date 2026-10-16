@@ -37,8 +37,8 @@ static func panel_style(alpha := 0.94) -> StyleBox:
 	if Assets.has("ui/panel.png"):
 		var sb := StyleBoxTexture.new()
 		sb.texture = Assets.tex("ui/panel.png")
-		sb.set_texture_margin_all(48)
-		sb.set_content_margin_all(22)
+		sb.set_texture_margin_all(30)
+		sb.set_content_margin_all(30)
 		sb.modulate_color = Color(1, 1, 1, alpha)
 		return sb
 	var f := StyleBoxFlat.new()
@@ -52,11 +52,12 @@ static func panel_style(alpha := 0.94) -> StyleBox:
 	return f
 
 static func _button_style(state: String) -> StyleBox:
-	var file := {"normal": "ui/button.png", "hover": "ui/button_hover.png", "pressed": "ui/button_pressed.png", "disabled": "ui/button.png"}[state]
+	var file: String = {"normal": "ui/button.png", "hover": "ui/button_hover.png", "pressed": "ui/button_selected.png",
+		"hover_pressed": "ui/button_selected.png", "disabled": "ui/button.png"}[state]
 	if Assets.has(file):
 		var sb := StyleBoxTexture.new()
 		sb.texture = Assets.tex(file)
-		sb.set_texture_margin_all(20)
+		sb.set_texture_margin_all(12)
 		sb.content_margin_left = 18
 		sb.content_margin_right = 18
 		sb.content_margin_top = 8
@@ -65,7 +66,7 @@ static func _button_style(state: String) -> StyleBox:
 			sb.modulate_color = Color(0.5, 0.5, 0.5)
 		return sb
 	var f := StyleBoxFlat.new()
-	f.bg_color = {"normal": Color(0.28, 0.18, 0.08), "hover": Color(0.42, 0.28, 0.12), "pressed": Color(0.18, 0.11, 0.05), "disabled": Color(0.2, 0.18, 0.16)}[state]
+	f.bg_color = {"normal": Color(0.28, 0.18, 0.08), "hover": Color(0.42, 0.28, 0.12), "pressed": Color(0.5, 0.36, 0.12), "hover_pressed": Color(0.55, 0.4, 0.14), "disabled": Color(0.2, 0.18, 0.16)}[state]
 	f.border_color = GOLD if state == "hover" else GOLD_DARK
 	f.set_border_width_all(2)
 	f.set_corner_radius_all(4)
@@ -85,12 +86,14 @@ static func theme() -> Theme:
 	t.set_color("font_shadow_color", "Label", Color(0, 0, 0, 0.8))
 	t.set_constant("shadow_offset_x", "Label", 2)
 	t.set_constant("shadow_offset_y", "Label", 2)
-	for st in ["normal", "hover", "pressed", "disabled"]:
+	for st in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:
 		t.set_stylebox(st, "Button", _button_style(st))
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	t.set_color("font_color", "Button", TEXT)
 	t.set_color("font_hover_color", "Button", Color(1, 0.95, 0.7))
-	t.set_color("font_pressed_color", "Button", GOLD)
+	# pressed/selected buttons use the bright gold texture: dark ink text stays readable on it
+	t.set_color("font_pressed_color", "Button", Color(0.2, 0.1, 0.03))
+	t.set_color("font_hover_pressed_color", "Button", Color(0.16, 0.08, 0.02))
 	t.set_color("font_disabled_color", "Button", Color(0.55, 0.5, 0.45))
 	t.set_stylebox("panel", "PanelContainer", panel_style())
 	t.set_stylebox("panel", "Panel", panel_style())

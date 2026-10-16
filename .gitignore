@@ -4,3 +4,4 @@ shots/
 tools/**/__pycache__/
 tools/**/raw/
 
+imagegen/

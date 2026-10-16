@@ -1,5 +1,9 @@
 # Asset Manifest (contract between art/audio pipeline and code)
 
+Sprites rendered by tools/art/blender use a fixed world scale and write their foot point to `<dir>/anchors.json`
+(map art: 64 px per Blender unit, drawn at 0.5 => 2 units per 64px tile; creatures: 150 px/unit). Code reads it
+with `Assets.anchor()`. Extra map decor ids: `map/mountain_snow_1..2.png`; `map/obelisk.png` is the Learning Stone.
+
 All paths relative to `res://assets/`. Code loads via `Assets.tex("<path>")` which falls back to a
 generated placeholder if the file is missing, so code and art can progress independently.
 **PNG with real alpha transparency** for all sprites/icons. Style: painterly high-fantasy,
@@ -10,6 +14,14 @@ Side-view full-body battle sprite, **facing RIGHT**, transparent background, fee
 ~512px tall canvas (square 512x512, 2-hex creatures 768x512). Ids: see `GameData.CREATURES`:
 pikeman archer griffin swordsman monk cavalier angel skeleton zombie ghost vampire lich dread_knight bone_dragon
 Also `creatures/portraits/<id>.png` — 128x128 bust/head close-up with painted background (used in recruit/army slots).
+
+**Source models.** Creatures, hero portraits and mounted hero sprites are rendered from Sketchfab library models
+(see `CREDITS.md`), not the procedural `figures.py` bodies. `tools/art/blender/imported.py` downloads a model
+(key from the Blender MCP addon), `adopt()`s it (3/4 facing, height, feet on the ground), and renders it with the
+same camera/lights/scale as before. Per-model settings (turn, height, hidden parts, tint, portrait framing) live
+in `tools/art/imported_specs.json`; the posed models are cached as `tools/art/raw/models/<id>.glb` (git-ignored).
+Re-render everything with batch step `"imported"`, then the usual `postfx.py` + `portrait_bg.py`.
+`python tools/art/credits.py` regenerates `CREDITS.md`. The ghost model is CC-BY-NC (non-commercial only).
 
 ## Heroes
 - `heroes/portraits/<hero_id>.png` — 256x256 painted portrait (ids in `GameData.HEROES`).
@@ -38,8 +50,9 @@ Also `creatures/portraits/<id>.png` — 128x128 bust/head close-up with painted 
   base walls/hill).
 - `town/<faction>_<building>.png` — each building as a separate transparent sprite to composite on the backdrop.
   building ids: village_hall (also used for town_hall/city_hall with `town_hall`, `city_hall` variants), fort, citadel,
-  tavern, marketplace, mage_guild_1, mage_guild_2, blacksmith, dwelling_1 .. dwelling_7.
-  Placement coordinates are defined in `scripts/town/town_layout.gd` (code side).
+  tavern, marketplace, mage_guild_1, mage_guild_2 (also shown for guild levels 3-4), blacksmith, dwelling_1 .. dwelling_7.
+  Rendered buildings are cropped layers of one 1920x810 scene; their pixel rects live in
+  `town/layout_<faction>.json` (written by tools/art/town_crop.py). `scripts/town/town_layout.gd` is the fallback.
 
 ## Icons & UI
 - `icons/res_<resource>.png` — 64x64 resource icons.

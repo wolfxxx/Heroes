@@ -1,0 +1,648 @@
+extends Node2D
+## Adventure map scene controller: input, camera, hero movement, visits, turns, AI turns.
+
+const TILE := WorldGen.TILE
+const MAP_VIEW_W := 1540.0   # visible map width (right panel covers the rest)
+const MAP_VIEW_H := 1036.0
+
+var world: Dictionary
+var rules: AdvRules
+var view: MapView
+var hud: AdventureHUD
+var ai: AdvAI
+var cam: Camera2D
+var busy := false
+var _plan := {}
+var _plan_target := Vector2i(-1, -1)
+var _drag_from := Vector2.ZERO
+var _dragging := false
+var _cam_target := Vector2.ZERO
+
+func _ready() -> void:
+	if GameState.world.is_empty():
+		var s := GameState.new_game_settings.duplicate()
+		if Shot.setup != "":
+			s["seed"] = 12345
+		GameState.world = WorldGen.generate(s)
+	world = GameState.world
+	RenderingServer.set_default_clear_color(Color(0.02, 0.02, 0.03))
+	rules = AdvRules.new(world)
+	ai = AdvAI.new(rules)
+
+	view = MapView.new()
+	add_child(view)
+	view.setup(world)
+
+	cam = Camera2D.new()
+	cam.anchor_mode = Camera2D.ANCHOR_MODE_FIXED_TOP_LEFT
+	add_child(cam)
+	cam.make_current()
+
+	hud = AdventureHUD.new()
+	add_child(hud)
+	hud.setup(self)
+
+	for p in world["players"]:
+		rules.reveal_all_for(p)
+	_refresh_fog()
+
+	var sel: int = world.get("selected_hero", -1)
+	if not world["heroes"].has(sel) or world["heroes"][sel]["owner"] != _human():
+		sel = _first_hero_with_mp()
+	_select_hero(sel, true)
+	_update_music()
+	_post_ready.call_deferred()
+
+func _post_ready() -> void:
+	await get_tree().process_frame
+	if not GameState.battle_result.is_empty():
+		var result := GameState.battle_result
+		GameState.battle_result = {}
+		var ev := rules.apply_battle(result)
+		view.rebuild_objects()
+		_refresh_fog()
+		hud.refresh()
+		if ev["hero"] >= 0 and world["heroes"].has(ev["hero"]):
+			await _handle_level_ups(world["heroes"][ev["hero"]])
+		if not world["heroes"].has(world.get("selected_hero", -1)):
+			_select_hero(_first_hero_with_mp())
+		if await _check_game_over():
+			return
+	if world["players"][world["current_player"]]["is_ai"]:
+		_run_ai_turns()
+	elif world.get("pending_turn_banner", false):
+		world["pending_turn_banner"] = false
+		_turn_banner()
+
+func _human() -> int:
+	return GameState.human_player_index()
+
+func human_player() -> Dictionary:
+	return world["players"][_human()]
+
+func selected_hero() -> Dictionary:
+	return world["heroes"].get(world.get("selected_hero", -1), {})
+
+# ---------------------------------------------------------------------------------------------
+# Camera
+# ---------------------------------------------------------------------------------------------
+func center_on(tile: Vector2i, instant := false) -> void:
+	var p := view.tile_center(tile)
+	_cam_target = _clamp_cam(p - Vector2(MAP_VIEW_W, MAP_VIEW_H) * 0.5 / cam.zoom)
+	if instant:
+		cam.position = _cam_target
+
+func center_on_world(p: Vector2) -> void:
+	_cam_target = _clamp_cam(p - Vector2(MAP_VIEW_W, MAP_VIEW_H) * 0.5 / cam.zoom)
+
+func _clamp_cam(p: Vector2) -> Vector2:
+	var size: Vector2 = Vector2(world["size"]) * TILE
+	var view_sz := Vector2(MAP_VIEW_W, MAP_VIEW_H) / cam.zoom
+	var margin := 0.0
+	return Vector2(clampf(p.x, -margin, maxf(-margin, size.x - view_sz.x + margin)),
+		clampf(p.y, -margin, maxf(-margin, size.y - view_sz.y + margin)))
+
+func _process(delta: float) -> void:
+	var move := Vector2.ZERO
+	if not _modal_open():
+		if Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A): move.x -= 1
+		if Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D): move.x += 1
+		if Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_W): move.y -= 1
+		if Input.is_key_pressed(KEY_DOWN) or Input.is_key_pressed(KEY_S) and not Input.is_key_pressed(KEY_CTRL): move.y += 1
+		var mp := get_viewport().get_mouse_position()
+		var vs := get_viewport().get_visible_rect().size
+		if DisplayServer.window_is_focused() and Rect2(Vector2.ZERO, vs).has_point(mp) and not Shot.active:
+			if mp.x < 6: move.x -= 1
+			if mp.x > vs.x - 6: move.x += 1
+			if mp.y < 6: move.y -= 1
+			if mp.y > vs.y - 6: move.y += 1
+	if move != Vector2.ZERO:
+		_cam_target = _clamp_cam(_cam_target + move.normalized() * 900.0 * delta / cam.zoom.x)
+	cam.position = cam.position.lerp(_cam_target, minf(1.0, delta * 10.0))
+	hud.update_minimap_view(cam.position, Vector2(MAP_VIEW_W, MAP_VIEW_H) / cam.zoom)
+
+func _modal_open() -> bool:
+	var l := get_tree().root.get_node_or_null("ModalLayer")
+	return l != null and l.get_child_count() > 0
+
+# ---------------------------------------------------------------------------------------------
+# Input
+# ---------------------------------------------------------------------------------------------
+func _unhandled_input(e: InputEvent) -> void:
+	if _modal_open():
+		return
+	if e is InputEventMouseMotion:
+		if _dragging:
+			_cam_target = _clamp_cam(_cam_target - e.relative / cam.zoom)
+			cam.position = _cam_target
+		var t := _pick(view.tile_at(_event_world(e)))
+		view.set_hover(t if rules.inside(t) else Vector2i(-1, -1))
+		hud.set_status(_describe_tile(t))
+	elif e is InputEventMouseButton:
+		if e.button_index == MOUSE_BUTTON_MIDDLE:
+			_dragging = e.pressed
+		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_zoom(1.1)
+		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_zoom(1.0 / 1.1)
+		elif e.pressed and e.button_index == MOUSE_BUTTON_LEFT and not busy:
+			_click(_pick(view.tile_at(_event_world(e))), e.double_click)
+		elif e.pressed and e.button_index == MOUSE_BUTTON_RIGHT:
+			_right_click(_pick(view.tile_at(_event_world(e))))
+	elif e is InputEventKey and e.pressed and not e.echo:
+		if busy:
+			return
+		match e.keycode:
+			KEY_SPACE, KEY_ENTER, KEY_KP_ENTER:
+				if not _plan.is_empty():
+					_execute_move()
+			KEY_E:
+				end_turn()
+			KEY_H, KEY_TAB:
+				next_hero()
+			KEY_T:
+				var p := human_player()
+				if p["towns"].size() > 0:
+					open_town(p["towns"][0])
+			KEY_ESCAPE:
+				hud.open_system_menu()
+			KEY_S:
+				if e.ctrl_pressed:
+					GameState.save_game()
+					hud.toast("Game saved")
+
+## Creature and hero sprites stand above their tile: a click on their body (the tile above an empty
+## tile) means the unit below.
+func _pick(t: Vector2i) -> Vector2i:
+	if not rules.inside(t) or not rules.at(t).is_empty() or not rules.town_covering(t).is_empty() or not rules.object_covering(t).is_empty():
+		return t
+	var below := t + Vector2i(0, 1)
+	if rules.inside(below):
+		var o := rules.at(below)
+		if o.get("kind", "") == "hero" or (o.get("kind", "") == "object" and world["objects"][o["uid"]]["type"] == "monster"):
+			return below
+	return t
+
+func _event_world(e: InputEventMouse) -> Vector2:
+	return get_viewport().get_canvas_transform().affine_inverse() * e.position
+
+func _zoom(f: float) -> void:
+	var center := cam.position + Vector2(MAP_VIEW_W, MAP_VIEW_H) * 0.5 / cam.zoom
+	cam.zoom = (cam.zoom * f).clamp(Vector2(0.55, 0.55), Vector2(1.4, 1.4))
+	_cam_target = _clamp_cam(center - Vector2(MAP_VIEW_W, MAP_VIEW_H) * 0.5 / cam.zoom)
+	cam.position = _cam_target
+
+func _click(t: Vector2i, _dbl: bool) -> void:
+	if not rules.inside(t):
+		return
+	var me := _human()
+	if not rules.is_explored(human_player(), t):
+		return
+	var hh := rules.hero_at(t)
+	if not hh.is_empty() and hh["owner"] == me:
+		if hh["uid"] == world["selected_hero"]:
+			hud.open_hero_screen(hh)
+		else:
+			_select_hero(hh["uid"])
+		return
+	var town := rules.town_covering(t)
+	var hero := selected_hero()
+	if not town.is_empty() and town["owner"] == me and t != town["pos"]:
+		open_town(town["uid"])
+		return
+	if hero.is_empty():
+		if not town.is_empty() and town["owner"] == me:
+			open_town(town["uid"])
+		return
+	if t == _plan_target and not _plan.is_empty():
+		_execute_move()
+		return
+	_make_plan(t)
+
+func _make_plan(t: Vector2i) -> void:
+	var hero := selected_hero()
+	if hero.is_empty():
+		return
+	var p := rules.plan(hero, t)
+	if p["path"].is_empty():
+		_plan = {}
+		_plan_target = Vector2i(-1, -1)
+		view.clear_path()
+		return
+	_plan = p
+	_plan_target = t
+	view.set_path(p["path"], p["reach"], p["kind"])
+	hero["dest"] = t
+
+func _right_click(t: Vector2i) -> void:
+	if not rules.inside(t) or not rules.is_explored(human_player(), t):
+		return
+	var o := rules.object_covering(t)
+	if not o.is_empty():
+		if o["type"] == "monster":
+			var c: Dictionary = GameData.CREATURES[o["creature"]]
+			hud.toast("%s %s" % [UI.count_word(o["count"]), c["plural"]])
+		else:
+			hud.toast(_describe_tile(t))
+		return
+	var hh := rules.hero_at(t)
+	if not hh.is_empty():
+		hud.toast("%s (Level %d %s), %s" % [hh["name"], hh["level"], hh["class"], world["players"][hh["owner"]]["name"]])
+
+func _describe_tile(t: Vector2i) -> String:
+	if not rules.inside(t):
+		return ""
+	if not rules.is_explored(human_player(), t):
+		return "Uncharted territory"
+	var hh := rules.hero_at(t)
+	if not hh.is_empty():
+		return "%s — %s" % [hh["name"], world["players"][hh["owner"]]["name"]]
+	var town := rules.town_covering(t)
+	if not town.is_empty():
+		var owner: String = "Neutral" if town["owner"] < 0 else world["players"][town["owner"]]["name"]
+		return "%s (%s) — %s" % [town["name"], GameData.FACTIONS[town["faction"]]["name"], owner]
+	var o := rules.object_covering(t)
+	if not o.is_empty():
+		match o["type"]:
+			"monster":
+				return "%s %s" % [UI.count_word(o["count"]), GameData.CREATURES[o["creature"]]["plural"]]
+			"resource":
+				return GameData.RESOURCE_NAMES[o["res"]]
+			"mine":
+				var owner: String = "unclaimed" if o["owner"] < 0 else world["players"][o["owner"]]["name"]
+				return "%s (%s)" % [GameData.MINES[o["mine"]]["name"], owner]
+			"dwelling":
+				return "%s dwelling (%d available)" % [GameData.CREATURES[o["creature"]]["name"], o["available"]]
+			"shrine":
+				return "Shrine of Magic (%s)" % GameData.SPELLS[o["spell"]]["name"]
+			"learning_stone":
+				return "Learning Stone"
+			_:
+				return o["type"].capitalize()
+	if rules.is_guarded(t):
+		return "Guarded by monsters"
+	var tn: String = WorldGen.TERRAIN_ORDER[rules.terrain_at(t)]
+	return GameData.TERRAINS[tn]["name"]
+
+# ---------------------------------------------------------------------------------------------
+# Selection
+# ---------------------------------------------------------------------------------------------
+func _select_hero(uid: int, instant := false) -> void:
+	world["selected_hero"] = uid
+	view.set_selected(uid)
+	_plan = {}
+	_plan_target = Vector2i(-1, -1)
+	view.clear_path()
+	var hero := selected_hero()
+	if not hero.is_empty():
+		center_on(hero["pos"], instant)
+		if hero.has("dest") and hero["dest"] != hero["pos"]:
+			_make_plan(hero["dest"])
+	elif human_player()["towns"].size() > 0:
+		center_on(world["towns"][human_player()["towns"][0]]["pos"], instant)
+	hud.refresh()
+
+func select_hero(uid: int) -> void:
+	if not busy:
+		_select_hero(uid)
+
+func _first_hero_with_mp() -> int:
+	var p := human_player()
+	for hid in p["heroes"]:
+		if world["heroes"][hid]["movement"] > 0:
+			return hid
+	return p["heroes"][0] if p["heroes"].size() > 0 else -1
+
+func next_hero() -> void:
+	var p := human_player()
+	if p["heroes"].is_empty():
+		return
+	var i: int = p["heroes"].find(world["selected_hero"])
+	for k in p["heroes"].size():
+		var hid: int = p["heroes"][(i + 1 + k) % p["heroes"].size()]
+		if world["heroes"][hid]["movement"] > 0 or k == p["heroes"].size() - 1:
+			_select_hero(hid)
+			return
+
+# ---------------------------------------------------------------------------------------------
+# Movement
+# ---------------------------------------------------------------------------------------------
+func _execute_move() -> void:
+	var hero := selected_hero()
+	if hero.is_empty() or _plan.is_empty():
+		return
+	if _plan["reach"] == 0:
+		Audio.sfx("error")
+		hud.toast("Not enough movement points left today")
+		return
+	busy = true
+	view.clear_path()
+	await move_hero(hero, _plan, true)
+	busy = false
+	if not is_inside_tree():
+		return
+	if world["heroes"].has(hero["uid"]):
+		if hero.has("dest") and hero["dest"] != hero["pos"] and not _plan.is_empty():
+			_make_plan(hero["dest"])
+		else:
+			_plan = {}
+			view.clear_path()
+	hud.refresh()
+
+## Moves a hero along plan up to its reach, performing the final interaction.
+## Returns "battle" if a scene change to battle happened, else "".
+func move_hero(hero: Dictionary, plan: Dictionary, animate: bool) -> String:
+	var path: Array = plan["path"]
+	var costs: Array = plan["costs"]
+	var reach: int = plan["reach"]
+	var player := rules.player_of(hero)
+	var human: bool = not player["is_ai"]
+	var visible_move := animate or _visible_to_human(hero["pos"])
+	for i in range(1, reach + 1):
+		var p: Vector2i = path[i]
+		var last := i == path.size() - 1
+		var occ := rules.at(p)
+		if occ.get("kind", "") == "hero" or (occ.get("kind", "") == "object" and world["objects"][occ["uid"]]["type"] == "monster"):
+			# The pseudo-step onto an enemy/ally.
+			hero.erase("dest")
+			return await _interact_with(hero, occ, human)
+		hero["movement"] = maxi(0, hero["movement"] - (costs[i] - costs[i - 1]))
+		var prev: Vector2i = hero["pos"]
+		_move_hero_tile(hero, p)
+		if p.x != prev.x:
+			hero["face_left"] = p.x < prev.x
+		if visible_move or _visible_to_human(p):
+			view.move_hero_step(hero["uid"], p, 0.14 if human else 0.09)
+			if human or _visible_to_human(p):
+				Audio.sfx("footstep_horse", -12, 0.12)
+				if human:
+					center_on(p)
+			await get_tree().create_timer(0.14 if human else 0.09).timeout
+			if not is_inside_tree():
+				return ""
+		else:
+			var n := view.hero_node(hero["uid"])
+			if n:
+				n.position = view.foot_of(p)
+		rules.reveal(player, p, rules.hero_scout_radius(hero))
+		if human:
+			_refresh_fog()
+		var gs := rules.guards(p)
+		if gs.size() > 0:
+			hero.erase("dest")
+			var tgt: Dictionary = plan["target"] if plan["target"] in gs else gs[0]
+			return await _interact_with(hero, {"kind": "object", "uid": tgt["uid"]}, human)
+		if last:
+			hero.erase("dest")
+			if occ.get("kind", "") != "":
+				return await _interact_with(hero, occ, human)
+	return ""
+
+func _move_hero_tile(hero: Dictionary, p: Vector2i) -> void:
+	var old: Vector2i = hero["pos"]
+	hero["pos"] = p
+	rules.refresh_tile(old)
+	rules.refresh_tile(p)
+
+func _visible_to_human(p: Vector2i) -> bool:
+	return rules.is_explored(human_player(), p)
+
+func _interact_with(hero: Dictionary, occ: Dictionary, human: bool) -> String:
+	match occ.get("kind", ""):
+		"object":
+			var o: Dictionary = world["objects"][occ["uid"]]
+			if o["type"] == "monster":
+				return await _start_battle(rules.battle_vs_monster(hero, o), human)
+			var ev := rules.visit(hero, o)
+			await _show_event(hero, ev, human)
+		"town":
+			var town: Dictionary = world["towns"][occ["uid"]]
+			if town["owner"] == hero["owner"]:
+				var learned := rules.hero_in_town(hero, town)
+				if human:
+					if learned.size() > 0:
+						hud.toast("Learned: " + ", ".join(learned.map(func(s): return GameData.SPELLS[s]["name"])))
+					open_town(town["uid"])
+				return ""
+			if GameState.army_is_empty(town["garrison"]) and rules.town_defender(town, hero).is_empty():
+				rules.capture_town(town, hero["owner"])
+				Audio.sfx("flag_capture")
+				view.rebuild_objects()
+				rules.check_eliminations()
+				if human:
+					await Modal.message(self, town["name"], "The town of %s opens its gates to you." % town["name"]).closed
+				await _check_game_over()
+				return ""
+			var with_human := human
+			if town["owner"] >= 0 and not world["players"][town["owner"]]["is_ai"]:
+				with_human = true
+			return await _start_battle(rules.battle_vs_town(hero, town), with_human)
+		"hero":
+			var other: Dictionary = world["heroes"][occ["uid"]]
+			if other["owner"] == hero["owner"]:
+				if human:
+					hud.open_exchange(hero, other)
+				return ""
+			var involves_human: bool = human or not rules.player_of(other)["is_ai"]
+			for t in world["towns"].values():
+				if t["pos"] == other["pos"] and t["owner"] != hero["owner"]:
+					return await _start_battle(rules.battle_vs_town(hero, t), involves_human)
+			return await _start_battle(rules.battle_vs_hero(hero, other), involves_human)
+	return ""
+
+func _start_battle(setup: Dictionary, involves_human: bool) -> String:
+	if involves_human:
+		Audio.sfx("battle_start")
+		GameState.return_scene = GameState.SCENE_ADVENTURE
+		world["selected_hero"] = world.get("selected_hero", -1)
+		GameState.start_battle(setup)
+		busy = true
+		return "battle"
+	var result := rules.quick_resolve(setup)
+	if Engine.time_scale > 1.0:  # soak-test diagnostics (tools/sim_test.gd)
+		print("SIMBATTLE day %d %s P%d str %d vs %d -> %s" % [world["day"], setup["context"]["type"], setup["attacker_player"],
+			GameState.army_strength(setup["attacker_army"]), GameState.army_strength(setup["defender_army"]), result["winner"]])
+	var ev := rules.apply_battle(result)
+	if ev["hero"] >= 0 and world["heroes"].has(ev["hero"]):
+		await _handle_level_ups(world["heroes"][ev["hero"]])
+	view.rebuild_objects()
+	return ""
+
+func _show_event(hero: Dictionary, ev: Dictionary, human: bool) -> void:
+	if ev.get("sfx", "") != "" and (human or _visible_to_human(hero["pos"])):
+		Audio.sfx(ev["sfx"])
+	for uid in world.get("_removed", []):
+		view.remove_object(uid)
+	world["_removed"] = []
+	if ev.has("refresh"):
+		view.refresh_object(ev["refresh"])
+	if ev.get("fog", false) and human:
+		_refresh_fog()
+	if ev.has("choice"):
+		var c: Dictionary = ev["choice"]
+		if human:
+			var r = await Modal.choice(self, ev["title"], ev["text"], [
+				["%d Gold" % c["gold"], "gold", Assets.res_icon("gold")],
+				["%d Experience" % c["xp"], "xp", Assets.tex("icons/stat_knowledge.png")]]).closed
+			var lv := rules.resolve_chest(hero, str(r), c["gold"], c["xp"])
+			if lv > 0:
+				await _handle_level_ups(hero)
+		else:
+			var lv := rules.resolve_chest(hero, "gold" if rules.player_of(hero)["resources"]["gold"] < 10000 else "xp", c["gold"], c["xp"])
+			if lv > 0:
+				await _handle_level_ups(hero)
+	elif ev.has("dwelling"):
+		if human:
+			await hud.open_dwelling(hero, world["objects"][ev["dwelling"]])
+		else:
+			ai.recruit_from_dwelling(hero, world["objects"][ev["dwelling"]])
+	elif human and ev["title"] != "":
+		if ev.has("float"):
+			hud.float_text(view.foot_of(hero["pos"]) - Vector2(0, 120), ev["float"])
+		else:
+			await Modal.message(self, ev["title"], ev["text"], ev["icons"]).closed
+	if ev.get("levels", 0) > 0:
+		await _handle_level_ups(hero)
+	hud.refresh()
+
+func _handle_level_ups(hero: Dictionary) -> void:
+	var human: bool = not rules.player_of(hero)["is_ai"]
+	while int(hero.get("pending_levels", 0)) > 0:
+		var roll := rules.roll_level_up(hero)
+		var skill := ""
+		if human:
+			Audio.sfx("level_up")
+			var opts := []
+			for s in roll["options"]:
+				var lvl := int(hero["skills"].get(s, 0)) + 1
+				opts.append(["%s %s" % [["", "Basic", "Advanced", "Expert"][lvl], GameData.SKILLS[s]["name"]], s, Assets.skill_icon(s)])
+			var text := "%s has gained a level! (%s +1)\n%s" % [hero["name"], roll["stat"].capitalize(), "Choose a skill to learn:" if opts.size() > 0 else ""]
+			if opts.size() > 0:
+				skill = await Modal.choice(self, "Level %d" % (hero["level"] - int(hero["pending_levels"]) + 1), text, opts).closed
+			else:
+				await Modal.message(self, "Level up", text).closed
+		elif roll["options"].size() > 0:
+			skill = roll["options"][randi() % roll["options"].size()]
+		rules.apply_level_up(hero, roll, skill)
+	hud.refresh()
+
+# ---------------------------------------------------------------------------------------------
+# Towns
+# ---------------------------------------------------------------------------------------------
+func open_town(uid: int) -> void:
+	var town: Dictionary = world["towns"][uid]
+	var visitor := rules.hero_at(town["pos"])
+	if not visitor.is_empty() and visitor["owner"] == town["owner"]:
+		rules.hero_in_town(visitor, town)
+	GameState.pending_town = {"town_uid": uid, "hero_uid": visitor.get("uid", -1)}
+	GameState.change_scene(GameState.SCENE_TOWN)
+
+# ---------------------------------------------------------------------------------------------
+# Turns
+# ---------------------------------------------------------------------------------------------
+func end_turn() -> void:
+	if busy:
+		return
+	var p := human_player()
+	var idle := 0
+	for hid in p["heroes"]:
+		if world["heroes"][hid]["movement"] >= 300:
+			idle += 1
+	if idle > 0:
+		var ok = await Modal.confirm(self, "End Turn", "One or more heroes can still move. End your turn anyway?").closed
+		if not ok:
+			return
+	_advance_player()
+	_run_ai_turns()
+
+func _advance_player() -> void:
+	var n: int = world["players"].size()
+	var cur: int = world["current_player"]
+	for k in n:
+		cur = (cur + 1) % n
+		if cur == 0:
+			var info := rules.new_day()
+			world["pending_week"] = info
+		if world["players"][cur]["alive"]:
+			break
+	world["current_player"] = cur
+
+func _run_ai_turns() -> void:
+	busy = true
+	hud.refresh()
+	while world["players"][world["current_player"]]["is_ai"] and not world.get("game_over", false):
+		var p: Dictionary = world["players"][world["current_player"]]
+		hud.set_turn_label("%s is moving..." % p["name"])
+		var r := await ai.run_turn(self, p)
+		if r == "battle" or not is_inside_tree():
+			return  # battle scene takes over; we resume in _post_ready
+		if await _check_game_over():
+			return
+		_advance_player()
+	busy = false
+	hud.set_turn_label("")
+	await _start_human_turn()
+
+func _start_human_turn() -> void:
+	_refresh_fog()
+	view.rebuild_objects()
+	_select_hero(_first_hero_with_mp())
+	hud.refresh()
+	if await _check_game_over():
+		return
+	await _turn_banner()
+
+func _turn_banner() -> void:
+	var info: Dictionary = world.get("pending_week", {})
+	world["pending_week"] = {}
+	Audio.sfx("new_day", -4)
+	if info.get("new_week", false):
+		Audio.sfx("new_week")
+		var cid: String = info.get("week_creature", "")
+		var text := "Astrologers proclaim the Week of the %s.\nAll dwellings increase their population." % (GameData.CREATURES[cid]["name"] if cid != "" else "Peasant")
+		await Modal.message(self, "A New Week", text, [[Assets.creature_portrait(cid), GameData.CREATURES[cid]["plural"]]] if cid != "" else []).closed
+	else:
+		hud.banner("Day %d" % world["day"])
+		hud.toast(rules.date_string())
+
+func _check_game_over() -> bool:
+	if world.get("game_over", false):
+		return true
+	var me := human_player()
+	var others_alive := false
+	for p in world["players"]:
+		if p["is_ai"] and p["alive"]:
+			others_alive = true
+	if not me["alive"]:
+		world["game_over"] = true
+		Audio.music("defeat")
+		await Modal.message(self, "Defeat", "Your last hero has fallen and your towns are lost. The Shattered Crown will never be whole again.").closed
+		GameState.world = {}
+		GameState.change_scene(GameState.SCENE_MENU)
+		return true
+	if not others_alive:
+		world["game_over"] = true
+		Audio.music("victory")
+		await Modal.message(self, "Victory!", "All your enemies have been vanquished. The lands bow before you, and the Shattered Crown is yours.").closed
+		GameState.world = {}
+		GameState.change_scene(GameState.SCENE_MENU)
+		return true
+	return false
+
+# ---------------------------------------------------------------------------------------------
+func _refresh_fog() -> void:
+	view.update_fog(human_player())
+	hud.refresh_minimap()
+
+func refresh_after_change() -> void:
+	rules.rebuild()
+	view.rebuild_objects()
+	view.set_selected(world.get("selected_hero", -1))
+	hud.refresh()
+
+func _update_music() -> void:
+	var hero := selected_hero()
+	var t := "grass"
+	if not hero.is_empty():
+		t = WorldGen.TERRAIN_ORDER[rules.terrain_at(hero["pos"])]
+	Audio.music("adventure_dirt" if t in ["dirt", "swamp", "snow"] else "adventure_grass")

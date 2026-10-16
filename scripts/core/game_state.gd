@@ -55,8 +55,8 @@ func next_uid() -> int:
 	return _uid
 
 func change_scene(path: String, fade := 0.35) -> void:
-	if transitioning:
-		return
+	while transitioning:
+		await get_tree().process_frame
 	transitioning = true
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_STOP
 	var tw := create_tween()
@@ -106,6 +106,8 @@ func make_hero(hero_id: String, owner: int) -> Dictionary:
 		"army": army, "spells": d.get("spells", []).duplicate(), "skills": d.get("skills", {}).duplicate(),
 		"artifacts": [], "pos": Vector2i.ZERO,
 	}
+	h["max_movement"] = hero_max_movement(h)
+	h["movement"] = h["max_movement"]
 	h["mana"] = max_mana(h)
 	return h
 
@@ -118,9 +120,16 @@ func hero_stat(h: Dictionary, stat: String) -> int:
 func max_mana(h: Dictionary) -> int:
 	return hero_stat(h, "knowledge") * 10
 
+func artifact_bonus(h: Dictionary, stat: String) -> int:
+	var v := 0
+	for a in h.get("artifacts", []):
+		v += GameData.ARTIFACTS[a]["bonus"].get(stat, 0)
+	return v
+
 func hero_max_movement(h: Dictionary) -> int:
+	# h["movement"] holds the points LEFT today, so only artifacts add to the maximum.
 	var base: int = 1500 + 150 * int(h.get("skills", {}).get("logistics", 0))
-	return base + hero_stat(h, "movement")
+	return base + artifact_bonus(h, "movement")
 
 func army_strength(army: Array) -> int:
 	var s := 0
@@ -152,3 +161,50 @@ func xp_level(xp: int) -> int:
 		if xp >= GameData.XP_LEVELS[i]:
 			lvl = i + 1
 	return lvl
+
+# ---------------------------------------------------------------------------------------------
+# Save / load (FileAccess.store_var keeps Vector2i, Color and packed arrays intact)
+# ---------------------------------------------------------------------------------------------
+const SAVE_PATH := "user://savegame.dat"
+
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+func save_game() -> bool:
+	if world.is_empty():
+		return false
+	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_var({"version": 1, "world": world, "uid": _uid})
+	return true
+
+func load_game() -> bool:
+	if not has_save():
+		return false
+	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if f == null:
+		return false
+	var d = f.get_var()
+	if typeof(d) != TYPE_DICTIONARY or not d.has("world"):
+		return false
+	world = d["world"]
+	_uid = int(d.get("uid", 1000))
+	pending_battle = {}
+	battle_result = {}
+	pending_town = {}
+	return_scene = SCENE_ADVENTURE
+	return true
+
+func current_player() -> Dictionary:
+	if world.is_empty():
+		return {}
+	return world["players"][world["current_player"]]
+
+func human_player_index() -> int:
+	if world.is_empty():
+		return 0
+	for p in world["players"]:
+		if not p["is_ai"]:
+			return p["index"]
+	return 0

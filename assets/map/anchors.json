@@ -1,0 +1,190 @@
+{
+"alchemist_lab.png": [
+0.5,
+1.0403
+],
+"artifact.png": [
+0.5,
+1.0533
+],
+"bush_1.png": [
+0.5,
+0.5509
+],
+"bush_2.png": [
+0.5,
+0.6313
+],
+"campfire.png": [
+0.5,
+1.0869
+],
+"chest.png": [
+0.5,
+1.0169
+],
+"crystal_cavern.png": [
+0.5,
+0.8466
+],
+"dwelling_neutral.png": [
+0.5,
+1.1625
+],
+"flowers_1.png": [
+0.5,
+0.5017
+],
+"flowers_2.png": [
+0.5,
+0.5011
+],
+"gem_pond.png": [
+0.5,
+1.0025
+],
+"gold_mine.png": [
+0.5,
+0.8195
+],
+"mountain_1.png": [
+0.5,
+0.7469
+],
+"mountain_2.png": [
+0.5,
+0.7233
+],
+"mountain_3.png": [
+0.5,
+0.7194
+],
+"mountain_snow_1.png": [
+0.5,
+0.7188
+],
+"mountain_snow_2.png": [
+0.5,
+0.7147
+],
+"obelisk.png": [
+0.5,
+1.0782
+],
+"ore_mine.png": [
+0.5,
+0.8107
+],
+"res_crystal.png": [
+0.5,
+1.2048
+],
+"res_gems.png": [
+0.5,
+1.3085
+],
+"res_gold.png": [
+0.5,
+1.0401
+],
+"res_mercury.png": [
+0.5,
+1.1759
+],
+"res_ore.png": [
+0.5,
+1.1868
+],
+"res_sulfur.png": [
+0.5,
+1.0399
+],
+"res_wood.png": [
+0.5,
+1.0558
+],
+"rock_1.png": [
+0.5,
+0.5726
+],
+"rock_2.png": [
+0.5,
+0.5647
+],
+"rock_3.png": [
+0.5,
+0.5653
+],
+"sawmill.png": [
+0.5,
+1.0923
+],
+"shrine.png": [
+0.5,
+0.9678
+],
+"snow_pine_1.png": [
+0.5,
+0.7618
+],
+"snow_pine_2.png": [
+0.5,
+0.758
+],
+"sulfur_dune.png": [
+0.5,
+0.8624
+],
+"town_haven.png": [
+0.5,
+0.964
+],
+"town_necropolis.png": [
+0.5,
+0.9565
+],
+"tree_dead_1.png": [
+0.5,
+0.7872
+],
+"tree_dead_2.png": [
+0.5,
+0.7587
+],
+"tree_oak_1.png": [
+0.5,
+0.6926
+],
+"tree_oak_2.png": [
+0.5,
+0.7076
+],
+"tree_oak_3.png": [
+0.5,
+0.7003
+],
+"tree_oak_4.png": [
+0.5,
+0.7018
+],
+"tree_pine_1.png": [
+0.5,
+0.7487
+],
+"tree_pine_2.png": [
+0.5,
+0.7646
+],
+"tree_pine_3.png": [
+0.5,
+0.7543
+],
+"watchtower.png": [
+0.5,
+0.9324
+],
+"windmill.png": [
+0.5,
+1.0227
+]
+}

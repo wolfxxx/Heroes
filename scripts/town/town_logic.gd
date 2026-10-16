@@ -92,7 +92,7 @@ static func build(town: Dictionary, player: Dictionary, id: String) -> bool:
 	return true
 
 static func learn_guild_spells(town: Dictionary) -> void:
-	var lvl := 2 if has_building(town, "mage_guild_2") else (1 if has_building(town, "mage_guild_1") else 0)
+	var lvl := mage_guild_level(town)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = town["uid"] * 7919
 	for l in range(1, lvl + 1):
@@ -110,6 +110,12 @@ static func learn_guild_spells(town: Dictionary) -> void:
 			town["mage_spells"].append(pool[i])
 			pool.remove_at(i)
 			have += 1
+
+static func mage_guild_level(town: Dictionary) -> int:
+	for l in range(4, 0, -1):
+		if has_building(town, "mage_guild_%d" % l):
+			return l
+	return 0
 
 static func daily_income(town: Dictionary) -> int:
 	for id in ["city_hall", "town_hall", "village_hall"]:
