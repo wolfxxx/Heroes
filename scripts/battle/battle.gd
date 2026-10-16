@@ -6,7 +6,23 @@ const ROW_STEP := 68.0
 const X0 := 264.0
 const Y0 := 272.0
 const TIER_H := [0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]
-const UNIT_SCALE := 0.58
+## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
+const FIG_H := [0, 132.0, 138.0, 150.0, 158.0, 165.0, 220.0, 240.0]
+const FIG_MAX_W := 2.6  # widest solid figure in hexes (1-hex units; 2-hex units get one more hex)
+
+static var _sizes = null
+
+## Solid figure size in texture pixels (assets/creatures/sizes.json, written by tools/art/sprite_sizes.py).
+static func fig_size(id: String) -> Vector2:
+	if _sizes == null:
+		_sizes = {}
+		var p := Assets.path("creatures/sizes.json")
+		if FileAccess.file_exists(p):
+			var d = JSON.parse_string(FileAccess.get_file_as_string(p))
+			if typeof(d) == TYPE_DICTIONARY:
+				_sizes = d
+	var v = _sizes.get(id + ".png")
+	return Vector2(v[0], v[1]) if v != null else Vector2.ZERO
 
 ## Flip a unit sprite horizontally while keeping its feet anchored.
 static func _set_flip(s: Sprite2D, flip: bool) -> void:
@@ -161,17 +177,24 @@ func _make_unit(st: Dictionary) -> void:
 		# Blender renders: fixed world scale, anchored at the feet (flip mirrors the anchor).
 		s.centered = true
 		var tsz := Vector2(s.texture.get_size())
-		# keep footprints honest: 1-hex units about one hex wide, 2-hex units about two
-		# images include weapons, wings and shadow, so only rein in the very largest renders
-		var max_w := HEX_W * (4.2 if "two_hex" in c["abilities"] else 3.3)
-		s.scale = Vector2.ONE * minf(UNIT_SCALE, max_w / tsz.x)
+		# size by tier on the solid figure, so a dragon towers over a pikeman; cap very wide figures (wings)
+		var fig := fig_size(st["id"])
+		var sc := 0.5
+		if fig.y > 0:
+			var max_w := HEX_W * (FIG_MAX_W + (1.0 if "two_hex" in c["abilities"] else 0.0))
+			sc = minf(FIG_H[c["tier"]] / fig.y, max_w / fig.x)
+			if "two_hex" in c["abilities"]:  # long lances / necks: a 2-hex unit should still span about two hexes
+				sc = clampf(2.0 * HEX_W / fig.x, sc, 1.35 * FIG_H[c["tier"]] / fig.y)
+		s.scale = Vector2.ONE * sc
 		s.offset = (Vector2(0.5, 0.5) - anc) * tsz
 		s.set_meta("anchor_x", (0.5 - anc.x) * tsz.x)
+		n.set_meta("top", fig.y * sc if fig.y > 0 else TIER_H[c["tier"]])
 	else:
 		var h: float = TIER_H[c["tier"]]
 		var sc := h / s.texture.get_height()
 		s.scale = Vector2(sc, sc)
 		s.offset = Vector2(0, -s.texture.get_height() * 0.5)
+		n.set_meta("top", h)
 	_set_flip(s, st["side"] == 1)
 	MapView.outline(s, 1.2)
 	if "two_hex" in c["abilities"]:
@@ -193,6 +216,10 @@ func _make_unit(st: Dictionary) -> void:
 
 func _unit(st: Dictionary) -> Node2D:
 	return units.get(st["uid"])
+
+## Height of the unit's figure on screen (for text and projectiles above it).
+func _top(st: Dictionary) -> float:
+	return _unit(st).get_meta("top", 150.0)
 
 # ---------------------------------------------------------------------------------------------
 # UI
@@ -252,7 +279,7 @@ func _build_ui() -> void:
 
 	var qc := CenterContainer.new()
 	qc.position = Vector2(0, 8)
-	qc.size = Vector2(1920, 96)
+	qc.size = Vector2(1920, 116)
 	qc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(qc)
 	var qp := PanelContainer.new()
@@ -270,7 +297,7 @@ func _refresh_queue() -> void:
 		var q := _QueueIcon.new()
 		q.st = s
 		q.first = i == 0
-		q.custom_minimum_size = Vector2(76 if i == 0 else 66, 76 if i == 0 else 66)
+		q.custom_minimum_size = Vector2(92 if i == 0 else 80, 92 if i == 0 else 80)
 		_queue_box.add_child(q)
 
 func _set_log(t: String) -> void:
@@ -306,9 +333,13 @@ func _next() -> void:
 	_grid.active = s
 	for k in units:
 		units[k].get_node("Shadow").active = k == s["uid"]
+		var m: ShaderMaterial = units[k].get_node("Sprite").material
+		if m:  # the active unit gets a thick gold outline instead of the ink one
+			m.set_shader_parameter("ink", Color(1, 0.82, 0.25, 1) if k == s["uid"] else Color(0.09, 0.06, 0.03, 0.95))
+			m.set_shader_parameter("width", 3.0 if k == s["uid"] else 1.2)
 	if L.check_fear(s):
 		_set_log("%s freeze in fear!" % L._name(s))
-		_float_text(_unit(s).position + Vector2(0, -170), "Fear!", Color(0.7, 0.5, 1.0))
+		_float_text(_unit(s).position + Vector2(0, -_top(s) - 10), "Fear!", Color(0.8, 0.65, 1.0))
 		L.finish_turn(s)
 		await get_tree().create_timer(0.7).timeout
 		_next()
@@ -610,7 +641,7 @@ func _play(events: Array) -> void:
 				_anim_death(ev["s"])
 				await get_tree().create_timer(0.25).timeout
 			"heal":
-				_float_text(_unit(ev["s"]).position + Vector2(0, -150), "+%d" % ev["amount"], Color(0.5, 1, 0.5))
+				_float_text(_unit(ev["s"]).position + Vector2(0, -_top(ev["s"]) - 10), "+%d" % ev["amount"], Color(0.5, 1, 0.5))
 				_refresh_badge(ev["s"])
 			"text":
 				_set_log(ev["text"])
@@ -669,7 +700,7 @@ func _anim_attack(ev: Dictionary) -> void:
 	if ev["ranged"]:
 		var proj := _Projectile.new()
 		proj.kind = "magic" if a["id"] in ["monk", "lich"] else "arrow"
-		proj.from = na.position + Vector2(0, -TIER_H[L.cdata(a)["tier"]] * 0.6)
+		proj.from = na.position + Vector2(0, -_top(a) * 0.6)
 		proj.to = nd.position + Vector2(0, -60)
 		_fx.add_child(proj)
 		Audio.sfx("magic_arrow" if proj.kind == "magic" else "arrow_shot", -2)
@@ -693,7 +724,7 @@ func _anim_attack(ev: Dictionary) -> void:
 		txt += "  (%d)" % ev["killed"]
 	if ev["lucky"]:
 		txt = "Lucky! " + txt
-	_float_text(nd.position + Vector2(0, -TIER_H[L.cdata(d)["tier"]] - 10), txt, col)
+	_float_text(nd.position + Vector2(0, -_top(d) - 10), txt, col)
 	_refresh_badge(d)
 	await get_tree().create_timer(0.3).timeout
 
@@ -733,7 +764,7 @@ func _anim_spell(ev: Dictionary) -> void:
 		"cure": "heal", "resurrection": "heal", "meteor_shower": "meteor", "death_ripple": "curse", "frost_ring": "magic_hit", "ice_bolt": "magic_hit"}
 	Audio.sfx(sfx_map.get(sp, "spell_cast"))
 	if sp != "death_cloud" and L.heroes[ev["side"]] != null:
-		_float_text(hex_pos(ev["hex"]) + Vector2(0, -250), GameData.SPELLS[sp]["name"], UI.GOLD)
+		_spell_banner(GameData.SPELLS[sp]["name"], ev["side"])
 	var targets: Array = ev["targets"]
 	var centers := []
 	if GameData.SPELLS.has(sp) and GameData.SPELLS[sp]["target"] == "area" or sp == "death_cloud":
@@ -754,7 +785,7 @@ func _anim_spell(ev: Dictionary) -> void:
 			var txt := "-%d" % ev["dmg"][t["uid"]]
 			if ev["killed"].get(t["uid"], 0) > 0:
 				txt += "  (%d)" % ev["killed"][t["uid"]]
-			_float_text(_unit(t).position + Vector2(0, -TIER_H[L.cdata(t)["tier"]] - 10), txt, Color(1, 0.4, 0.35))
+			_float_text(_unit(t).position + Vector2(0, -_top(t) - 10), txt, Color(1, 0.4, 0.35))
 			_refresh_badge(t)
 		else:
 			var s: Sprite2D = _unit(t).get_node("Sprite")
@@ -774,17 +805,43 @@ func _float_text(p: Vector2, t: String, col: Color) -> void:
 	l.add_theme_font_override("font", UI.title_font())
 	l.add_theme_font_size_override("font_size", 30)
 	l.add_theme_color_override("font_color", col)
-	l.add_theme_color_override("font_outline_color", Color.BLACK)
-	l.add_theme_constant_override("outline_size", 6)
-	l.position = p - Vector2(150, 0)
-	l.size = Vector2(300, 40)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	l.add_theme_constant_override("outline_size", 8)
+	var bg := StyleBoxFlat.new()  # soft dark backing so numbers stay readable over busy sprites
+	bg.bg_color = Color(0, 0, 0, 0.42)
+	bg.set_corner_radius_all(8)
+	bg.content_margin_left = 10
+	bg.content_margin_right = 10
+	l.add_theme_stylebox_override("normal", bg)
 	l.z_index = 30
 	_fx.add_child(l)
+	l.reset_size()
+	l.position = p - Vector2(l.size.x * 0.5, 0)
 	var tw := l.create_tween().set_parallel(true)
 	tw.tween_property(l, "position:y", p.y - 70, 1.1).set_ease(Tween.EASE_OUT)
 	tw.tween_property(l, "modulate:a", 0.0, 0.5).set_delay(0.7)
 	tw.chain().tween_callback(l.queue_free)
+
+## Spell name as a banner under the turn queue (not over the units), tinted by the caster's side.
+func _spell_banner(t: String, side: int) -> void:
+	var l := UI.label(t, 34, UI.GOLD, true)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	l.add_theme_constant_override("outline_size", 8)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(0.08, 0.05, 0.03, 0.8)
+	bg.border_color = Color(0.8, 0.25, 0.2) if side == 0 else Color(0.3, 0.45, 0.95)
+	bg.set_border_width_all(2)
+	bg.set_corner_radius_all(6)
+	bg.content_margin_left = 24
+	bg.content_margin_right = 24
+	l.add_theme_stylebox_override("normal", bg)
+	ui.add_child(l)
+	l.reset_size()
+	l.position = Vector2(960 - l.size.x * 0.5, 140)
+	var tw := l.create_tween()
+	tw.tween_interval(1.0)
+	tw.tween_property(l, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(l.queue_free)
 
 # ---------------------------------------------------------------------------------------------
 # End of battle
@@ -874,6 +931,9 @@ class _Grid extends Node2D:
 	var hover := Vector2i(-1, -1)
 	var active := {}
 	var attack_from := Vector2i(-1, -1)
+	func _process(_d: float) -> void:
+		if not active.is_empty():
+			queue_redraw()  # pulse the active hex
 	func _draw() -> void:
 		for y in BattleLogic.ROWS:
 			for x in BattleLogic.COLS:
@@ -881,16 +941,18 @@ class _Grid extends Node2D:
 				var c: Vector2 = b.hex_pos(h)
 				var poly: PackedVector2Array = b.hex_poly(c, 2.0)
 				if reach.has(h):
-					draw_colored_polygon(poly, Color(0, 0, 0, 0.22))
+					draw_colored_polygon(poly, Color(0.05, 0.03, 0.0, 0.3))
 				var closed := poly.duplicate()
 				closed.append(poly[0])
-				draw_polyline(closed, Color(1, 1, 0.85, 0.16), 1.5, true)
+				draw_polyline(closed, Color(0, 0, 0, 0.22), 3.0, true)  # dark under-line keeps the grid visible on light ground
+				draw_polyline(closed, Color(1, 0.97, 0.8, 0.34), 1.5, true)
 		if not active.is_empty() and active.get("alive", false):
+			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 180.0)
 			var poly: PackedVector2Array = b.hex_poly(b.hex_pos(active["hex"]), 3.0)
-			draw_colored_polygon(poly, Color(1, 0.85, 0.3, 0.25))
+			draw_colored_polygon(poly, Color(1, 0.85, 0.3, 0.22 + 0.18 * pulse))
 			var closed := poly.duplicate()
 			closed.append(poly[0])
-			draw_polyline(closed, Color(1, 0.85, 0.3, 0.9), 3.0, true)
+			draw_polyline(closed, Color(1, 0.9, 0.4, 0.75 + 0.25 * pulse), 4.0, true)
 		if hover.x >= 0:
 			var poly: PackedVector2Array = b.hex_poly(b.hex_pos(hover), 3.0)
 			var closed := poly.duplicate()
@@ -946,7 +1008,7 @@ class _QueueIcon extends Control:
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		draw_rect(r, Color(0.05, 0.04, 0.03))
-		draw_texture_rect(Assets.creature_portrait(st["id"]), r.grow(-3), false)
+		draw_texture_rect(Assets.creature_portrait(st["id"]), r.grow(-3), false, Color(1.25, 1.2, 1.15))  # portraits are dark at this size
 		var col := Color(0.8, 0.2, 0.15) if st["side"] == 0 else Color(0.25, 0.4, 0.95)
 		draw_rect(r, UI.GOLD if first else col, false, 4.0 if first else 3.0)
 		var txt := str(st["count"])
@@ -999,8 +1061,12 @@ class _Burst extends Node2D:
 			for i in 8:
 				p = p.lerp(Vector2.ZERO, 1.0 / (8 - i)) + Vector2(randf_range(-30, 30), 0)
 				pts.append(p)
-			draw_polyline(pts, Color(0.85, 0.95, 1.0, 1.0 - t * 2.0), 6.0)
-			draw_polyline(pts, Color(1, 1, 1, 1.0 - t * 2.0), 2.0)
+			var a2 := 1.0 - t * 2.0
+			draw_polyline(pts, Color(0.45, 0.65, 1.0, 0.22 * a2), 34.0)  # outer glow
+			draw_polyline(pts, Color(0.6, 0.8, 1.0, 0.5 * a2), 16.0)
+			draw_polyline(pts, Color(0.85, 0.95, 1.0, a2), 7.0)
+			draw_polyline(pts, Color(1, 1, 1, a2), 3.0)
+			draw_circle(Vector2.ZERO, 60.0 * (1.0 - t), Color(0.9, 0.95, 1.0, 0.55 * a2))  # impact flash
 		draw_circle(Vector2.ZERO, radius * (0.3 + t * 0.9), Color(color, 0.35 * a))
 		draw_arc(Vector2.ZERO, radius * (0.2 + t), 0, TAU, 48, Color(color.lightened(0.4), a), 4.0 * a + 1.0)
 		for s in _seeds:

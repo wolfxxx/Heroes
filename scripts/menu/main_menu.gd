@@ -86,16 +86,17 @@ func _build_background() -> void:
 
 func _build_menu() -> void:
 	var panel := PanelContainer.new()
-	panel.position = Vector2(760, 420)
-	panel.custom_minimum_size = Vector2(400, 0)
+	# right-hand column, as in the classics: the painted castle stays visible in the centre
+	panel.position = Vector2(1400, 330)
+	panel.custom_minimum_size = Vector2(440, 0)
 	add_child(panel)
 	_menu_box = VBoxContainer.new()
-	_menu_box.add_theme_constant_override("separation", 14)
+	_menu_box.add_theme_constant_override("separation", 18)
 	panel.add_child(_menu_box)
 	var entries := [["New Game", _open_setup], ["Load Game", _load_game], ["Quick Battle", _quick_battle], ["Quit", func(): get_tree().quit()]]
 	for e in entries:
-		var b := UI.button(e[0], e[1], 30)
-		b.custom_minimum_size = Vector2(360, 64)
+		var b := UI.button(e[0], e[1], 34)
+		b.custom_minimum_size = Vector2(400, 78)
 		if e[0] == "Load Game":
 			b.disabled = not GameState.has_save()
 		_menu_box.add_child(b)
@@ -106,12 +107,12 @@ func _build_menu() -> void:
 # ---------------------------------------------------------------------------------------------
 func _build_setup() -> void:
 	_setup_panel = PanelContainer.new()
-	_setup_panel.position = Vector2(310, 300)
-	_setup_panel.custom_minimum_size = Vector2(1300, 700)
+	_setup_panel.position = Vector2(310, 262)
+	_setup_panel.custom_minimum_size = Vector2(1300, 0)
 	_setup_panel.visible = false
 	add_child(_setup_panel)
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 18)
+	v.add_theme_constant_override("separation", 10)
 	_setup_panel.add_child(v)
 
 	var title := UI.label("New Campaign", 40, UI.GOLD, true)
@@ -126,8 +127,9 @@ func _build_setup() -> void:
 	for f in GameData.FACTIONS:
 		var b := Button.new()
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(620, 130)
-		b.add_theme_font_size_override("font_size", 22)
+		b.custom_minimum_size = Vector2(620, 118)
+		b.add_theme_font_size_override("font_size", 21)
+		_ink(b)
 		b.icon = Assets.tex("map/town_%s.png" % f)
 		b.expand_icon = true
 		b.add_theme_constant_override("icon_max_width", 150)
@@ -173,6 +175,13 @@ func _build_setup() -> void:
 	_select_faction(_settings.get("faction", "haven"))
 	_refresh_options()
 
+## Selected toggles sit on the bright gold texture: force dark ink text in every pressed/focus state, no focus ring.
+func _ink(b: Button) -> void:
+	b.focus_mode = Control.FOCUS_NONE
+	for c in ["font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(c, Color(0.16, 0.08, 0.02))
+	b.add_theme_color_override("font_outline_color", Color(1, 0.9, 0.6, 0.0))
+
 func _option_group(label: String, names: Array, key: String, values: Array) -> Control:
 	var v := VBoxContainer.new()
 	v.add_child(UI.label(label, 22, UI.GOLD))
@@ -184,6 +193,7 @@ func _option_group(label: String, names: Array, key: String, values: Array) -> C
 		b.toggle_mode = true
 		b.text = names[i]
 		b.custom_minimum_size = Vector2(110, 48)
+		_ink(b)
 		var val = values[i]
 		b.pressed.connect(func():
 			Audio.sfx("click", -6)
@@ -215,13 +225,14 @@ func _select_faction(f: String) -> void:
 			first = hid
 		var b := Button.new()
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(300, 150)
+		b.custom_minimum_size = Vector2(300, 132)
+		_ink(b)
 		b.icon = Assets.hero_portrait(hid)
 		b.expand_icon = true
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.text = "%s\n%s" % [h["name"], h["class"]]
 		b.add_theme_font_size_override("font_size", 20)
-		b.add_theme_constant_override("icon_max_width", 120)
+		b.add_theme_constant_override("icon_max_width", 110)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)

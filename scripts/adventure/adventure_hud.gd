@@ -154,8 +154,18 @@ func _build_bar() -> void:
 
 	_status = UI.label("", 21)
 	_status.position = Vector2(16, 994)
-	_status.size = Vector2(900, 36)
 	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sbg := StyleBoxFlat.new()  # dark backing: the status line sits on top of busy map art
+	sbg.bg_color = Color(0.06, 0.04, 0.03, 0.78)
+	sbg.border_color = UI.GOLD_DARK
+	sbg.set_border_width_all(1)
+	sbg.set_corner_radius_all(4)
+	sbg.content_margin_left = 12
+	sbg.content_margin_right = 12
+	sbg.content_margin_top = 2
+	sbg.content_margin_bottom = 2
+	_status.add_theme_stylebox_override("normal", sbg)
+	_status.visible = false
 	root.add_child(_status)
 
 	_toast = UI.label("", 26, UI.TEXT)
@@ -245,15 +255,30 @@ func _hero_card(h: Dictionary) -> Control:
 	var p := UI.icon(Assets.hero_portrait(h["id"]), Vector2(48, 48))
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hb.add_child(p)
+	# movement / mana as vertical bars beside the portrait (as in the classic games), name to the right
+	var mv := _bar(float(h["movement"]) / maxf(1.0, h["max_movement"]), Color(0.35, 0.8, 0.3), 7)
+	mv.vertical = true
+	mv.custom_minimum_size = Vector2(7, 48)
+	mv.tooltip_text = "Movement"
+	hb.add_child(mv)
+	var mn := _bar(float(h["mana"]) / maxf(1.0, GameState.max_mana(h)), Color(0.35, 0.55, 1.0), 7)
+	mn.vertical = true
+	mn.custom_minimum_size = Vector2(7, 48)
+	hb.add_child(mn)
 	var v := VBoxContainer.new()
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_theme_constant_override("separation", 2)
+	v.add_theme_constant_override("separation", -4)
 	hb.add_child(v)
-	var l := UI.label("%s  (Lv %d)" % [h["name"], h["level"]], 19)
+	var sel := b.button_pressed  # the selected card is bright gold: dark ink text, no shadow
+	var l := UI.label(h["name"], 19, Color(0.16, 0.08, 0.02) if sel else UI.TEXT)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(l)
-	v.add_child(_bar(float(h["movement"]) / maxf(1.0, h["max_movement"]), Color(0.35, 0.8, 0.3), 220))
-	v.add_child(_bar(float(h["mana"]) / maxf(1.0, GameState.max_mana(h)), Color(0.35, 0.55, 1.0), 220))
+	var lv := UI.label("Level %d" % h["level"], 16, Color(0.3, 0.18, 0.06) if sel else Color(0.8, 0.75, 0.62))
+	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(lv)
+	if sel:
+		for x in [l, lv]:
+			x.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
 	return b
 
 func _bar(frac: float, col: Color, width: float) -> Control:
@@ -278,6 +303,8 @@ func _town_card(t: Dictionary) -> Control:
 
 func set_status(t: String) -> void:
 	_status.text = t
+	_status.visible = t != ""
+	_status.reset_size()
 
 func set_turn_label(t: String) -> void:
 	_turn_label.text = t
@@ -334,7 +361,7 @@ func refresh_minimap() -> void:
 		for x in size.x:
 			var i := y * size.x + x
 			if not ex[i]:
-				_mini_img.set_pixel(x, y, Color(0.02, 0.02, 0.03))
+				_mini_img.set_pixel(x, y, Color(0.07, 0.055, 0.04))  # unexplored: dark parchment, not void black
 				continue
 			var c: Color = TERRAIN_COLORS[terr[i]]
 			if blk[i]:
@@ -631,9 +658,13 @@ static func recruit_dialog(owner_node: Node, cid: String, available: int, player
 class _Bar extends Control:
 	var frac := 1.0
 	var col := Color.GREEN
+	var vertical := false  # fills bottom-up
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.6))
-		draw_rect(Rect2(Vector2.ZERO, Vector2(size.x * frac, size.y)), col)
+		if vertical:
+			draw_rect(Rect2(Vector2(0, size.y * (1.0 - frac)), Vector2(size.x, size.y * frac)), col)
+		else:
+			draw_rect(Rect2(Vector2.ZERO, Vector2(size.x * frac, size.y)), col)
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.8), false, 1.0)
 
 class _MiniView extends Control:

@@ -85,6 +85,14 @@ BATTLE_BG = ("Repaint this as the battlefield background of a fantasy strategy g
              "distance along the horizon.\n"
              "16:9. No creatures, no people, no text, no border.")
 
+MENU_BG = ("Repaint this as the title-screen backdrop of a fantasy strategy game. " + STYLE + "\n"
+           "A majestic castle of white stone with blue slate roofs, gold trim and fluttering banners on a hill, at golden "
+           "dusk: dramatic glowing sky with warm clouds, snowy peaks behind, rolling green hills, a winding road leading "
+           "up to the gate, small torches lit along the walls. Keep the same composition and camera: castle centred in "
+           "the upper middle, open meadow in the foreground. The game title is drawn over the top quarter and a menu "
+           "panel over the centre, so keep the upper sky calm and the centre free of fine clutter. A rich, detailed, "
+           "atmospheric painting with depth and light. 16:9. No text, no logo, no border, no people.")
+
 BG_TERRAIN = {
     "grass": "lush green meadow under a bright blue sky with white clouds, distant snowy peaks and oak trees",
     "dirt": "dry brown earth and rough trodden ground, distant hills and sparse trees under a warm hazy sky",
@@ -123,6 +131,8 @@ def _sprite_ratio(name):
 def prompt_for(name):
     if name.startswith("portrait_"):
         return PORTRAIT, "1:1"
+    if name == "menu__bg":  # batch 5: title screen
+        return MENU_BG, "16:9"
     if name.startswith("bg__"):  # batch 4: battle backgrounds
         return BATTLE_BG.format(terrain=BG_TERRAIN[name[4:]]), "16:9"
     if name.startswith(("creatures__", "heroes__")):  # batch 4 (1c): battle units and mounted heroes

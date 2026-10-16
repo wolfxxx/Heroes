@@ -1,0 +1,58 @@
+{
+"angel.png": [
+359,
+402
+],
+"archer.png": [
+152,
+272
+],
+"bone_dragon.png": [
+372,
+541
+],
+"cavalier.png": [
+329,
+507
+],
+"dread_knight.png": [
+329,
+507
+],
+"ghost.png": [
+133,
+275
+],
+"griffin.png": [
+489,
+258
+],
+"lich.png": [
+199,
+287
+],
+"monk.png": [
+142,
+277
+],
+"pikeman.png": [
+158,
+312
+],
+"skeleton.png": [
+175,
+287
+],
+"swordsman.png": [
+111,
+301
+],
+"vampire.png": [
+288,
+378
+],
+"zombie.png": [
+181,
+263
+]
+}

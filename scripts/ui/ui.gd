@@ -115,8 +115,8 @@ static func label(text: String, size := 22, color := TEXT, title := false) -> La
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
-	if title:
-		l.add_theme_font_override("font", title_font())
+	# explicit font: labels placed outside a themed Control (e.g. on a Node2D) would fall back to Godot's sans-serif
+	l.add_theme_font_override("font", title_font() if title else font())
 	return l
 
 static func button(text: String, cb: Callable = Callable(), size := 22) -> Button:

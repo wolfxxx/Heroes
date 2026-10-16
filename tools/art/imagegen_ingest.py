@@ -144,6 +144,9 @@ def ingest_town(batch, fac, var, src):
         Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), "RGBA").save(dst)
     print("  town", fac, var, "->", ", ".join(EXTRACT[var]))
 
+# regions (fractions of the sprite: x0, y0, x1, y1) that keep the unpainted pixels, where the painter invented things
+KEEP_ORIGINAL = {}
+
 def ingest_group(batch, name, src):
     """Batch 2: a group of non-overlapping buildings; every building is cut out whole."""
     fac = name.split("_")[1]
@@ -155,10 +158,18 @@ def ingest_group(batch, name, src):
     for sid in ids:
         x, y, w, h = layout[sid]
         dst = f"assets/town/{fac}_{sid}.png"
-        alpha = np.asarray(Image.open(original(dst)).convert("RGBA").resize((w, h)), dtype=np.float32)[..., 3]
-        rgb = np.zeros((h, w, 3), np.float32)
+        orig = np.asarray(Image.open(original(dst)).convert("RGBA").resize((w, h)), dtype=np.float32)
+        alpha = orig[..., 3]
+        rgb = orig[..., :3].copy()
         vh, vw = min(h, VIEW_H - y), min(w, PAD_W - x)
         rgb[:vh, :vw] = pv[y:y + vh, x:x + vw]
+        # soft pixels (cast shadows, antialiased edges) keep the original colour: painted content there shows
+        # through half-transparent as a ghost image (fort walls, stray market awnings)
+        wgt = np.clip((alpha / 255 - 0.55) / 0.35, 0, 1)[..., None]
+        rgb = rgb * wgt + orig[..., :3] * (1 - wgt)
+        for fx0, fy0, fx1, fy1 in KEEP_ORIGINAL.get(f"{fac}_{sid}", []):
+            ys, xs = slice(int(fy0 * h), int(fy1 * h)), slice(int(fx0 * w), int(fx1 * w))
+            rgb[ys, xs] = orig[ys, xs, :3]
         Image.fromarray(np.clip(np.dstack([rgb, alpha]), 0, 255).astype(np.uint8), "RGBA").save(dst)
     print("  group", name, "->", ", ".join(ids))
 

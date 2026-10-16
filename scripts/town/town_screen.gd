@@ -142,6 +142,8 @@ func refresh() -> void:
 	var flag := _Banner.new()
 	flag.custom_minimum_size = Vector2(92, 92)
 	flag.color = GameData.PLAYER_COLORS[town["owner"]] if town["owner"] >= 0 else Color.GRAY
+	if Assets.has("map/town_%s.png" % town["faction"]):
+		flag.town_tex = Assets.tex("map/town_%s.png" % town["faction"])
 	flag.tooltip_text = "Garrison"
 	row1.add_child(flag)
 	var g := ArmyStrip.new()
@@ -340,11 +342,11 @@ func _open_build() -> void:
 		var built: bool = id in town["buildings"]
 		var reason := "Built" if built else TownLogic.build_block_reason(town, player, id)
 		var card := Button.new()
-		card.custom_minimum_size = Vector2(312, 172)
+		card.custom_minimum_size = Vector2(312, 196)
 		card.focus_mode = Control.FOCUS_NONE
 		var v := VBoxContainer.new()
 		v.position = Vector2(10, 10)
-		v.size = Vector2(292, 154)
+		v.size = Vector2(292, 178)
 		v.add_theme_constant_override("separation", 2)
 		v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		card.add_child(v)
@@ -358,7 +360,7 @@ func _open_build() -> void:
 		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		nm.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(nm)
-		var cost := UI.label(UI.format_cost(b["cost"]) if not built else "", 14)
+		var cost := UI.label(UI.format_cost(b["cost"]) if not built else "", 16)
 		cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cost.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cost.custom_minimum_size = Vector2(292, 0)
@@ -681,8 +683,17 @@ func _unhandled_input(e: InputEvent) -> void:
 
 class _Banner extends Control:
 	var color := Color.RED
+	var town_tex: Texture2D = null  # the town's map picture, with a small owner pennant
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.06, 0.05, 0.04))
+		if town_tex:
+			var ts := Vector2(town_tex.get_size())
+			var sc := minf((size.x - 6) / ts.x, (size.y - 6) / ts.y) * 1.25  # the map sprite has empty margins
+			var ds := ts * sc
+			draw_texture_rect(town_tex, Rect2((size - ds) * 0.5 + Vector2(0, 6), ds), false)
+			draw_colored_polygon(PackedVector2Array([Vector2(6, 6), Vector2(30, 6), Vector2(30, 34), Vector2(18, 28), Vector2(6, 34)]), color)
+			draw_rect(Rect2(Vector2.ZERO, size), UI.GOLD_DARK, false, 2.0)
+			return
 		var pts := PackedVector2Array([Vector2(18, 8), Vector2(size.x - 18, 8), Vector2(size.x - 18, size.y - 22), Vector2(size.x * 0.5, size.y - 8), Vector2(18, size.y - 22)])
 		draw_colored_polygon(pts, color)
 		var outline := pts.duplicate()
