@@ -11,8 +11,40 @@
 0.5,
 0.8495
 ],
+"map_haven_run0.png": [
+0.4246,
+0.9355
+],
+"map_haven_run1.png": [
+0.4084,
+0.9381
+],
+"map_haven_run2.png": [
+0.4226,
+0.9391
+],
+"map_haven_run3.png": [
+0.4171,
+0.9333
+],
 "map_necropolis.png": [
 0.5,
 0.8495
+],
+"map_necropolis_run0.png": [
+0.4168,
+0.9349
+],
+"map_necropolis_run1.png": [
+0.4134,
+0.9375
+],
+"map_necropolis_run2.png": [
+0.4095,
+0.9389
+],
+"map_necropolis_run3.png": [
+0.4215,
+0.9369
 ]
 }

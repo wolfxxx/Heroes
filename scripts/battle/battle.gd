@@ -203,6 +203,7 @@ func _make_unit(st: Dictionary) -> void:
 	MapView.outline(s, 1.2)
 	if "two_hex" in c["abilities"]:
 		s.position.x = -26 if st["side"] == 0 else 26
+	s.set_meta("home", s.position)
 	n.add_child(s)
 	var badge := _Badge.new()
 	badge.name = "Badge"
@@ -685,32 +686,51 @@ func _play(events: Array) -> void:
 func _anim_move(st: Dictionary, path: Array) -> void:
 	var n := _unit(st)
 	var spr: Sprite2D = n.get_node("Sprite")
+	var cycle := Assets.has("creatures/%s_move0.png" % st["id"])  # 4-frame walk / flap / gallop (tools/art/cycle_paint.py)
 	if L.is_flyer(st):
 		Audio.sfx("wings", -4)
 		var target := hex_pos(path[path.size() - 1]) + Vector2(0, 24)
 		if absf(target.x - n.position.x) > 2:
 			_set_flip(spr, target.x < n.position.x)
-		var dur := clampf(n.position.distance_to(target) / 900.0, 0.3, 0.8)
+		var dur := clampf(n.position.distance_to(target) / 700.0, 0.45, 1.1)
 		var tw := n.create_tween()
 		tw.tween_property(n, "position", target, dur).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 		var tw2 := spr.create_tween()
-		tw2.tween_property(spr, "position:y", -50.0, dur * 0.5).set_ease(Tween.EASE_OUT)
+		tw2.tween_property(spr, "position:y", -60.0, dur * 0.5).set_ease(Tween.EASE_OUT)
 		tw2.tween_property(spr, "position:y", 0.0, dur * 0.5).set_ease(Tween.EASE_IN)
+		if cycle:
+			_play_cycle(st, dur, 11.0)
 		await tw.finished
 	else:
+		var step := 0.2 if cycle else 0.13
+		var frame := 0
 		for i in range(1, path.size()):
 			var target := hex_pos(path[i]) + Vector2(0, 24)
 			if absf(target.x - n.position.x) > 2:
 				_set_flip(spr, target.x < n.position.x)
 			Audio.sfx("move_step", -10, 0.15)
 			var tw := n.create_tween()
-			tw.tween_property(n, "position", target, 0.13)
-			var bob := spr.create_tween()  # a small step bob per hex so walkers don't glide
-			bob.tween_property(spr, "position:y", -7.0, 0.065).set_ease(Tween.EASE_OUT)
-			bob.tween_property(spr, "position:y", 0.0, 0.065).set_ease(Tween.EASE_IN)
+			tw.tween_property(n, "position", target, step)
+			if cycle:  # two frames of the cycle per hex
+				_pose(st, "move%d" % (frame % 4))
+				get_tree().create_timer(step * 0.5).timeout.connect(_pose.bind(st, "move%d" % ((frame + 1) % 4)))
+				frame += 2
+			var bob := spr.create_tween()  # a small step bob per hex
+			bob.tween_property(spr, "position:y", -5.0 if cycle else -7.0, step * 0.5).set_ease(Tween.EASE_OUT)
+			bob.tween_property(spr, "position:y", 0.0, step * 0.5).set_ease(Tween.EASE_IN)
 			await tw.finished
+	if cycle:
+		_pose(st, "")
 	_set_flip(spr, st["side"] == 1)
 	_face_enemies(st)
+
+## Loop the unit's 4 movement frames for `dur` seconds at `fps` (flyers).
+func _play_cycle(st: Dictionary, dur: float, fps: float) -> void:
+	var count := maxi(4, int(dur * fps))
+	for i in count:
+		get_tree().create_timer(i / fps).timeout.connect(func():
+			if st.get("alive", false):
+				_pose(st, "move%d" % (i % 4)))
 
 func _face_enemies(st: Dictionary) -> void:
 	# Face the nearest enemy horizontally.
@@ -732,28 +752,45 @@ func _anim_attack(ev: Dictionary) -> void:
 	var nd := _unit(d)
 	var spr: Sprite2D = na.get_node("Sprite")
 	_set_flip(spr, nd.position.x < na.position.x)
-	_pose(a, "attack", 0.55 if ev["ranged"] else 0.42)
+	var dir := (nd.position - na.position).normalized()
+	var big: bool = ev["killed"] > 0 or L.cdata(a)["tier"] >= 6
+	var home: Vector2 = spr.get_meta("home", Vector2.ZERO)
 	if ev["ranged"]:
+		_pose(a, "attack", 0.55)
 		var proj := _Projectile.new()
 		proj.kind = "magic" if a["id"] in ["monk", "lich"] else "arrow"
 		proj.from = na.position + Vector2(0, -_top(a) * 0.6)
 		proj.to = nd.position + Vector2(0, -60)
 		_fx.add_child(proj)
 		Audio.sfx("magic_arrow" if proj.kind == "magic" else "arrow_shot", -2)
-		var tw := na.create_tween()
-		tw.tween_property(spr, "rotation", -0.06 if spr.flip_h else 0.06, 0.1)
-		tw.tween_property(spr, "rotation", 0.0, 0.1)
+		var tw := spr.create_tween()  # recoil
+		tw.tween_property(spr, "position", home - dir * 10, 0.08).set_ease(Tween.EASE_OUT)
+		tw.tween_property(spr, "position", home, 0.25).set_trans(Tween.TRANS_SINE)
 		await proj.fly(0.28)
 		Audio.sfx("magic_hit" if proj.kind == "magic" else "arrow_hit", -2)
 	else:
-		var dir := (nd.position - na.position).normalized()
-		var home := spr.position
-		var tw := spr.create_tween()
-		tw.tween_property(spr, "position", home + dir * 34, 0.12).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-		tw.tween_property(spr, "position", home, 0.18)
-		await get_tree().create_timer(0.11).timeout
+		# wind-up: draw back and lean away
+		var lean := signf(dir.x) if dir.x != 0.0 else 1.0
+		var tw := spr.create_tween().set_parallel(true)
+		tw.tween_property(spr, "position", home - dir * 14, 0.13).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		tw.tween_property(spr, "rotation", -0.07 * lean, 0.13)
+		await tw.finished
+		# strike in the attack pose
+		_pose(a, "attack", 0.45)
+		var tw2 := spr.create_tween().set_parallel(true)
+		tw2.tween_property(spr, "position", home + dir * 44, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw2.tween_property(spr, "rotation", 0.05 * lean, 0.08)
+		await tw2.finished
 		Audio.creature_sfx(a["id"], "attack", "claw_hit" if a["id"] in ["griffin", "bone_dragon", "ghost", "vampire"] else ("blunt_hit" if a["id"] in ["zombie", "monk"] else "sword_hit"))
-	_hit_flash(d)
+		_hit_flash(d, dir, big)
+		await get_tree().create_timer(0.07).timeout  # hit-stop: let the blow land
+		var tw3 := spr.create_tween().set_parallel(true)
+		tw3.tween_property(spr, "position", home, 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw3.tween_property(spr, "rotation", 0.0, 0.24)
+	if ev["ranged"]:
+		_hit_flash(d, dir, big)
+	if big:
+		_shake(7.0 if ev["killed"] > 0 else 4.0)
 	var col := Color(1, 0.85, 0.3) if ev["lucky"] else Color(1, 0.35, 0.3)
 	var txt := "-%d" % ev["dmg"]
 	if ev["killed"] > 0:
@@ -764,7 +801,8 @@ func _anim_attack(ev: Dictionary) -> void:
 	_refresh_badge(d)
 	await get_tree().create_timer(0.3).timeout
 
-func _hit_flash(d: Dictionary) -> void:
+## Red flash + hit pose; with a direction the unit is knocked back and springs home, otherwise it shudders.
+func _hit_flash(d: Dictionary, dir := Vector2.ZERO, big := false) -> void:
 	if d.get("alive", false):
 		_pose(d, "hit", 0.45)
 	var nd := _unit(d)
@@ -772,11 +810,27 @@ func _hit_flash(d: Dictionary) -> void:
 	var tw := s.create_tween()
 	tw.tween_property(s, "modulate", Color(1.8, 0.6, 0.6), 0.06)
 	tw.tween_property(s, "modulate", Color.WHITE, 0.2)
-	var base := s.position.x
+	var home: Vector2 = s.get_meta("home", Vector2.ZERO)
 	var tw2 := s.create_tween()
-	for i in 3:
-		tw2.tween_property(s, "position:x", base + (6 if i % 2 == 0 else -6), 0.04)
-	tw2.tween_property(s, "position:x", base, 0.04)
+	if dir != Vector2.ZERO:
+		var push := Vector2(dir.x, dir.y * 0.4).normalized() * (22.0 if big else 14.0)
+		tw2.set_parallel(true)
+		tw2.tween_property(s, "position", home + push, 0.07).set_ease(Tween.EASE_OUT)
+		tw2.tween_property(s, "rotation", 0.06 * signf(push.x), 0.07)
+		tw2.chain().tween_property(s, "position", home, 0.35).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+		tw2.parallel().tween_property(s, "rotation", 0.0, 0.3).set_trans(Tween.TRANS_SINE)
+	else:
+		for i in 3:
+			tw2.tween_property(s, "position:x", home.x + (6 if i % 2 == 0 else -6), 0.04)
+		tw2.tween_property(s, "position:x", home.x, 0.04)
+
+## Short screen shake for heavy blows (the UI layer stays put).
+func _shake(strength: float) -> void:
+	var tw := create_tween()
+	for i in 6:
+		var k := strength * (1.0 - i / 6.0)
+		tw.tween_property(self, "position", Vector2(randf_range(-k, k), randf_range(-k, k)), 0.035)
+	tw.tween_property(self, "position", Vector2.ZERO, 0.04)
 
 func _anim_death(st: Dictionary) -> void:
 	var n := _unit(st)
@@ -791,10 +845,18 @@ func _anim_death(st: Dictionary) -> void:
 	# (a negative z_index would hide the body behind the battlefield background)
 	n.reparent(_corpses)
 	if _pose(st, "dead"):
-		# the corpse stays on its hex, a little darker, as in the classics
+		# the corpse stays on its hex, a little darker, as in the classics: it drops in with a puff of dust
 		s.modulate = Color(1.6, 0.7, 0.7)
-		var tw0 := s.create_tween()
+		s.rotation = 0.0
+		var home: Vector2 = s.get_meta("home", Vector2.ZERO)
+		s.position = home + Vector2(0, -16)
+		var tw0 := s.create_tween().set_parallel(true)
 		tw0.tween_property(s, "modulate", Color(0.78, 0.74, 0.72), 0.5)
+		tw0.tween_property(s, "position", home, 0.22).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		var dust := _Dust.new()
+		dust.position = n.position + Vector2(0, -4)
+		dust.big = "two_hex" in c["abilities"]
+		_fx.add_child(dust)
 		var m: ShaderMaterial = s.material
 		if m:
 			m.set_shader_parameter("ink", Color(0.09, 0.06, 0.03, 0.95))
@@ -1124,6 +1186,27 @@ class _Burst extends Node2D:
 		for s in _seeds:
 			var d: float = radius * s[1] * (0.2 + t * 1.1)
 			draw_circle(Vector2(cos(s[0]), sin(s[0]) * 0.6) * d, s[2] * a, Color(color.lightened(0.3), a))
+
+class _Dust extends Node2D:
+	var big := false
+	var t := 0.0
+	var _puffs := []
+	func _ready() -> void:
+		z_index = -1  # in front of the corpse layer but behind standing units' text
+		for i in 9:
+			_puffs.append([randf_range(-1, 1), randf_range(0.5, 1.0), randf_range(0.6, 1.2)])
+		var tw := create_tween()
+		tw.tween_property(self, "t", 1.0, 0.7).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(queue_free)
+	func _process(_d: float) -> void:
+		queue_redraw()
+	func _draw() -> void:
+		var w := 90.0 if big else 55.0
+		for p in _puffs:
+			var c := Vector2(p[0] * w * (0.4 + t), -p[1] * 18.0 * t)
+			draw_set_transform(c, 0, Vector2(1, 0.55))
+			draw_circle(Vector2.ZERO, 14.0 * p[2] * (0.5 + t), Color(0.55, 0.47, 0.36, 0.45 * (1.0 - t)))
+		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 
 class _Fallback extends Node2D:
 	var terrain := "grass"

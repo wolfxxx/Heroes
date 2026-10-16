@@ -111,6 +111,41 @@ POSE_NOTES = {  # how each creature attacks
     "dread_knight": "For the attack: the horse charging forward, the knight's lance lowered and thrusting.",
 }
 
+GALLOP = ("This image is a 2x2 sprite sheet showing the same mounted hero four times, seen from a high three-quarter "
+          "angle as on a fantasy strategy game's adventure map. Redraw it as a 4-frame GALLOP cycle of the horse moving "
+          "to the right, one frame per cell in reading order (top-left, top-right, bottom-left, bottom-right):\n"
+          "1) all four legs gathered under the body, back slightly arched;\n"
+          "2) full stretch: front legs reaching far forward, hind legs pushed far back;\n"
+          "3) front hooves striking the ground, hind legs swinging forward;\n"
+          "4) hind hooves landing under the body, front legs lifting and folding.\n"
+          "The rider and horse are otherwise IDENTICAL in every frame - same armour, colours, barding, lance, plume, "
+          "size and painting style as the original - with the rider leaning slightly forward and mane and tail flying. "
+          "Keep each figure the same size, centred in its own cell, standing on the same ground line. Hand-painted style. "
+          "The background must be a perfectly flat, pure magenta (#FF00FF) everywhere: no ground, no shadows, no dust, "
+          "no grid lines, no borders, no text.")
+
+CYCLE = ("This image is a 2x2 sprite sheet showing the same battle unit of a fantasy strategy game four times, in side "
+         "view facing right. Redraw it as a smooth 4-frame {what} cycle, one frame per cell in reading order (top-left, "
+         "top-right, bottom-left, bottom-right):\n{frames}\n"
+         "The character is otherwise IDENTICAL in every frame - same armour, clothes, colours, weapon, proportions, size "
+         "and hand-painted style as the original - only the moving parts change, so the frames play as one fluid loop. "
+         "Keep each figure the same size, centred in its own cell, on the same ground line. The background must be a "
+         "perfectly flat, pure magenta (#FF00FF) everywhere: no ground, no shadows, no motion lines, no grid lines, no "
+         "borders, no text.")
+
+CYCLE_FRAMES = {
+    "walk": ("WALK", "1) left foot forward, right foot back, arms swinging opposite;\n2) passing: legs together, body "
+             "slightly raised;\n3) right foot forward, left foot back;\n4) passing again, legs together"),
+    "fly": ("WING-FLAP flight", "1) wings fully raised high above the back;\n2) wings level and spread wide, mid "
+            "downstroke;\n3) wings swept fully down below the body;\n4) wings level again, rising on the upstroke.\n"
+            "The creature is airborne in every frame: legs tucked, body level, no ground contact"),
+    "glide": ("hovering GLIDE", "1) robes and tatters billowing back; 2) robes rising and curling; 3) robes streaming "
+              "forward; 4) robes settling, the figure bobbing slightly. It floats above the ground, drifting forward"),
+    "gallop": ("GALLOP", "1) all four legs gathered under the body;\n2) full stretch: front legs reaching forward, hind "
+               "legs pushed back;\n3) front hooves striking the ground, hind legs swinging forward;\n4) hind hooves "
+               "landing, front legs lifting. The rider leans forward, lance steady"),
+}
+
 MENU_BG = ("Repaint this as the title-screen backdrop of a fantasy strategy game. " + STYLE + "\n"
            "A majestic castle of white stone with blue slate roofs, gold trim and fluttering banners on a hill, at golden "
            "dusk: dramatic glowing sky with warm clouds, snowy peaks behind, rolling green hills, a winding road leading "
@@ -151,12 +186,22 @@ GROUP_STYLE = ("\nThe second image is the same town already painted: match its p
                "any building from it: paint only the buildings that are in the first image, and keep every empty part of "
                "the town square and landscape empty.")
 
+NL = chr(10)
+
 def _sprite_ratio(name):
     return json.load(open("imagegen/batch4/in/sprites.json"))[name]["ratio"]
 
 def prompt_for(name):
     if name.startswith("portrait_"):
         return PORTRAIT, "1:1"
+    if name.startswith("cycle__"):  # batch 8: battle movement cycles
+        cid = name.split("__")[1]
+        kd = json.load(open("imagegen/batch8/in/cycles.json"))[name]["kind"]
+        what, frames = CYCLE_FRAMES[kd]
+        extra = CREATURE_NOTES.get(cid, "")
+        return CYCLE.format(what=what, frames=frames) + (NL + extra if extra else ""), "16:9"
+    if name.startswith("gallop__"):  # batch 7: map hero gallop sheet
+        return GALLOP + ("\n" + HERO_NOTES.get(name.split("__")[1], "")), "16:9"
     if name.startswith("pose__"):  # batch 6: extra battle poses on a magenta backdrop
         _, cid, pose = name.split("__")
         note = POSE_NOTES.get(cid, "") if pose == "attack" else ""

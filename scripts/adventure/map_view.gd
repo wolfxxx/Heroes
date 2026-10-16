@@ -240,6 +240,7 @@ func _hero_node(h: Dictionary) -> Node2D:
 	n.add_child(ring)
 	var spr := _sprite("heroes/map_%s.png" % h["faction"], Vector2(0, 4), 0, h.get("face_left", false), 118.0, 1.35)
 	spr.name = "Sprite"
+	spr.set_meta("faction", h["faction"])
 	outline(spr)
 	n.add_child(spr)
 	_add_flag(n, Vector2(-30, -138), h["owner"], 1.5)
@@ -298,14 +299,52 @@ func move_hero_step(uid: int, to_tile: Vector2i, dur: float) -> void:
 		return
 	var target := foot_of(to_tile)
 	var spr: Sprite2D = n.get_node("Sprite")
+	var flip := spr.flip_h
 	if absf(target.x - n.position.x) > 1.0:
-		spr.flip_h = target.x < n.position.x
+		flip = target.x < n.position.x
 	var tw := n.create_tween()
 	tw.tween_property(n, "position", target, dur)
-	# little bob
-	var tw2 := spr.create_tween()
-	tw2.tween_property(spr, "position:y", 0.0, dur * 0.5)
-	tw2.tween_property(spr, "position:y", 4.0, dur * 0.5)
+	# gallop: two frames of the 4-frame cycle per tile, a rocking stride and a little dust
+	var fac: String = spr.get_meta("faction", "")
+	var frame: int = spr.get_meta("run_frame", 0)
+	var has_run := Assets.has("heroes/map_%s_run0.png" % fac)
+	for i in 2:
+		var k := (frame + i) % 4
+		if has_run:
+			get_tree().create_timer(dur * 0.5 * i).timeout.connect(func():
+				if is_instance_valid(spr):
+					_set_hero_tex(spr, "heroes/map_%s_run%d.png" % [fac, k], flip))
+	spr.set_meta("run_frame", (frame + 2) % 4)
+	if not has_run:
+		_set_hero_tex(spr, "heroes/map_%s.png" % fac, flip)
+	var tw2 := spr.create_tween().set_parallel(true)
+	var lean := -0.05 if flip else 0.05
+	tw2.tween_property(spr, "position:y", -2.0, dur * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw2.tween_property(spr, "rotation", lean if frame % 4 == 0 else -lean * 0.4, dur * 0.5)
+	tw2.chain().tween_property(spr, "position:y", 4.0, dur * 0.5).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tw2.parallel().tween_property(spr, "rotation", 0.0, dur * 0.5)
+	if frame % 4 == 0:
+		var dust := _HoofDust.new()
+		dust.position = n.position + Vector2(-26 if not flip else 26, -2)
+		_sorted.add_child(dust)
+	# back to the standing sprite once no newer step has arrived
+	var token: int = spr.get_meta("step_token", 0) + 1
+	spr.set_meta("step_token", token)
+	get_tree().create_timer(dur + 0.12).timeout.connect(func():
+		if is_instance_valid(spr) and spr.get_meta("step_token", 0) == token:
+			spr.rotation = 0.0
+			_set_hero_tex(spr, "heroes/map_%s.png" % fac, flip))
+
+## Swap a hero's texture keeping the feet anchored, mirrored when facing left.
+func _set_hero_tex(spr: Sprite2D, rel: String, flip: bool) -> void:
+	if not Assets.has(rel):
+		return
+	spr.texture = Assets.tex(rel)
+	spr.flip_h = flip
+	var anc := Assets.anchor(rel)
+	if anc.x >= 0.0:
+		var ax := (1.0 - anc.x) if flip else anc.x
+		spr.offset = -Vector2(ax * spr.texture.get_width(), anc.y * spr.texture.get_height())
 
 func update_fog(player: Dictionary) -> void:
 	var size: Vector2i = world["size"]
@@ -346,6 +385,23 @@ class _RectNode extends Node2D:
 	var rect := Rect2()
 	func _draw() -> void:
 		draw_rect(rect, Color.WHITE)
+
+class _HoofDust extends Node2D:
+	var t := 0.0
+	var _p := []
+	func _ready() -> void:
+		for i in 5:
+			_p.append([randf_range(-1, 1), randf_range(0.6, 1.2)])
+		var tw := create_tween()
+		tw.tween_property(self, "t", 1.0, 0.55).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(queue_free)
+	func _process(_d: float) -> void:
+		queue_redraw()
+	func _draw() -> void:
+		for p in _p:
+			draw_set_transform(Vector2(p[0] * 22.0 * (0.4 + t), -10.0 * t), 0, Vector2(1, 0.55))
+			draw_circle(Vector2.ZERO, 9.0 * p[1] * (0.5 + t), Color(0.6, 0.52, 0.4, 0.38 * (1.0 - t)))
+		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE)
 
 class _Ring extends Node2D:
 	func _process(_d: float) -> void:
