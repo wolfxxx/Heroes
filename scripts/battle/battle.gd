@@ -1176,7 +1176,7 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 		l.add_theme_color_override("font_outline_color", Color(0.15, 0.02, 0.0, 1.0))
 		l.add_theme_constant_override("outline_size", 9 if part[1] > 26 else 6)
 		row.add_child(l)
-	box.z_index = 30
+	box.z_index = 50 if follow else 30  # (over spell effects, which draw at 45; under count badges at 60)
 	(follow if follow else _fx).add_child(box)
 	box.reset_size()
 	var origin: Vector2 = follow.position if follow else Vector2.ZERO
