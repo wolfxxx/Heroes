@@ -376,7 +376,7 @@ func _object_node(o: Dictionary) -> Node2D:
 
 func _hero_node(h: Dictionary) -> Node2D:
 	var n := Node2D.new()
-	n.position = foot_of(h["pos"])
+	n.position = hero_foot(h["pos"])
 	var ring := _Ring.new()
 	ring.name = "Ring"
 	ring.visible = h["uid"] == selected_hero
@@ -403,6 +403,13 @@ func _add_flag(parent: Node2D, pos: Vector2, owner: int, h := 60.0, fly_left := 
 
 func foot_of(tile: Vector2i) -> Vector2:
 	return Vector2((tile.x + 0.5) * TILE, (tile.y + 1.0) * TILE - 6)
+
+## Where a hero stands on a tile: at a town's gate it steps out onto the road, in front of the wall (not into it).
+func hero_foot(tile: Vector2i) -> Vector2:
+	for t in world["towns"].values():
+		if t["pos"] == tile:
+			return foot_of(tile) + Vector2(0, 0.42 * TILE)
+	return foot_of(tile)
 
 func tile_center(tile: Vector2i) -> Vector2:
 	return (Vector2(tile) + Vector2(0.5, 0.5)) * TILE
@@ -495,7 +502,7 @@ func move_hero_step(uid: int, to_tile: Vector2i, dur: float) -> void:
 	var n: Node2D = _hero_nodes.get(uid)
 	if n == null:
 		return
-	var target := foot_of(to_tile)
+	var target := hero_foot(to_tile)
 	var spr: Sprite2D = n.get_node("Sprite")
 	var flip := spr.flip_h
 	if absf(target.x - n.position.x) > 1.0:

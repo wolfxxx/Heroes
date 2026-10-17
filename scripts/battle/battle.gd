@@ -8,7 +8,8 @@ const Y0 := 272.0
 const TIER_H := [0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]
 ## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
 const FIG_H := [0, 112.0, 118.0, 128.0, 135.0, 142.0, 188.0, 205.0]
-const FIG_MAX_W := 2.1  # widest solid figure in hexes (1-hex units; 2-hex units get one more hex)
+## Widest figure in hexes, wings and capes included: 1-hex and 2-hex units (a stack mustn't swallow its neighbours).
+const VIS_MAX_W := [1.6, 2.5]
 
 static var _sizes = null
 
@@ -23,6 +24,12 @@ static func fig_size(id: String) -> Vector2:
 				_sizes = d
 	var v = _sizes.get(id + ".png")
 	return Vector2(v[0], v[1]) if v != null else Vector2.ZERO
+
+## Width with semi-transparent parts (bone wings, capes, pikes), above the shadow.
+static func fig_vis_w(id: String) -> float:
+	fig_size(id)
+	var v = _sizes.get(id + ".png")
+	return float(v[2]) if v != null and v.size() > 2 else fig_size(id).x
 
 ## Flip a unit sprite horizontally while keeping its feet anchored.
 static func _set_flip(s: Sprite2D, flip: bool) -> void:
@@ -89,6 +96,14 @@ func _demo_setup() -> Dictionary:
 # ---------------------------------------------------------------------------------------------
 static func hex_pos(h: Vector2i) -> Vector2:
 	return Vector2(X0 + h.x * HEX_W + (HEX_W * 0.5 if h.y % 2 == 1 else 0.0), Y0 + h.y * ROW_STEP)
+
+## Where a stack's feet stand with its head on `head`: the middle of its footprint (two hexes for large ones).
+func stand_pos(st: Dictionary, head = null) -> Vector2:
+	var h: Vector2i = st["hex"] if head == null else head
+	var p := hex_pos(h) + Vector2(0, 24)
+	if L.is_wide(st):
+		p.x += BattleLogic.tail_dir(st["side"]).x * HEX_W * 0.5
+	return p
 
 static func hex_poly(c: Vector2, shrink := 0.0) -> PackedVector2Array:
 	var r := HEX_W / sqrt(3.0) - shrink
@@ -182,9 +197,10 @@ func _build_scene() -> void:
 func _make_unit(st: Dictionary) -> void:
 	var c: Dictionary = GameData.CREATURES[st["id"]]
 	var n := Node2D.new()
-	n.position = hex_pos(st["hex"]) + Vector2(0, 24)
+	n.position = stand_pos(st)
+	var wide := L.is_wide(st)
 	var shadow := _Shadow.new()
-	shadow.big = "two_hex" in c["abilities"]
+	shadow.big = wide
 	shadow.side = st["side"]
 	shadow.name = "Shadow"
 	n.add_child(shadow)
@@ -200,10 +216,10 @@ func _make_unit(st: Dictionary) -> void:
 		var fig := fig_size(st["id"])
 		var sc := 0.5
 		if fig.y > 0:
-			var max_w := HEX_W * (FIG_MAX_W + (1.0 if "two_hex" in c["abilities"] else 0.0))
-			sc = minf(FIG_H[c["tier"]] / fig.y, max_w / fig.x)
-			if "two_hex" in c["abilities"]:  # long lances / necks: a 2-hex unit should still span about two hexes
-				sc = clampf(2.0 * HEX_W / fig.x, sc, 1.35 * FIG_H[c["tier"]] / fig.y)
+			sc = FIG_H[c["tier"]] / fig.y
+			if wide:  # the body of a large unit spans most of its two hexes
+				sc = clampf(1.9 * HEX_W / fig.x, sc, 1.2 * sc)
+			sc = minf(sc, HEX_W * VIS_MAX_W[1 if wide else 0] / fig_vis_w(st["id"]))
 		s.scale = Vector2.ONE * sc
 		s.offset = (Vector2(0.5, 0.5) - anc) * tsz
 		s.set_meta("anchor_x", (0.5 - anc.x) * tsz.x)
@@ -216,14 +232,13 @@ func _make_unit(st: Dictionary) -> void:
 		n.set_meta("top", h)
 	_set_flip(s, st["side"] == 1)
 	MapView.outline(s, 1.2)
-	if "two_hex" in c["abilities"]:
-		s.position.x = -26 if st["side"] == 0 else 26
 	s.set_meta("home", s.position)
 	n.add_child(s)
 	var badge := _Badge.new()
 	badge.name = "Badge"
 	badge.st = st
-	badge.position = Vector2(34 if st["side"] == 0 else -34, 18)
+	# at the front corner of the footprint, facing the enemy (as the classic count plates)
+	badge.position = Vector2((HEX_W * (0.5 if wide else 0.0) + 26) * (1 if st["side"] == 0 else -1), 20)
 	badge.z_index = 5
 	n.add_child(badge)
 	_sorted.add_child(n)
@@ -319,8 +334,10 @@ func _build_ui() -> void:
 	root.add_child(_log)
 
 	_status = UI.label("", 22, UI.GOLD)
-	_status.position = Vector2(0, 966)
-	_status.size = Vector2(1920, 36)
+	# what a click would do, in the bottom bar in place of the log line (not over the field)
+	_status.position = _log.position
+	_status.size = _log.size
+	_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_status)
@@ -350,6 +367,10 @@ func _refresh_queue() -> void:
 
 func _set_log(t: String) -> void:
 	_log.text = t
+
+func _set_status(t: String) -> void:
+	_status.text = t
+	_log.visible = t == ""
 
 func _refresh_buttons(human_turn: bool) -> void:
 	var cur = L.current()
@@ -431,7 +452,7 @@ func _act(ev: Array) -> void:
 	_grid.reach = {}
 	_grid.hover = Vector2i(-1, -1)
 	_grid.queue_redraw()
-	_status.text = ""
+	_set_status("")
 	_refresh_buttons(false)
 	_reset_info()
 	await _play(ev)
@@ -496,7 +517,12 @@ func _update_info() -> void:
 	if key == "":
 		HoverInfo.hide_for(self)
 	elif key.begins_with("s"):
-		HoverInfo.show_for(self, _stack_info(L.stack_at(_hover)), 0.25, -1 if _hover.x >= L.COLS / 2 else 1)
+		var st: Dictionary = L.stack_at(_hover)
+		var side := -1 if stand_pos(st).x > 960 else 1
+		# beside the stack, clear of the deployment columns (the panel mustn't hide the army you're looking at)
+		var edge := stand_pos(st).x + side * (HEX_W * (1.0 if L.is_wide(st) else 0.5) + 30)
+		var clear := maxf(edge, X0 + HEX_W * 2.2) if side > 0 else minf(edge, X0 + HEX_W * 11.8)
+		HoverInfo.show_for(self, _stack_info(st), 0.25, side, clear)
 	else:
 		HoverInfo.show_for(self, _hero_info(int(key.substr(1))), 0.25, -1 if key == "h1" else 1)
 
@@ -638,7 +664,7 @@ func _update_hover() -> void:
 		_grid.hover = Vector2i(-1, -1)
 		_grid.attack_from = Vector2i(-1, -1)
 		_grid.queue_redraw()
-		_status.text = ""
+		_set_status("")
 		return
 	var txt := ""
 	if _spell != "":
@@ -658,7 +684,7 @@ func _update_hover() -> void:
 				var r := L.damage_range(cur, t, true)
 				_hover_action = {"type": "shoot", "target": t}
 				txt = "Shoot %s (damage %d-%d, kills %s)%s" % [L._name(t), r[0], r[1], _kills(t, r),
-					"  [half damage: range]" if L.distance(cur["hex"], t["hex"]) > 10 else ""]
+					"  [half damage: range]" if L.stack_distance(cur, t) > 10 else ""]
 			else:
 				var from := _attack_from(cur, t)
 				if from != Vector2i(-1, -1):
@@ -670,12 +696,13 @@ func _update_hover() -> void:
 					txt = "%s — out of reach" % L._name(t)
 		elif t and t["side"] == cur["side"]:
 			txt = "%d %s" % [t["count"], L._name(t)]
-		elif _reach.has(_hover):
-			_hover_action = {"type": "move", "hex": _hover}
+		elif _reach.has(_hover) or (L.is_wide(cur) and _reach.has(_hover - BattleLogic.tail_dir(cur["side"]))):
+			_hover_action = {"type": "move", "hex": _hover if _reach.has(_hover) else _hover - BattleLogic.tail_dir(cur["side"])}
 			txt = "Move here" if not L.is_flyer(cur) else "Fly here"
 	_grid.attack_from = _hover_action.get("from", Vector2i(-1, -1))
+	_grid.move_to = _hover_action.get("hex", Vector2i(-1, -1)) if _hover_action.get("type", "") == "move" else Vector2i(-1, -1)
 	_grid.queue_redraw()
-	_status.text = txt
+	_set_status(txt)
 
 func _kills(t: Dictionary, r: Array) -> String:
 	var hp: int = L.cdata(t)["hp"]
@@ -695,7 +722,7 @@ func _attack_from(cur: Dictionary, t: Dictionary) -> Vector2i:
 	var best: Vector2i = opts[0]
 	var bd := 1e9
 	for h in opts:
-		var d := (hex_pos(h) - m).length()
+		var d := (stand_pos(cur, h) - Vector2(0, 24) - m).length()
 		if d < bd:
 			bd = d
 			best = h
@@ -810,7 +837,7 @@ func _anim_move(st: Dictionary, path: Array) -> void:
 	var cycle := Assets.has("creatures/%s_move0.png" % st["id"])  # 4-frame walk / flap / gallop (tools/art/cycle_paint.py)
 	if L.is_flyer(st):
 		Audio.sfx("wings", -4)
-		var target := hex_pos(path[path.size() - 1]) + Vector2(0, 24)
+		var target := stand_pos(st, path[path.size() - 1])
 		if absf(target.x - n.position.x) > 2:
 			_set_flip(spr, target.x < n.position.x)
 		var dur := clampf(n.position.distance_to(target) / 700.0, 0.45, 1.1)
@@ -826,7 +853,7 @@ func _anim_move(st: Dictionary, path: Array) -> void:
 		var step := 0.2 if cycle else 0.13
 		var frame := 0
 		for i in range(1, path.size()):
-			var target := hex_pos(path[i]) + Vector2(0, 24)
+			var target := stand_pos(st, path[i])
 			if absf(target.x - n.position.x) > 2:
 				_set_flip(spr, target.x < n.position.x)
 			Audio.sfx("move_step", -10, 0.15)
@@ -859,12 +886,12 @@ func _face_enemies(st: Dictionary) -> void:
 	var best = null
 	var bd := 1e9
 	for e in L.alive_stacks(1 - st["side"]):
-		var d := L.distance(st["hex"], e["hex"])
+		var d := L.stack_distance(st, e)
 		if d < bd:
 			bd = d
 			best = e
 	if best:
-		_set_flip(n.get_node("Sprite"), hex_pos(best["hex"]).x < hex_pos(st["hex"]).x)
+		_set_flip(n.get_node("Sprite"), stand_pos(best).x < stand_pos(st).x)
 
 func _anim_attack(ev: Dictionary) -> void:
 	var a: Dictionary = ev["a"]
@@ -899,7 +926,7 @@ func _anim_attack(ev: Dictionary) -> void:
 		# strike in the attack pose
 		_pose(a, "attack", 0.45)
 		var tw2 := spr.create_tween().set_parallel(true)
-		tw2.tween_property(spr, "position", home + dir * 44, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw2.tween_property(spr, "position", home + dir * 24, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw2.tween_property(spr, "rotation", 0.05 * lean, 0.08)
 		await tw2.finished
 		Audio.creature_sfx(a["id"], "attack", "claw_hit" if a["id"] in ["griffin", "bone_dragon", "ghost", "vampire"] else ("blunt_hit" if a["id"] in ["zombie", "monk"] else "sword_hit"))
@@ -1019,7 +1046,7 @@ func _anim_spell(ev: Dictionary) -> void:
 	for t in targets:
 		if ev["dmg"].has(t["uid"]):
 			_hit_flash(t)
-			_damage_text(t, "-%d" % ev["dmg"][t["uid"]], ev["killed"].get(t["uid"], 0))
+			_damage_text(t, "-%d" % ev["dmg"][t["uid"]], ev["killed"].get(t["uid"], 0), false, targets.find(t) * 0.14)
 			_refresh_badge(t)
 		else:
 			var s: Sprite2D = _unit(t).get_node("Sprite")
@@ -1056,54 +1083,67 @@ func _refresh_badge(st: Dictionary) -> void:
 	var n := _unit(st)
 	if n:
 		n.get_node("Badge").queue_redraw()
+	for q in _queue_box.get_children():
+		q.queue_redraw()
+	if _info_key == "s%d" % st["uid"]:  # its hover panel shows the old numbers: rebuild it
+		_reset_info()
+		_update_info()
 
-## Damage over a stack: a large number, and how many died on a second line.
-func _damage_text(d: Dictionary, txt: String, killed: int, lucky := false) -> void:
-	if killed > 0:
-		txt += "\n%d killed" % killed
-	_float_text(_unit(d).position + Vector2(0, -_top(d) - 20), txt, Color(1, 0.85, 0.3) if lucky else Color(1, 0.95, 0.85), 36)
+## Damage over a stack: one compact label, "-45  2 slain" (area spells stagger theirs so they don't pile up).
+func _damage_text(d: Dictionary, txt: String, killed: int, lucky := false, delay := 0.0) -> void:
+	var p := _unit(d).position + Vector2(0, -_top(d) - 20)
+	_float_text(p, txt, Color(1, 0.85, 0.3) if lucky else Color(1, 0.95, 0.85), 34, ("%d slain" % killed) if killed > 0 else "", delay)
 
-func _float_text(p: Vector2, t: String, col: Color, size := 30) -> void:
-	var l := Label.new()
-	l.text = t
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_override("font", UI.title_font())
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", col)
-	l.add_theme_color_override("font_outline_color", Color(0.15, 0.02, 0.0, 1.0))
-	l.add_theme_constant_override("outline_size", 10 if size > 30 else 8)
-	l.add_theme_constant_override("line_spacing", -10)
+func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay := 0.0) -> void:
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+	var box := PanelContainer.new()
 	var bg := StyleBoxFlat.new()  # soft dark backing so numbers stay readable over busy sprites
-	bg.bg_color = Color(0, 0, 0, 0.3)
+	bg.bg_color = Color(0, 0, 0, 0.42)
 	bg.set_corner_radius_all(8)
 	bg.content_margin_left = 10
 	bg.content_margin_right = 10
-	l.add_theme_stylebox_override("normal", bg)
-	l.z_index = 30
-	_fx.add_child(l)
-	l.reset_size()
-	# don't land on a number that just appeared (area spells hit neighbouring stacks at once): stack above it
-	var r := Rect2(p - Vector2(l.size.x * 0.5, 0), l.size)
+	box.add_theme_stylebox_override("panel", bg)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	box.add_child(row)
+	for part in [[t, size, col], [sub, 22, Color(1, 0.62, 0.5)]]:
+		if part[0] == "":
+			continue
+		var l := Label.new()
+		l.text = part[0]
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.add_theme_font_override("font", UI.title_font())
+		l.add_theme_font_size_override("font_size", part[1])
+		l.add_theme_color_override("font_color", part[2])
+		l.add_theme_color_override("font_outline_color", Color(0.15, 0.02, 0.0, 1.0))
+		l.add_theme_constant_override("outline_size", 9 if part[1] > 26 else 6)
+		row.add_child(l)
+	box.z_index = 30
+	_fx.add_child(box)
+	box.reset_size()
+	# don't land on a label that just appeared (neighbouring stacks hit at once): sit above it
+	var r := Rect2(p - Vector2(box.size.x * 0.5, 0), box.size)
 	var now := Time.get_ticks_msec()
 	for k in 8:
 		var hit := false
 		for o in _fx.get_children():
-			if o != l and o.has_meta("float_rect") and now - int(o.get_meta("born")) < 700 and r.intersects(o.get_meta("float_rect").grow(-2)):
+			if o != box and o.has_meta("float_rect") and now - int(o.get_meta("born")) < 700 and r.intersects(o.get_meta("float_rect").grow(-2)):
 				r.position.y = o.get_meta("float_rect").position.y - r.size.y - 2
 				hit = true
 		if not hit:
 			break
-	l.set_meta("float_rect", r)
-	l.set_meta("born", now)
-	p.y = r.position.y
-	l.position = r.position
-	var tw := l.create_tween().set_parallel(true)
-	l.pivot_offset = l.size * 0.5
-	l.scale = Vector2(0.6, 0.6)
-	tw.tween_property(l, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "position:y", p.y - 70, 1.3).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 0.5).set_delay(1.0)
-	tw.chain().tween_callback(l.queue_free)
+	box.set_meta("float_rect", r)
+	box.set_meta("born", now)
+	box.position = r.position
+	var tw := box.create_tween().set_parallel(true)
+	box.pivot_offset = box.size * 0.5
+	box.scale = Vector2(0.6, 0.6)
+	tw.tween_property(box, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(box, "position:y", r.position.y - 60, 1.3).set_ease(Tween.EASE_OUT)
+	tw.tween_property(box, "modulate:a", 0.0, 0.5).set_delay(1.0)
+	tw.chain().tween_callback(box.queue_free)
 
 ## Spell name as a banner under the turn queue (not over the units), tinted by the caster's side.
 func _spell_banner(t: String, side: int) -> void:
@@ -1214,9 +1254,23 @@ class _Grid extends Node2D:
 	var hover := Vector2i(-1, -1)
 	var active := {}
 	var attack_from := Vector2i(-1, -1)
+	var move_to := Vector2i(-1, -1)
 	func _process(_d: float) -> void:
 		if not active.is_empty():
 			queue_redraw()  # pulse the active hex
+	## The hexes the active stack would cover with its head on h.
+	func _body(h: Vector2i) -> Array:
+		return b.L.cells(active, h) if not active.is_empty() else [h]
+	func _fill(hexes: Array, col: Color, line := Color(0, 0, 0, 0), width := 2.0) -> void:
+		for h in hexes:
+			if not BattleLogic.in_bounds(h):
+				continue
+			var poly: PackedVector2Array = b.hex_poly(b.hex_pos(h), 3.0)
+			draw_colored_polygon(poly, col)
+			if line.a > 0.0:
+				var closed := poly.duplicate()
+				closed.append(poly[0])
+				draw_polyline(closed, line, width, true)
 	func _draw() -> void:
 		for y in BattleLogic.ROWS:
 			for x in BattleLogic.COLS:
@@ -1231,20 +1285,13 @@ class _Grid extends Node2D:
 				draw_polyline(closed, Color(1, 0.97, 0.8, 0.34), 1.5, true)
 		if not active.is_empty() and active.get("alive", false):
 			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 180.0)
-			var poly: PackedVector2Array = b.hex_poly(b.hex_pos(active["hex"]), 3.0)
-			draw_colored_polygon(poly, Color(1, 0.85, 0.3, 0.22 + 0.18 * pulse))
-			var closed := poly.duplicate()
-			closed.append(poly[0])
-			draw_polyline(closed, Color(1, 0.9, 0.4, 0.75 + 0.25 * pulse), 4.0, true)
+			_fill(_body(active["hex"]), Color(1, 0.85, 0.3, 0.22 + 0.18 * pulse), Color(1, 0.9, 0.4, 0.75 + 0.25 * pulse), 4.0)
 		if hover.x >= 0:
-			var poly: PackedVector2Array = b.hex_poly(b.hex_pos(hover), 3.0)
-			var closed := poly.duplicate()
-			closed.append(poly[0])
-			draw_colored_polygon(poly, Color(1, 1, 1, 0.12))
-			draw_polyline(closed, Color(1, 1, 1, 0.7), 2.0, true)
+			var under = b.L.stack_at(hover)
+			var hexes: Array = b.L.cells(under) if under != null else (_body(move_to) if move_to.x >= 0 else [hover])
+			_fill(hexes, Color(1, 1, 1, 0.12), Color(1, 1, 1, 0.7))
 		if attack_from.x >= 0:
-			var poly: PackedVector2Array = b.hex_poly(b.hex_pos(attack_from), 3.0)
-			draw_colored_polygon(poly, Color(1, 0.4, 0.2, 0.25))
+			_fill(_body(attack_from), Color(1, 0.4, 0.2, 0.25))
 
 class _Shadow extends Node2D:
 	var big := false
@@ -1257,7 +1304,7 @@ class _Shadow extends Node2D:
 		if active:
 			queue_redraw()
 	func _draw() -> void:
-		var w := 62.0 if big else 44.0
+		var w := 84.0 if big else 44.0
 		draw_set_transform(Vector2(0, -2), 0, Vector2(1, 0.32))
 		draw_circle(Vector2.ZERO, w, Color(0, 0, 0, 0.35))
 		# side colour (as the count badge): whose stack is whose, even when sprites overlap

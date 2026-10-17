@@ -261,20 +261,14 @@ func _build_setup() -> void:
 ## Selected toggles sit on the bright gold texture: force dark ink text in every pressed/focus state, no focus ring.
 func _ink(b: Button) -> void:
 	b.focus_mode = Control.FOCUS_NONE
-	for c in ["font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(c, Color(0.16, 0.08, 0.02))
-	b.add_theme_color_override("font_outline_color", Color(1, 0.9, 0.6, 0.0))
+	UI.plate_toggle(b)
 
 ## A big choice card (faction, hero): picture + gold title + wrapped text. The selected card keeps light text on a
 ## dark panel and is marked by a bright gold frame and glow (dark ink on the gold toggle texture read poorly).
 func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, title_size := 25) -> void:
 	b.focus_mode = Control.FOCUS_NONE
-	var on := StyleBoxFlat.new()
-	on.bg_color = Color(0.2, 0.13, 0.06, 0.97)
-	on.border_color = Color(1.0, 0.82, 0.38)
+	var on := UI.selected_plate()
 	on.set_border_width_all(4)
-	on.set_corner_radius_all(6)
-	on.shadow_color = Color(1.0, 0.75, 0.3, 0.45)
 	on.shadow_size = 10
 	for st in ["pressed", "hover_pressed"]:
 		b.add_theme_stylebox_override(st, on)

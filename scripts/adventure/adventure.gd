@@ -32,8 +32,10 @@ func _ready() -> void:
 			s["faction"] = Shot.args.get("faction", s.get("faction", "haven"))
 		GameState.world = WorldGen.generate(s)
 		if Shot.setup == "all_spells":
-			for h in GameState.world["heroes"].values():
+			for h in GameState.world["heroes"].values():  # a seasoned hero: spells, skills and some gear
 				h["spells"] = GameData.SPELLS.keys()
+				h["skills"].merge({"wisdom": 2, "offense": 1, "logistics": 3})
+				h["artifacts"] = ["sword_of_valor", "helm_of_wisdom", "boots_of_speed", "ring_of_vitality"]
 	world = GameState.world
 	RenderingServer.set_default_clear_color(Color(0.02, 0.02, 0.03))
 	rules = AdvRules.new(world)

@@ -69,6 +69,11 @@ leaves the `_dead` sprite on the hex as a corpse.
 - `ui/spellbook.png` — 1536x1024 open leather spellbook with five school tabs (all, air, fire, water, earth), keyed
   from magenta. Page and tab rectangles are in `scripts/ui/spell_book.gd`. `icons/spell_<id>.png` (128 px) are painted
   miniatures. Both by `tools/art/spellbook_paint.py` (imagegen/batch14; `paint <spell_id>` repaints one miniature).
+- `ui/paperdoll.png` — 600x800 hero-screen paper-doll: a faint gilded etching of an armoured figure on dark slate;
+  the artifact sockets are drawn over it (`scripts/ui/hero_screen.gd` SOCKETS). `tools/art/paperdoll_paint.py`
+  (imagegen/batch17).
+- `creatures/sizes.json` — per sprite `[w, h, vis_w]`: solid figure size and the width with semi-transparent wings /
+  capes, used by `battle.gd` to size stacks within their 1- or 2-hex footprint (`tools/art/sprite_sizes.py`).
 - `battle/obstacle_1..4.png` — rocks/stumps/skulls placed on hexes, transparent, ~160x128.
 
 ## Town screens

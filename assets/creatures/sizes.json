@@ -1,58 +1,562 @@
 {
 "angel.png": [
 359,
-402
+402,
+359
+],
+"angel_attack.png": [
+559,
+390,
+561
+],
+"angel_dead.png": [
+572,
+356,
+573
+],
+"angel_hit.png": [
+407,
+382,
+409
+],
+"angel_move0.png": [
+304,
+554,
+306
+],
+"angel_move1.png": [
+675,
+380,
+676
+],
+"angel_move2.png": [
+374,
+417,
+377
+],
+"angel_move3.png": [
+550,
+386,
+551
 ],
 "archer.png": [
 152,
-272
+272,
+153
+],
+"archer_attack.png": [
+250,
+315,
+232
+],
+"archer_dead.png": [
+301,
+143,
+303
+],
+"archer_hit.png": [
+192,
+299,
+167
+],
+"archer_move0.png": [
+198,
+289,
+184
+],
+"archer_move1.png": [
+164,
+307,
+166
+],
+"archer_move2.png": [
+195,
+288,
+181
+],
+"archer_move3.png": [
+165,
+303,
+165
 ],
 "bone_dragon.png": [
 372,
-541
+541,
+562
+],
+"bone_dragon_attack.png": [
+527,
+483,
+528
+],
+"bone_dragon_dead.png": [
+557,
+407,
+560
+],
+"bone_dragon_hit.png": [
+493,
+525,
+499
+],
+"bone_dragon_move0.png": [
+478,
+600,
+480
+],
+"bone_dragon_move1.png": [
+715,
+472,
+720
+],
+"bone_dragon_move2.png": [
+607,
+460,
+609
+],
+"bone_dragon_move3.png": [
+475,
+586,
+478
 ],
 "cavalier.png": [
 329,
-507
+507,
+329
+],
+"cavalier_attack.png": [
+540,
+351,
+542
+],
+"cavalier_dead.png": [
+450,
+223,
+454
+],
+"cavalier_hit.png": [
+362,
+529,
+363
+],
+"cavalier_move0.png": [
+401,
+505,
+404
+],
+"cavalier_move1.png": [
+453,
+518,
+440
+],
+"cavalier_move2.png": [
+418,
+528,
+421
+],
+"cavalier_move3.png": [
+416,
+519,
+419
 ],
 "dread_knight.png": [
 329,
-507
+507,
+329
+],
+"dread_knight_attack.png": [
+565,
+330,
+566
+],
+"dread_knight_dead.png": [
+514,
+200,
+486
+],
+"dread_knight_hit.png": [
+364,
+470,
+366
+],
+"dread_knight_move0.png": [
+403,
+500,
+406
+],
+"dread_knight_move1.png": [
+476,
+498,
+454
+],
+"dread_knight_move2.png": [
+433,
+516,
+435
+],
+"dread_knight_move3.png": [
+432,
+488,
+435
 ],
 "ghost.png": [
 133,
-275
+275,
+134
+],
+"ghost_attack.png": [
+216,
+221,
+217
+],
+"ghost_dead.png": [
+280,
+133,
+281
+],
+"ghost_hit.png": [
+162,
+248,
+164
+],
+"ghost_move0.png": [
+228,
+257,
+235
+],
+"ghost_move1.png": [
+204,
+251,
+216
+],
+"ghost_move2.png": [
+205,
+258,
+215
+],
+"ghost_move3.png": [
+134,
+281,
+136
 ],
 "griffin.png": [
 489,
-258
+258,
+571
+],
+"griffin_attack.png": [
+560,
+416,
+562
+],
+"griffin_dead.png": [
+460,
+200,
+461
+],
+"griffin_hit.png": [
+352,
+323,
+353
+],
+"griffin_move0.png": [
+298,
+336,
+299
+],
+"griffin_move1.png": [
+572,
+240,
+575
+],
+"griffin_move2.png": [
+344,
+209,
+346
+],
+"griffin_move3.png": [
+497,
+276,
+499
 ],
 "lich.png": [
 199,
-287
+287,
+201
+],
+"lich_attack.png": [
+308,
+319,
+310
+],
+"lich_dead.png": [
+358,
+146,
+362
+],
+"lich_hit.png": [
+181,
+314,
+183
+],
+"lich_move0.png": [
+206,
+298,
+197
+],
+"lich_move1.png": [
+187,
+304,
+189
+],
+"lich_move2.png": [
+197,
+301,
+189
+],
+"lich_move3.png": [
+193,
+307,
+195
 ],
 "monk.png": [
 142,
-277
+277,
+143
+],
+"monk_attack.png": [
+221,
+225,
+220
+],
+"monk_dead.png": [
+284,
+107,
+285
+],
+"monk_hit.png": [
+179,
+227,
+180
+],
+"monk_move0.png": [
+150,
+255,
+133
+],
+"monk_move1.png": [
+88,
+286,
+88
+],
+"monk_move2.png": [
+148,
+258,
+131
+],
+"monk_move3.png": [
+90,
+289,
+91
 ],
 "pikeman.png": [
 158,
-312
+312,
+267
+],
+"pikeman_attack.png": [
+276,
+281,
+277
+],
+"pikeman_dead.png": [
+320,
+147,
+322
+],
+"pikeman_hit.png": [
+229,
+292,
+230
+],
+"pikeman_move0.png": [
+186,
+331,
+158
+],
+"pikeman_move1.png": [
+142,
+354,
+144
+],
+"pikeman_move2.png": [
+172,
+330,
+148
+],
+"pikeman_move3.png": [
+149,
+342,
+152
 ],
 "skeleton.png": [
 175,
-287
+287,
+176
+],
+"skeleton_attack.png": [
+337,
+272,
+327
+],
+"skeleton_dead.png": [
+323,
+156,
+324
+],
+"skeleton_hit.png": [
+168,
+277,
+168
+],
+"skeleton_move0.png": [
+193,
+301,
+189
+],
+"skeleton_move1.png": [
+191,
+312,
+191
+],
+"skeleton_move2.png": [
+190,
+310,
+191
+],
+"skeleton_move3.png": [
+188,
+309,
+189
 ],
 "swordsman.png": [
 111,
-301
+301,
+111
+],
+"swordsman_attack.png": [
+247,
+257,
+242
+],
+"swordsman_dead.png": [
+281,
+172,
+282
+],
+"swordsman_hit.png": [
+187,
+277,
+176
+],
+"swordsman_move0.png": [
+169,
+301,
+144
+],
+"swordsman_move1.png": [
+132,
+326,
+135
+],
+"swordsman_move2.png": [
+146,
+309,
+142
+],
+"swordsman_move3.png": [
+135,
+326,
+137
 ],
 "vampire.png": [
 288,
-378
+378,
+445
+],
+"vampire_attack.png": [
+389,
+293,
+391
+],
+"vampire_dead.png": [
+373,
+177,
+375
+],
+"vampire_hit.png": [
+236,
+323,
+236
+],
+"vampire_move0.png": [
+256,
+423,
+260
+],
+"vampire_move1.png": [
+448,
+281,
+452
+],
+"vampire_move2.png": [
+229,
+312,
+231
+],
+"vampire_move3.png": [
+439,
+307,
+442
 ],
 "zombie.png": [
 181,
-263
+263,
+175
+],
+"zombie_attack.png": [
+246,
+254,
+243
+],
+"zombie_dead.png": [
+320,
+102,
+320
+],
+"zombie_hit.png": [
+182,
+266,
+154
+],
+"zombie_move0.png": [
+210,
+278,
+200
+],
+"zombie_move1.png": [
+188,
+278,
+182
+],
+"zombie_move2.png": [
+197,
+275,
+185
+],
+"zombie_move3.png": [
+187,
+274,
+181
 ]
 }

@@ -72,6 +72,14 @@ class _Book extends Control:
 			c.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			c.pressed.connect(_turn.bind(-1 if i == 0 else 1))
 			add_child(c)
+		# a wax-seal close button under the bookmarks (Esc, right click and a click beside the book also close it)
+		var x := _Seal.new()
+		x.position = Vector2(1404, 906)
+		x.size = Vector2(84, 84)
+		x.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		x.pressed.connect(func(): m.close(""))
+		HoverInfo.attach(x, func(): return "Close the book  (Esc, right click)", 0.3)
+		add_child(x)
 		_content = Control.new()
 		_content.mouse_filter = MOUSE_FILTER_IGNORE
 		_content.size = SpellBook.SIZE
@@ -251,3 +259,22 @@ class _Book extends Control:
 		b.flat = true
 		for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 			b.add_theme_stylebox_override(st, StyleBoxEmpty.new())
+
+## Round red wax seal with a gold rim and a cross: the book's close button.
+class _Seal extends BaseButton:
+	func _ready() -> void:
+		focus_mode = Control.FOCUS_NONE
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.5 - 4
+		var hot := is_hovered()
+		draw_circle(c + Vector2(2, 4), r, Color(0, 0, 0, 0.45))
+		draw_circle(c, r, Color(0.86, 0.66, 0.3) if hot else Color(0.7, 0.52, 0.22))
+		draw_circle(c, r - 5, Color(0.62, 0.1, 0.07) if hot else Color(0.48, 0.07, 0.05))
+		draw_arc(c, r - 9, PI * 1.1, PI * 1.6, 16, Color(1, 0.6, 0.5, 0.35), 3, true)  # wax sheen
+		var k := r * 0.36
+		for d in [Vector2(k, k), Vector2(k, -k)]:
+			draw_line(c - d, c + d, Color(0.2, 0.02, 0.0), 9, true)
+			draw_line(c - d, c + d, Color(1, 0.86, 0.55) if hot else Color(0.93, 0.76, 0.42), 5, true)

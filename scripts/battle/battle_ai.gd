@@ -55,7 +55,7 @@ static func decide(L: BattleLogic, s: Dictionary) -> Dictionary:
 	var target: Dictionary = enemies[0]
 	var tv := -1.0
 	for e in enemies:
-		var v: float = L.cdata(e)["ai_value"] * e["count"] / (1.0 + L.distance(s["hex"], e["hex"]))
+		var v: float = L.cdata(e)["ai_value"] * e["count"] / (1.0 + L.stack_distance(s, e))
 		if v > tv:
 			tv = v
 			target = e
@@ -110,11 +110,9 @@ static func decide_spell(L: BattleLogic, side: int) -> Dictionary:
 			"area":
 				for e in enemies:
 					var v := 0.0
-					for n in [e["hex"]] + BattleLogic.neighbors(e["hex"]):
-						var s = L.stack_at(n)
-						if s:
-							var val := _value_of_damage(L, s, L.spell_damage(side, sp))
-							v += val if s["side"] != side else -1.2 * val
+					for s in L.stacks_on([e["hex"]] + BattleLogic.neighbors(e["hex"])):
+						var val := _value_of_damage(L, s, L.spell_damage(side, sp))
+						v += val if s["side"] != side else -1.2 * val
 					if v > bv:
 						bv = v
 						best = {"spell": sp, "hex": e["hex"]}

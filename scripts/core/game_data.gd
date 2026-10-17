@@ -57,7 +57,7 @@ const CREATURES := {
 		"cost": {"gold": 1000}, "abilities": ["jousting", "two_hex"], "ai_value": 1946},
 	"angel": {"name": "Angel", "plural": "Angels", "faction": "haven", "tier": 7,
 		"attack": 20, "defense": 20, "dmg": [50, 50], "hp": 200, "speed": 12, "growth": 1, "shots": 0,
-		"cost": {"gold": 3000, "gems": 1}, "abilities": ["flying", "hates_undead"], "ai_value": 5019},
+		"cost": {"gold": 3000, "gems": 1}, "abilities": ["flying", "hates_undead", "two_hex"], "ai_value": 5019},
 	# ---------------- NECROPOLIS ----------------
 	"skeleton": {"name": "Skeleton", "plural": "Skeletons", "faction": "necropolis", "tier": 1,
 		"attack": 5, "defense": 4, "dmg": [1, 3], "hp": 6, "speed": 4, "growth": 12, "shots": 0,

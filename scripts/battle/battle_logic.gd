@@ -1,6 +1,8 @@
 extends RefCounted
 class_name BattleLogic
 ## Pure combat rules on a 15x11 hex grid (odd rows shifted right, HoMM3 layout).
+## Large ("two_hex") creatures stand on two hexes of one row: s["hex"] is the front (head) hex, the tail is the
+## hex behind it, towards the stack's own side (cells()).
 ## Mutating calls return Arrays of "events" the battle scene animates:
 ##   {"t": "move", "s": stack, "path": [hex...]}
 ##   {"t": "attack", "a": stack, "d": stack, "ranged": bool, "retaliation": bool, "dmg": int, "killed": int, "lucky": bool}
@@ -54,10 +56,11 @@ func _deploy(army: Array, side: int) -> void:
 		if a == null or a["count"] <= 0:
 			continue
 		var c: Dictionary = GameData.CREATURES[a["id"]]
+		var wide: bool = "two_hex" in c["abilities"]
 		_uid += 1
 		var st := {
 			"uid": _uid, "id": a["id"], "side": side, "slot": i, "count": a["count"], "hp_top": c["hp"],
-			"hex": Vector2i(0 if side == 0 else COLS - 1, SLOT_ROWS[i]), "shots": c["shots"],
+			"hex": Vector2i((1 if wide else 0) if side == 0 else COLS - (2 if wide else 1), SLOT_ROWS[i]), "shots": c["shots"],
 			"retaliations": 2 if "two_retaliations" in c["abilities"] else 1, "effects": {},
 			"alive": true, "defending": false, "waited": false, "acted": false,
 		}
@@ -108,12 +111,52 @@ static func distance(a: Vector2i, b: Vector2i) -> int:
 
 func stack_at(h: Vector2i) -> Variant:
 	for s in stacks:
-		if s["alive"] and s["hex"] == h:
+		if s["alive"] and (s["hex"] == h or (is_wide(s) and tail(s) == h)):
 			return s
 	return null
 
 func is_free(h: Vector2i) -> bool:
 	return in_bounds(h) and not obstacles.has(h) and stack_at(h) == null
+
+func is_wide(s: Dictionary) -> bool:
+	return has_ab(s, "two_hex")
+
+## Offset from a stack's head hex to its tail: towards its own side of the field.
+static func tail_dir(side: int) -> Vector2i:
+	return Vector2i(-1 if side == 0 else 1, 0)
+
+func tail(s: Dictionary, head = null) -> Vector2i:
+	return (s["hex"] if head == null else head) + tail_dir(s["side"])
+
+## The hexes a stack covers with its head on `head` (default: where it stands).
+func cells(s: Dictionary, head = null) -> Array:
+	var h: Vector2i = s["hex"] if head == null else head
+	return [h, h + tail_dir(s["side"])] if is_wide(s) else [h]
+
+## Can the stack stand with its head on `head` (in bounds, no obstacle, no other stack)?
+func fits(s: Dictionary, head: Vector2i) -> bool:
+	for c in cells(s, head):
+		if not in_bounds(c) or obstacles.has(c):
+			return false
+		var o = stack_at(c)
+		if o != null and o != s:
+			return false
+	return true
+
+## Hex distance between two stacks (closest cells).
+func stack_distance(a: Dictionary, b: Dictionary) -> int:
+	var best := 999
+	for x in cells(a):
+		for y in cells(b):
+			best = mini(best, distance(x, y))
+	return best
+
+func _touches(a_cells: Array, b_cells: Array) -> bool:
+	for x in a_cells:
+		for y in b_cells:
+			if distance(x, y) == 1:
+				return true
+	return false
 
 # ---------------------------------------------------------------------------------------------
 # Stats
@@ -178,7 +221,7 @@ func reachable(s: Dictionary) -> Dictionary:
 			for x in COLS:
 				var h := Vector2i(x, y)
 				var d := distance(s["hex"], h)
-				if d <= spd and d > 0 and is_free(h):
+				if d <= spd and d > 0 and fits(s, h):
 					out[h] = d
 		return out
 	var dist := {s["hex"]: 0}
@@ -187,7 +230,7 @@ func reachable(s: Dictionary) -> Dictionary:
 		var nxt := []
 		for h in frontier:
 			for n in neighbors(h):
-				if dist.has(n) or not is_free(n):
+				if dist.has(n) or not fits(s, n):
 					continue
 				dist[n] = dist[h] + 1
 				if dist[n] < spd:
@@ -205,7 +248,7 @@ func path_to(s: Dictionary, target: Vector2i) -> Array:
 		var nxt := []
 		for h in frontier:
 			for n in neighbors(h):
-				if prev.has(n) or not is_free(n):
+				if prev.has(n) or not fits(s, n):
 					continue
 				prev[n] = h
 				if n == target:
@@ -222,23 +265,42 @@ func path_to(s: Dictionary, target: Vector2i) -> Array:
 
 func adjacent_enemies(s: Dictionary) -> Array:
 	var out := []
-	for n in neighbors(s["hex"]):
-		var o = stack_at(n)
-		if o and o["side"] != s["side"]:
+	for c in cells(s):
+		for n in neighbors(c):
+			var o = stack_at(n)
+			if o and o["side"] != s["side"] and not o in out:
+				out.append(o)
+	return out
+
+## Every stack standing on `hexes`, each once (a large stack covers two of them).
+func stacks_on(hexes: Array) -> Array:
+	var out := []
+	for h in hexes:
+		var o = stack_at(h)
+		if o and not o in out:
 			out.append(o)
 	return out
 
 func can_shoot(s: Dictionary) -> bool:
 	return s["shots"] > 0 and adjacent_enemies(s).is_empty()
 
-## Hexes from which s can melee target this turn (includes current hex if adjacent).
+## Head hexes from which s can melee target this turn (includes where it stands if already adjacent).
 func attack_positions(s: Dictionary, target: Dictionary, reach: Dictionary = {}) -> Array:
 	if reach.is_empty():
 		reach = reachable(s)
+	var tc := cells(target)
+	var cand := []
+	for c in tc:
+		for n in neighbors(c):
+			cand.append(n)
+			if is_wide(s):
+				cand.append(n - tail_dir(s["side"]))  # the tail touches the target
 	var out := []
-	for n in neighbors(target["hex"]):
-		if n == s["hex"] or reach.has(n):
-			out.append(n)
+	for h in cand:
+		if h in out or not (h == s["hex"] or reach.has(h)):
+			continue
+		if _touches(cells(s, h), tc):
+			out.append(h)
 	return out
 
 # ---------------------------------------------------------------------------------------------
@@ -266,7 +328,7 @@ func _mult(a: Dictionary, d: Dictionary, ranged: bool, moved: int) -> float:
 	var bonus := 1.0
 	if ranged:
 		bonus += 0.15 * hero_skill(a["side"], "archery")
-		if distance(a["hex"], d["hex"]) > 10:
+		if stack_distance(a, d) > 10:
 			bonus *= 0.5
 	else:
 		bonus += 0.10 * hero_skill(a["side"], "offense")
@@ -439,9 +501,11 @@ func do_shoot(s: Dictionary, target: Dictionary) -> Array:
 	if has_ab(s, "death_cloud"):
 		var hit := {}
 		var killed := {}
-		for n in neighbors(target["hex"]):
-			var o = stack_at(n)
-			if o and not has_ab(o, "undead"):
+		var around := []
+		for c in cells(target):
+			around += neighbors(c)
+		for o in stacks_on(around):
+			if o != target and not has_ab(o, "undead"):
 				var dmg := maxi(1, int(_roll_damage(s, o, true, 0) * 0.5))
 				hit[o["uid"]] = dmg
 				killed[o["uid"]] = apply_damage(o, dmg)
@@ -543,10 +607,7 @@ func cast(side: int, spell: String, hex: Vector2i) -> Array:
 			if s:
 				targets = [s]
 		"area":
-			for n in [hex] + neighbors(hex):
-				var s = stack_at(n)
-				if s:
-					targets.append(s)
+			targets = stacks_on([hex] + neighbors(hex))
 		"all_living":
 			for s in alive_stacks():
 				if not has_ab(s, "undead"):

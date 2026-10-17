@@ -5,6 +5,7 @@ class_name HoverInfo
 ##   HoverInfo.attach(control, func(): return HoverInfo.creature("skeleton", 12))
 ##   HoverInfo.show_for(owner, content, delay, side) / HoverInfo.hide_for(owner)   for things that aren't Controls
 ## side: 1 = right of the cursor (default), -1 = left of it (each falls back to the other if there's no room).
+## clear_x (>= 0): keep the panel on that side of this screen x (e.g. clear of a battle stack and its neighbours).
 ## Content is a Control, a String, or null (nothing to show).
 
 const WIDTH := 400.0
@@ -26,8 +27,9 @@ static func attach(c: Control, build: Callable, delay := 0.0) -> void:
 	c.mouse_exited.connect(func(): hide_for(c))
 	c.tree_exiting.connect(func(): hide_for(c))
 
-static func show_for(owner: Object, content, delay := 0.0, side := 1) -> void:
+static func show_for(owner: Object, content, delay := 0.0, side := 1, clear_x := -1.0) -> void:
 	_layer().side = side
+	_layer().clear_x = clear_x
 	_layer().present(owner, content, delay)
 
 static func hide_for(owner: Object) -> void:
@@ -110,6 +112,7 @@ class _Layer extends CanvasLayer:
 	var wait := 0.0
 	var mouse := Vector2.ZERO  # from motion events (follows simulated input too, unlike the OS cursor)
 	var side := 1
+	var clear_x := -1.0
 
 	func _init() -> void:
 		layer = 120
@@ -197,7 +200,9 @@ class _Layer extends CanvasLayer:
 		panel.size = sz
 		var p := m + Vector2(26, 26)
 		var left := m.x - sz.x - 16
-		if (side < 0 and left >= 8) or p.x + sz.x > vs.x - 8:
+		if clear_x >= 0.0:
+			p.x = clampf(maxf(p.x, clear_x) if side > 0 else minf(left, clear_x - sz.x), 8, vs.x - sz.x - 8)
+		elif (side < 0 and left >= 8) or p.x + sz.x > vs.x - 8:
 			p.x = left
 		if p.y + sz.y > vs.y - 8:
 			p.y = maxf(8, vs.y - sz.y - 8)
@@ -207,5 +212,6 @@ class _Layer extends CanvasLayer:
 		if e is InputEventMouse:
 			mouse = e.position
 		# a click starts something else (a dialog, a move): get out of the way
-		if e is InputEventMouseButton and e.pressed and panel.visible:
+		# (also one still waiting out its delay, or it would pop up afterwards with what the click just changed)
+		if e is InputEventMouseButton and e.pressed and content != null:
 			dismiss(owner_obj)

@@ -275,12 +275,13 @@ func _hero_card(h: Dictionary) -> Control:
 	var lv := UI.label("Level %d" % h["level"], 16)
 	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(lv)
-	# the selected card is bright gold: dark ink text without shadow (follows the toggle, which can change later)
+	# the selected card: a dark plate in a gold frame, gold name (follows the toggle, which can change later)
+	var on := UI.selected_plate(6)
+	b.add_theme_stylebox_override("pressed", on)
+	b.add_theme_stylebox_override("hover_pressed", on)
 	var ink := func(sel: bool):
-		l.add_theme_color_override("font_color", Color(0.16, 0.08, 0.02) if sel else UI.TEXT)
-		lv.add_theme_color_override("font_color", Color(0.2, 0.09, 0.02) if sel else Color(0.8, 0.75, 0.62))
-		for x in [l, lv]:
-			x.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0) if sel else Color(0, 0, 0, 0.7))
+		l.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5) if sel else UI.TEXT)
+		lv.add_theme_color_override("font_color", Color(0.9, 0.84, 0.7) if sel else Color(0.8, 0.75, 0.62))
 	ink.call(b.button_pressed)
 	b.toggled.connect(ink)
 	return b
@@ -431,120 +432,7 @@ func open_system_menu() -> void:
 			adv.get_tree().quit()
 
 func open_hero_screen(h: Dictionary) -> void:
-	var m := Modal.custom(adv, "", 1060)
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 24)
-	m.body.add_child(top)
-	top.add_child(UI.icon(Assets.hero_portrait(h["id"]), Vector2(160, 160)))
-	var info := VBoxContainer.new()
-	top.add_child(info)
-	info.add_child(UI.label(h["name"], 36, UI.GOLD, true))
-	info.add_child(UI.label("Level %d %s  —  %d / %d experience" % [h["level"], h["class"], h["xp"],
-		GameData.XP_LEVELS[mini(h["level"], GameData.XP_LEVELS.size() - 1)]], 21))
-	info.add_child(UI.label("Specialty: %s     Movement %d / %d     Mana %d / %d" % [GameData.HEROES[h["id"]]["specialty"],
-		h["movement"], h["max_movement"], h["mana"], GameState.max_mana(h)], 21))
-	var stats := HBoxContainer.new()
-	stats.add_theme_constant_override("separation", 28)
-	info.add_child(stats)
-	for s in ["attack", "defense", "power", "knowledge"]:
-		var v := VBoxContainer.new()
-		v.add_child(UI.icon(Assets.tex("icons/stat_%s.png" % s), Vector2(56, 56)))
-		var l := UI.label("%s %d" % [s.capitalize(), GameState.hero_stat(h, s)], 19)
-		v.add_child(l)
-		stats.add_child(v)
-
-	m.body.add_child(UI.label("Secondary Skills", 24, UI.GOLD))
-	var sk := GridContainer.new()
-	sk.columns = 4
-	sk.add_theme_constant_override("h_separation", 10)
-	sk.add_theme_constant_override("v_separation", 8)
-	m.body.add_child(sk)
-	var skill_ids: Array = h["skills"].keys()
-	for i in range(skill_ids.size(), 8):
-		skill_ids.append("")
-	for s in skill_ids:
-		var v := HBoxContainer.new()
-		v.custom_minimum_size = Vector2(240, 60)
-		v.add_theme_constant_override("separation", 8)
-		if s == "":
-			var empty := PanelContainer.new()
-			empty.custom_minimum_size = Vector2(240, 60)
-			empty.modulate = Color(1, 1, 1, 0.35)
-			sk.add_child(empty)
-			continue
-		var ic := UI.icon(Assets.skill_icon(s), Vector2(52, 52))
-		ic.tooltip_text = GameData.SKILLS[s]["desc"]
-		ic.mouse_filter = Control.MOUSE_FILTER_PASS
-		v.add_child(ic)
-		v.add_child(UI.label("%s\n%s" % [["", "Basic", "Advanced", "Expert"][mini(3, h["skills"][s])], GameData.SKILLS[s]["name"]], 16))
-		sk.add_child(v)
-
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 60)
-	m.body.add_child(row)
-	var av := VBoxContainer.new()
-	row.add_child(av)
-	av.add_child(UI.label("Artifacts", 24, UI.GOLD))
-	var ah := HBoxContainer.new()
-	ah.add_theme_constant_override("separation", 6)
-	av.add_child(ah)
-	# one slot per body part, like a HoMM paperdoll
-	var by_slot := {}
-	var extra := []
-	for a in h["artifacts"]:
-		var sl: String = GameData.ARTIFACTS[a]["slot"]
-		if by_slot.has(sl):
-			extra.append(a)
-		else:
-			by_slot[sl] = a
-	for sl in ["head", "weapon", "shield", "ring", "feet", "misc"]:
-		var slot := PanelContainer.new()
-		slot.custom_minimum_size = Vector2(66, 66)
-		slot.tooltip_text = sl.capitalize()
-		if by_slot.has(sl):
-			var a: String = by_slot[sl]
-			var ic := UI.icon(Assets.artifact_icon(a), Vector2(54, 54))
-			ic.tooltip_text = "%s: %s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
-			ic.mouse_filter = Control.MOUSE_FILTER_PASS
-			slot.add_child(ic)
-		else:
-			var l := UI.label(sl.capitalize(), 13, Color(0.6, 0.55, 0.45))
-			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			slot.add_child(l)
-		ah.add_child(slot)
-	for a in extra:
-		var ic := UI.icon(Assets.artifact_icon(a), Vector2(54, 54))
-		ic.tooltip_text = "%s: %s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
-		ic.mouse_filter = Control.MOUSE_FILTER_PASS
-		ah.add_child(ic)
-	var sv := VBoxContainer.new()
-	row.add_child(sv)
-	var st := HBoxContainer.new()
-	st.add_theme_constant_override("separation", 16)
-	sv.add_child(st)
-	st.add_child(UI.label("Spells", 24, UI.GOLD))
-	if not h["spells"].is_empty():
-		var bk := UI.button("Open spellbook", func(): SpellBook.open(self, h), 18)
-		st.add_child(bk)
-	var sh := HFlowContainer.new()  # wraps instead of widening the dialog for a hero who knows many spells
-	sh.custom_minimum_size.x = 400
-	sv.add_child(sh)
-	if h["spells"].is_empty():
-		sh.add_child(UI.label("None", 18))
-	for s in h["spells"]:
-		var ic := UI.icon(Assets.spell_icon(s), Vector2(48, 48))
-		ic.tooltip_text = "%s (level %d, %d mana): %s" % [GameData.SPELLS[s]["name"], GameData.SPELLS[s]["level"], GameData.SPELLS[s]["mana"], GameData.SPELLS[s]["desc"]]
-		ic.mouse_filter = Control.MOUSE_FILTER_PASS
-		sh.add_child(ic)
-
-	m.body.add_child(UI.label("Army  (click to move, shift+click to split, right click for info)", 20, UI.GOLD))
-	var strip := ArmyStrip.new()
-	strip.bind(h["army"], {}, true)
-	m.body.add_child(strip)
-	var bh := m.add_buttons([["Close", "close"], ["Dismiss Hero", "dismiss"]])
-	m.set_meta("default", "close")
-	m.set_meta("cancel", "close")
+	var m := HeroScreen.open(adv, h)
 	var r = await m.closed
 	if r == "dismiss":
 		var me: Dictionary = adv.human_player()

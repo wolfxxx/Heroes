@@ -76,6 +76,27 @@ static func _button_style(state: String) -> StyleBox:
 	f.content_margin_bottom = 8
 	return f
 
+## The look of a selected toggle (option, card): a dark plate in a bright gold frame with a soft glow. Light text
+## stays readable on it, unlike on the gold "selected" button texture.
+static func selected_plate(margin := 18.0) -> StyleBoxFlat:
+	var on := StyleBoxFlat.new()
+	on.bg_color = Color(0.2, 0.13, 0.06, 0.97)
+	on.border_color = Color(1.0, 0.82, 0.38)
+	on.set_border_width_all(3)
+	on.set_corner_radius_all(5)
+	on.shadow_color = Color(1.0, 0.75, 0.3, 0.4)
+	on.shadow_size = 8
+	on.content_margin_left = margin
+	on.content_margin_right = margin
+	return on
+
+## Use selected_plate() for a toggle button's pressed states, with gold text.
+static func plate_toggle(b: BaseButton) -> void:
+	for st in ["pressed", "hover_pressed"]:
+		b.add_theme_stylebox_override(st, selected_plate())
+	for c in ["font_pressed_color", "font_hover_pressed_color"]:
+		b.add_theme_color_override(c, Color(1.0, 0.88, 0.55))
+
 static func theme() -> Theme:
 	if _theme:
 		return _theme
