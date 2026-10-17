@@ -260,16 +260,22 @@ func _generate(settings: Dictionary) -> Dictionary:
 			o["available"] = GameData.CREATURES[o["creature"]]["growth"]
 
 	# ---- small non-blocking decorations ---------------------------------------------------
+	var clump := FastNoiseLite.new()
+	clump.seed = rng.randi()
+	clump.frequency = 0.12
 	for y in h:
 		for x in w:
 			var p := Vector2i(x, y)
 			var i := idx(p)
 			if blocked[i] or terrain[i] in [T_WATER, T_ROAD] or occupied.has(p) or keep_clear[i]:
 				continue
-			if rng.randf() < 0.07:
-				var t: int = terrain[i]
-				var kinds := ["flowers_1", "flowers_2", "bush_1", "bush_2"] if t == T_GRASS else (["rock_1", "rock_2", "rock_3"] if t in [T_DIRT, T_SAND] else (["bush_1", "bush_2"] if t == T_SWAMP else ["rock_1", "rock_2"]))
-				decor.append({"k": kinds[rng.randi() % kinds.size()], "p": Vector2((x + rng.randf_range(0.2, 0.8)) * TILE, (y + rng.randf_range(0.5, 0.95)) * TILE), "s": rng.randf_range(0.45, 0.7), "m": rng.randf_range(0.7, 1.0), "flip": rng.randf() < 0.5, "flat": true})
+			# denser in clumps (and next to woods), sparse in between
+			var dens := 0.08 + 0.2 * clampf(clump.get_noise_2d(x, y) + 0.3, 0.0, 1.0) + (0.04 if _near_obstacle(p) else 0.0)
+			if rng.randf() < dens:
+				var k := _pick_weighted(DECOR_KINDS.get(terrain[i], DECOR_KINDS[T_GRASS]))
+				var upright: bool = k in DECOR_UPRIGHT
+				decor.append({"k": k, "p": Vector2((x + rng.randf_range(0.2, 0.8)) * TILE, (y + rng.randf_range(0.5, 0.95)) * TILE), "s": rng.randf_range(0.45, 0.7),
+					"m": rng.randf_range(0.8, 1.05) if k.begins_with("decor_") else rng.randf_range(0.7, 1.0), "flip": rng.randf() < 0.5, "flat": not upright})
 
 	# ---- players -------------------------------------------------------------------------
 	var res_amounts: Array = [[30000, 30, 15], [20000, 20, 10], [15000, 15, 7]][clampi(difficulty, 0, 2)]
@@ -354,8 +360,12 @@ func _place_town(t: Dictionary) -> void:
 func _carve_road(a: Vector2i, b: Vector2i) -> void:
 	var astar := AStarGrid2D.new()
 	astar.region = Rect2i(0, 0, w, h)
-	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
+	# diagonals let roads run at an angle instead of in long stair steps; the noise cost makes them wander
+	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	astar.update()
+	var wander := FastNoiseLite.new()
+	wander.seed = rng.randi()
+	wander.frequency = 0.07
 	for y in h:
 		for x in w:
 			var p := Vector2i(x, y)
@@ -367,7 +377,7 @@ func _carve_road(a: Vector2i, b: Vector2i) -> void:
 			elif terrain[i] == T_ROAD:
 				astar.set_point_weight_scale(p, 0.3)
 			else:
-				astar.set_point_weight_scale(p, 1.0 + 0.5 * absf(sin(x * 0.7) * cos(y * 0.9)))
+				astar.set_point_weight_scale(p, 2.2 + 2.0 * wander.get_noise_2d(x, y))
 	var path := astar.get_id_path(a, b)
 	for p in path:
 		var i := idx(p)
@@ -428,6 +438,39 @@ func _place_forests(kind_noise: FastNoiseLite) -> void:
 				if k.begins_with("rock"):
 					s = rng.randf_range(0.7, 0.95)
 				decor.append({"k": k, "p": Vector2((x + rng.randf_range(0.2, 0.8)) * TILE, (y + rng.randf_range(0.55, 1.0)) * TILE), "s": s, "m": rng.randf_range(0.8, 1.1), "flip": rng.randf() < 0.5})
+
+## Ground details per terrain: [sprite, weight]. Upright ones are depth-sorted with trees and heroes.
+const DECOR_KINDS := {
+	T_GRASS: [["flowers_1", 0.6], ["flowers_2", 0.6], ["bush_1", 0.8], ["bush_2", 0.8], ["decor_tuft", 2.0], ["decor_wildflowers", 1.4],
+		["decor_fern", 1.0], ["decor_toadstools", 0.8], ["decor_stump", 0.8], ["decor_log", 0.5], ["decor_twigs", 0.6],
+		["decor_boulders", 0.6], ["decor_thorns", 0.4], ["decor_menhir", 0.2], ["decor_pillar", 0.15]],
+	T_DIRT: [["rock_1", 0.6], ["rock_2", 0.6], ["rock_3", 0.6], ["decor_twigs", 1.0], ["decor_bones", 0.7], ["decor_thorns", 1.0],
+		["decor_dry_grass", 1.2], ["decor_tuft", 0.8], ["decor_stump", 0.8], ["decor_boulders", 0.7], ["decor_menhir", 0.3], ["decor_pillar", 0.2]],
+	T_SAND: [["rock_1", 0.5], ["rock_3", 0.5], ["decor_cactus", 1.2], ["decor_horn_skull", 0.6], ["decor_dry_grass", 1.6], ["decor_sandstone", 1.0],
+		["decor_bones", 0.5]],
+	T_SNOW: [["rock_1", 0.4], ["rock_2", 0.4], ["decor_snow_rock", 1.2], ["decor_ice", 0.8], ["decor_snow_stump", 1.0], ["decor_frost_shrub", 1.2]],
+	T_SWAMP: [["bush_1", 0.6], ["bush_2", 0.6], ["decor_reeds", 2.0], ["decor_swamp_caps", 1.0], ["decor_mossy_log", 0.7], ["decor_swamp_shrub", 1.0],
+		["decor_toadstools", 0.4], ["decor_fern", 0.6], ["decor_tuft", 0.8]],
+}
+const DECOR_UPRIGHT := ["decor_stump", "decor_log", "decor_boulders", "decor_thorns", "decor_menhir", "decor_pillar", "decor_cactus",
+	"decor_sandstone", "decor_snow_rock", "decor_ice", "decor_snow_stump", "decor_frost_shrub", "decor_reeds", "decor_mossy_log", "decor_swamp_shrub"]
+
+func _pick_weighted(items: Array) -> String:
+	var total := 0.0
+	for it in items:
+		total += it[1]
+	var r := rng.randf() * total
+	for it in items:
+		r -= it[1]
+		if r <= 0.0:
+			return it[0]
+	return items[0][0]
+
+func _near_obstacle(p: Vector2i) -> bool:
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if inside(p + d) and blocked[idx(p + d)] == 2:
+			return true
+	return false
 
 func _passable(p: Vector2i) -> bool:
 	if not inside(p):

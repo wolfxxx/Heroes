@@ -28,7 +28,8 @@ func _ready() -> void:
 	if GameState.world.is_empty():
 		var s := GameState.new_game_settings.duplicate()
 		if Shot.setup != "":
-			s["seed"] = 12345
+			s["seed"] = int(Shot.args.get("seed", "12345"))
+			s["faction"] = Shot.args.get("faction", s.get("faction", "haven"))
 		GameState.world = WorldGen.generate(s)
 	world = GameState.world
 	RenderingServer.set_default_clear_color(Color(0.02, 0.02, 0.03))
@@ -61,6 +62,8 @@ func _ready() -> void:
 
 func _post_ready() -> void:
 	await get_tree().process_frame
+	if Shot.active:
+		_shot_view()
 	if not GameState.battle_result.is_empty():
 		var result := GameState.battle_result
 		GameState.battle_result = {}
@@ -92,6 +95,18 @@ func selected_hero() -> Dictionary:
 # ---------------------------------------------------------------------------------------------
 # Camera
 # ---------------------------------------------------------------------------------------------
+## Screenshot harness options: --reveal (no fog), --cam=x,y (tile to centre on), --zoom=z; with --setup also
+## --seed=n and --faction=f for the generated map.
+func _shot_view() -> void:
+	if Shot.args.has("reveal"):
+		human_player()["explored"].fill(1)
+		_refresh_fog()
+	if Shot.args.has("zoom"):
+		cam.zoom = Vector2.ONE * float(Shot.args["zoom"])
+	if Shot.args.has("cam"):
+		var xy: PackedStringArray = Shot.args["cam"].split(",")
+		center_on(Vector2i(int(xy[0]), int(xy[1])), true)
+
 func center_on(tile: Vector2i, instant := false) -> void:
 	var p := view.tile_center(tile)
 	_cam_target = _clamp_cam(p - Vector2(MAP_VIEW_W, MAP_VIEW_H) * 0.5 / cam.zoom)
@@ -310,6 +325,8 @@ func _tile_info(t: Vector2i):
 		HoverInfo.line(v, "Neutral" if town["owner"] < 0 else world["players"][town["owner"]]["name"], Color(0.8, 0.75, 0.65))
 		return v
 	var o := rules.object_covering(t)
+	var me: int = human_player()["index"]
+	var hero := selected_hero()
 	if o.is_empty():
 		if rules.is_guarded(t):
 			return "Guarded: stepping here means a fight with the monsters next to it."
@@ -349,25 +366,49 @@ func _tile_info(t: Vector2i):
 			var c: Dictionary = GameData.CREATURES[o["creature"]]
 			var v := HoverInfo.creature(o["creature"], -1, "%s dwelling" % c["name"])
 			HoverInfo.line(v, "%d available to recruit." % o["available"], UI.GOLD, 18)
+			var own: int = o.get("owner", -1)
+			_visit_line(v, own == me, "Yours: new recruits every week." if own == me else
+				("Not visited." if own < 0 else "Owned by %s." % world["players"][own]["name"]))
 			return v
 		"shrine":
 			var sp: Dictionary = GameData.SPELLS[o["spell"]]
 			var v := HoverInfo.box("Shrine of Magic")
 			HoverInfo.line(v, "Teaches %s (level %d): %s" % [sp["name"], sp["level"], sp["desc"]])
+			if not hero.is_empty():
+				if o["spell"] in hero["spells"]:
+					_visit_line(v, true, "%s already knows it." % hero["name"])
+				elif sp["level"] > rules.max_spell_level(hero):
+					_visit_line(v, true, "%s needs more Wisdom to learn a level %d spell." % [hero["name"], sp["level"]])
+				else:
+					_visit_line(v, false, "%s can learn it." % hero["name"])
 			return v
 		"learning_stone":
 			var v := HoverInfo.box("Learning Stone")
 			HoverInfo.line(v, "+1000 experience, once per hero.")
+			if not hero.is_empty():
+				var seen: bool = hero["uid"] in o.get("visited", [])
+				_visit_line(v, seen, "%s: %s" % [hero["name"], "already visited." if seen else "not visited yet."])
 			return v
 		"windmill":
 			var v := HoverInfo.box("Windmill")
 			HoverInfo.line(v, "The miller shares resources once a week.")
+			if me in o.get("visited_week", []):
+				var left: int = 7 - (int(world["day"]) - 1) % 7
+				_visit_line(v, true, "Visited this week. More in %d day%s." % [left, "" if left == 1 else "s"])
+			else:
+				_visit_line(v, false, "Not visited this week.")
 			return v
 		"watchtower":
 			var v := HoverInfo.box("Watchtower")
 			HoverInfo.line(v, "Reveals the land around it.")
+			var seen: bool = me in o.get("visited_by", [])
+			_visit_line(v, seen, "Visited." if seen else "Not visited.")
 			return v
 	return _describe_tile(t)
+
+## "Visited" status line on a map site's hover panel: grey once used up, green while there is something to get.
+func _visit_line(v: VBoxContainer, done: bool, text: String) -> void:
+	HoverInfo.line(v, text, Color(0.62, 0.6, 0.56) if done else Color(0.55, 0.95, 0.5), 18)
 
 func _describe_tile(t: Vector2i) -> String:
 	if not rules.inside(t):
@@ -396,7 +437,12 @@ func _describe_tile(t: Vector2i) -> String:
 			"shrine":
 				return "Shrine of Magic (%s)" % GameData.SPELLS[o["spell"]]["name"]
 			"learning_stone":
-				return "Learning Stone"
+				var sel := selected_hero()
+				return "Learning Stone" + ("" if sel.is_empty() else (" (visited)" if sel["uid"] in o.get("visited", []) else " (not visited)"))
+			"windmill":
+				return "Windmill (%s)" % ("visited this week" if human_player()["index"] in o.get("visited_week", []) else "not visited this week")
+			"watchtower":
+				return "Watchtower (%s)" % ("visited" if human_player()["index"] in o.get("visited_by", []) else "not visited")
 			_:
 				return o["type"].capitalize()
 	if rules.is_guarded(t):

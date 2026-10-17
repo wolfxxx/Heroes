@@ -425,6 +425,10 @@ func visit(hero: Dictionary, o: Dictionary) -> Dictionary:
 				ev["sfx"] = "resource_pickup"
 		"watchtower":
 			reveal(player, o["pos"], 14)
+			var vb: Array = o.get("visited_by", [])
+			if not hero["owner"] in vb:
+				vb.append(hero["owner"])
+				o["visited_by"] = vb
 			ev["title"] = "Watchtower"
 			ev["text"] = "From the top of the tower you survey the surrounding lands."
 			ev["sfx"] = "flag_capture"

@@ -33,7 +33,8 @@ func setup(w: Dictionary) -> void:
 	mat.set_shader_parameter("map_size", Vector2(size))
 	mat.set_shader_parameter("tile_px", float(TILE))
 	mat.set_shader_parameter("water_index", WorldGen.T_WATER)
-	mat.set_shader_parameter("road_index", WorldGen.T_ROAD)
+	mat.set_shader_parameter("road_map", _road_field())
+	mat.set_shader_parameter("road_tex", Assets.tex("terrain/road.png"))
 	_terrain.material = mat
 	add_child(_terrain)
 
@@ -104,14 +105,156 @@ func _procedural_terrain(t: String) -> Image:
 			img.set_pixel(x, y, base.lightened(v * 0.35) if v > 0 else base.darkened(-v * 0.45))
 	return img
 
+## One texel per tile. Road tiles take the ground around them: the road itself is drawn from _road_field().
 func _index_texture() -> ImageTexture:
 	var size: Vector2i = world["size"]
 	var img := Image.create(size.x, size.y, false, Image.FORMAT_R8)
 	var terr: PackedByteArray = world["terrain"]
 	for y in size.y:
 		for x in size.x:
-			img.set_pixel(x, y, Color(terr[y * size.x + x] / 255.0, 0, 0))
+			var t: int = terr[y * size.x + x]
+			if t == WorldGen.T_ROAD:
+				t = _ground_under_road(Vector2i(x, y))
+			img.set_pixel(x, y, Color(t / 255.0, 0, 0))
 	return ImageTexture.create_from_image(img)
+
+func _ground_under_road(p: Vector2i) -> int:
+	var size: Vector2i = world["size"]
+	var terr: PackedByteArray = world["terrain"]
+	var count := {}
+	for r in [1, 2, 3]:
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				var q := p + Vector2i(dx, dy)
+				if q.x < 0 or q.y < 0 or q.x >= size.x or q.y >= size.y:
+					continue
+				var t: int = terr[q.y * size.x + q.x]
+				if t != WorldGen.T_ROAD and t != WorldGen.T_WATER:
+					count[t] = count.get(t, 0) + 1
+		if not count.is_empty():
+			break
+	var best := WorldGen.T_GRASS
+	for t in count:
+		if count[t] > count.get(best, 0):
+			best = t
+	return best
+
+# ---------------------------------------------------------------------------------------------
+# Roads: road tiles -> smoothed polylines -> distance field (in tiles) the terrain shader paints cobbles from
+# ---------------------------------------------------------------------------------------------
+const ROAD_RES := 8      # distance-field texels per tile
+const ROAD_REACH := 0.9  # distances are stored up to this many tiles
+
+func _is_road(p: Vector2i) -> bool:
+	var size: Vector2i = world["size"]
+	return p.x >= 0 and p.y >= 0 and p.x < size.x and p.y < size.y and world["terrain"][p.y * size.x + p.x] == WorldGen.T_ROAD
+
+## Road tiles linked to their road neighbours: straight neighbours always, diagonal ones only when no straight
+## neighbour already joins them (so a stair step reads as one diagonal, not a zigzag).
+func _road_links(p: Vector2i) -> Array:
+	var out := []
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if _is_road(p + d):
+			out.append(p + d)
+	for d in [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		if _is_road(p + d) and not _is_road(p + Vector2i(d.x, 0)) and not _is_road(p + Vector2i(0, d.y)):
+			out.append(p + d)
+	return out
+
+## Chains of road tiles between junctions / ends (each link used once), as tile-centre polylines.
+func road_polylines() -> Array:
+	var size: Vector2i = world["size"]
+	var links := {}
+	for y in size.y:
+		for x in size.x:
+			var p := Vector2i(x, y)
+			if _is_road(p):
+				links[p] = _road_links(p)
+	var used := {}
+	var lines := []
+	var starts: Array = links.keys().filter(func(p): return links[p].size() != 2)
+	starts += links.keys()  # loops have no ends: any tile starts them
+	for a in starts:
+		for b in links[a]:
+			if used.has(_lk(a, b)):
+				continue
+			var line := [a]
+			var prev: Vector2i = a
+			var cur: Vector2i = b
+			used[_lk(a, b)] = true
+			used[_lk(b, a)] = true
+			while true:
+				line.append(cur)
+				if links[cur].size() != 2:
+					break
+				var nxt: Vector2i = links[cur][0] if links[cur][0] != prev else links[cur][1]
+				if used.has(_lk(cur, nxt)):
+					break
+				used[_lk(cur, nxt)] = true
+				used[_lk(nxt, cur)] = true
+				prev = cur
+				cur = nxt
+			lines.append(line)
+	for p in links:  # a lone road tile
+		if links[p].is_empty():
+			lines.append([p, p])
+	return lines
+
+static func _lk(a: Vector2i, b: Vector2i) -> Vector4i:
+	return Vector4i(a.x, a.y, b.x, b.y)
+
+## Corner cutting: rounds the bends while the ends stay where they are (junctions keep meeting).
+static func _chaikin(pts: PackedVector2Array, rounds: int) -> PackedVector2Array:
+	for r in rounds:
+		if pts.size() < 3:
+			return pts
+		var out := PackedVector2Array([pts[0]])
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			if i > 0:
+				out.append(a.lerp(b, 0.25))
+			if i < pts.size() - 2:
+				out.append(a.lerp(b, 0.75))
+		out.append(pts[pts.size() - 1])
+		pts = out
+	return pts
+
+func _road_field() -> ImageTexture:
+	var size: Vector2i = world["size"]
+	var fw := size.x * ROAD_RES
+	var fh := size.y * ROAD_RES
+	var dist := PackedFloat32Array()
+	dist.resize(fw * fh)
+	dist.fill(ROAD_REACH)
+	var reach := ROAD_REACH * ROAD_RES
+	for line in road_polylines():
+		var pts := PackedVector2Array()
+		for t in line:
+			pts.append((Vector2(t) + Vector2(0.5, 0.5)) * ROAD_RES)
+		pts = _chaikin(pts, 3)
+		for i in pts.size() - 1:
+			var a := pts[i]
+			var b := pts[i + 1]
+			var ab := b - a
+			var l2 := maxf(ab.length_squared(), 1e-6)
+			var x0 := maxi(0, int(minf(a.x, b.x) - reach))
+			var x1 := mini(fw - 1, int(maxf(a.x, b.x) + reach) + 1)
+			var y0 := maxi(0, int(minf(a.y, b.y) - reach))
+			var y1 := mini(fh - 1, int(maxf(a.y, b.y) + reach) + 1)
+			for y in range(y0, y1 + 1):
+				for x in range(x0, x1 + 1):
+					var q := Vector2(x + 0.5, y + 0.5)
+					var t := clampf((q - a).dot(ab) / l2, 0.0, 1.0)
+					var d := q.distance_to(a + ab * t) / ROAD_RES
+					var k := y * fw + x
+					if d < dist[k]:
+						dist[k] = d
+	var bytes := PackedByteArray()
+	bytes.resize(fw * fh)
+	for k in dist.size():
+		bytes[k] = int(dist[k] / ROAD_REACH * 255.0)
+	return ImageTexture.create_from_image(Image.create_from_data(fw, fh, false, Image.FORMAT_L8, bytes))
 
 # ---------------------------------------------------------------------------------------------
 # Sprites
@@ -140,7 +283,7 @@ func _sprite(tex_path: String, foot: Vector2, display_w: float, flip := false, d
 	s.offset = Vector2(0, -th * 0.5)
 	return s
 
-const DECOR_REF_W := {"mountain": 256.0, "tree": 150.0, "snow": 150.0, "rock": 90.0, "bush": 90.0, "flowers": 80.0}
+const DECOR_REF_W := {"mountain": 256.0, "tree": 150.0, "snow": 150.0, "rock": 90.0, "bush": 90.0, "flowers": 80.0, "decor": 100.0}
 
 const OUTLINE_SHADER := preload("res://scripts/ui/sprite_outline.gdshader")
 

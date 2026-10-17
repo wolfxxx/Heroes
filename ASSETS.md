@@ -49,6 +49,12 @@ leaves the `_dead` sprite on the hex as a corpse.
   `map/windmill.png`, `map/obelisk.png`, `map/dwelling_neutral.png`, `map/watchtower.png`.
 - Decorations, transparent: `map/tree_oak_1..4.png`, `map/tree_pine_1..3.png`, `map/tree_dead_1..2.png`,
   `map/mountain_1..3.png` (large ~256x224), `map/rock_1..3.png`, `map/bush_1..2.png`, `map/flowers_1..2.png`, `map/snow_pine_1..2.png`.
+- Ground details `map/decor_<name>.png` (stump, log, toadstools, tuft, boulders, wildflowers, fern, twigs, pillar, bones,
+  thorns, menhir, snow_rock, ice, snow_stump, frost_shrub, cactus, horn_skull, dry_grass, sandstone, reeds, swamp_caps,
+  mossy_log, swamp_shrub): painted as two 4x3 sheets on magenta by `tools/art/decor_paint.py` (imagegen/batch12),
+  keyed, cut, given a cast shadow and an anchor. Which terrain gets which: `WorldGen.DECOR_KINDS`.
+- Roads are not a texture of their own: `MapView` turns road tiles into smoothed polylines and a distance field, and
+  `terrain.gdshader` paints cobbles there (gravel shoulder from `terrain/road.png`).
 - `map/monster_<creature_id>.png` optional — default is to reuse the creature sprite scaled.
 
 ## Battle

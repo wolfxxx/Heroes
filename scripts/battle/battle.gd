@@ -53,6 +53,8 @@ var _hover_action := {}
 var _retreated := -1
 var _ended := false
 var _mouse := Vector2.ZERO
+var _hero_rects := [Rect2(), Rect2()]
+var _info_key := ""   # what the hover panel shows: "s<uid>" a stack, "h<side>" a hero, "" nothing
 
 func _ready() -> void:
 	setup_d = GameState.pending_battle
@@ -159,6 +161,8 @@ func _build_scene() -> void:
 		s.flip_h = side == 1
 		s.position = Vector2(110 if side == 0 else 1810, 175)
 		add_child(s)
+		var sz := Vector2(s.texture.get_size()) * sc
+		_hero_rects[side] = Rect2(s.position - sz * 0.5, sz).grow(-sz.x * 0.12)
 		var nl := UI.label(hh["name"], 20, UI.GOLD)
 		nl.position = Vector2(10 if side == 0 else 1710, 292)
 		nl.size = Vector2(200, 30)
@@ -363,6 +367,8 @@ func _next() -> void:
 		_end_battle(L.is_over())
 		return
 	_refresh_queue()
+	_reset_info()
+	_update_info()  # stats may have changed: show the panel under the cursor again, up to date
 	_grid.active = s
 	for k in units:
 		units[k].get_node("Shadow").active = k == s["uid"]
@@ -416,6 +422,7 @@ func _act(ev: Array) -> void:
 	_grid.queue_redraw()
 	_status.text = ""
 	_refresh_buttons(false)
+	_reset_info()
 	await _play(ev)
 	_next()
 
@@ -431,7 +438,9 @@ func _unhandled_input(e: InputEvent) -> void:
 		if h != _hover:
 			_hover = h
 			_update_hover()
+		_update_info()
 	elif e is InputEventMouseButton and e.pressed:
+		_info_key = ""  # the click hides the panel; it comes back when the mouse moves on
 		if e.button_index == MOUSE_BUTTON_LEFT and not _busy:
 			_click()
 		elif e.button_index == MOUSE_BUTTON_RIGHT:
@@ -456,6 +465,159 @@ func _unhandled_input(e: InputEvent) -> void:
 func _modal_open() -> bool:
 	var l := get_tree().root.get_node_or_null("ModalLayer")
 	return l != null and l.get_child_count() > 0
+
+# ---------------------------------------------------------------------------------------------
+# Hover info: stack and hero stats, base value with the battle value (hero, spells, defending) in brackets
+# ---------------------------------------------------------------------------------------------
+func _update_info() -> void:
+	var key := ""
+	if not _ended and not _modal_open():
+		var st = L.stack_at(_hover) if L.in_bounds(_hover) else null
+		if st:
+			key = "s%d" % st["uid"]
+		else:
+			for side in 2:
+				if L.heroes[side] != null and _hero_rects[side].has_point(_mouse):
+					key = "h%d" % side
+	if key == _info_key:
+		return
+	_info_key = key
+	if key == "":
+		HoverInfo.hide_for(self)
+	elif key.begins_with("s"):
+		HoverInfo.show_for(self, _stack_info(L.stack_at(_hover)), 0.25)
+	else:
+		HoverInfo.show_for(self, _hero_info(int(key.substr(1))), 0.25)
+
+## Forget the shown panel (the stats changed): the next mouse move builds it again.
+func _reset_info() -> void:
+	_info_key = ""
+	HoverInfo.hide_for(self)
+
+const _UP := Color(0.55, 0.95, 0.5)
+const _DOWN := Color(1.0, 0.5, 0.42)
+
+## "base (battle)": the bracket only when they differ, green when better, red when worse.
+func _stat_cell(base, now, better := 0) -> HBoxContainer:
+	var h := HBoxContainer.new()
+	h.add_theme_constant_override("separation", 6)
+	h.add_child(UI.label(str(base), 18))
+	if str(now) != str(base):
+		if better == 0 and typeof(base) == TYPE_INT:
+			better = 1 if now > base else -1
+		h.add_child(UI.label("(%s)" % str(now), 18, _UP if better > 0 else (_DOWN if better < 0 else UI.TEXT)))
+	return h
+
+func _grid_row(g: GridContainer, label: String, cell: Control) -> void:
+	g.add_child(UI.label(label, 18, UI.GOLD))
+	g.add_child(cell)
+
+func _stat_grid() -> GridContainer:
+	var g := GridContainer.new()
+	g.columns = 2
+	g.add_theme_constant_override("h_separation", 14)
+	g.add_theme_constant_override("v_separation", 1)
+	return g
+
+const _EFFECT_NAMES := {"disease": "Diseased", "bless": "Blessed", "curse": "Cursed"}
+const _SKILL_STEP := {"offense": 10, "archery": 15, "armorer": 7}
+
+func _stack_info(st: Dictionary) -> Control:
+	var c := L.cdata(st)
+	var mine := _human_controls(st["side"])
+	var v := HoverInfo.box("%d %s" % [st["count"], c["plural"] if st["count"] != 1 else c["name"]])
+	var hh = L.heroes[st["side"]]
+	HoverInfo.line(v, ("Your army" if mine else "Enemy") + ((", led by %s" % hh["name"]) if hh else ""),
+		Color(0.6, 0.8, 1.0) if mine else Color(1.0, 0.6, 0.5), 17)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	row.add_child(UI.icon(Assets.creature_portrait(st["id"]), Vector2(84, 84)))
+	var g := _stat_grid()
+	_grid_row(g, "Attack", _stat_cell(c["attack"], L.attack_stat(st)))
+	_grid_row(g, "Defense", _stat_cell(c["defense"], L.defense_stat(st)))
+	var lo: int = c["dmg"][0]
+	var hi: int = c["dmg"][1]
+	var dmg := "%d-%d" % [lo, hi]
+	var dnow := dmg
+	if st["effects"].has("bless"):
+		dnow = "%d-%d" % [hi, hi]
+	elif st["effects"].has("curse"):
+		dnow = "%d-%d" % [lo, lo]
+	_grid_row(g, "Damage", _stat_cell(dmg, dnow, 1 if st["effects"].has("bless") else -1))
+	_grid_row(g, "Health", _stat_cell(c["hp"], st["hp_top"]))
+	var full: int = L.start_counts.get(st["uid"], st["count"]) * c["hp"]
+	_grid_row(g, "Total HP", UI.label("%d / %d" % [L.total_hp(st), full], 18))
+	_grid_row(g, "Speed", _stat_cell(c["speed"], L.speed(st)))
+	if c["shots"] > 0:
+		_grid_row(g, "Shots", UI.label("%d / %d" % [st["shots"], c["shots"]], 18))
+	row.add_child(g)
+	v.add_child(row)
+	# what changes the numbers
+	var why := []
+	if hh:
+		var ha := GameState.hero_stat(hh, "attack")
+		var hd := GameState.hero_stat(hh, "defense")
+		if ha != 0 or hd != 0:
+			why.append("%+d Attack, %+d Defense from %s" % [ha, hd, hh["name"]])
+		for sk in ["offense", "archery", "armorer"]:
+			var lvl := L.hero_skill(st["side"], sk)
+			if lvl <= 0 or (sk == "archery" and c["shots"] == 0):
+				continue
+			var pct: int = lvl * _SKILL_STEP[sk]
+			var what := "-%d%% damage taken" % pct if sk == "armorer" else "+%d%% %s damage" % [pct, "ranged" if sk == "archery" else "melee"]
+			why.append("%s (%s)" % [what, GameData.SKILLS[sk]["name"]])
+		var lk := L.luck(st["side"])
+		if lk != 0:
+			why.append("Luck %+d" % lk)
+	for e in st["effects"]:
+		var nm: String = _EFFECT_NAMES.get(e, GameData.SPELLS[e]["name"] if GameData.SPELLS.has(e) else String(e).capitalize())
+		var n: int = st["effects"][e]
+		why.append("%s (%d round%s left)" % [nm, n, "" if n == 1 else "s"])
+	if st["defending"]:
+		why.append("Defending: +20% Defense")
+	if c["shots"] > 0:
+		why.append("Shooter: half damage in melee and beyond 10 hexes")
+	if why.size() > 0:
+		HoverInfo.line(v, "\n".join(why), Color(0.85, 0.82, 0.72), 17)
+	var ab: Array = c["abilities"].map(func(a): return GameData.ABILITY_TEXT.get(a, a))
+	if ab.size() > 0:
+		HoverInfo.line(v, ", ".join(ab), Color(0.75, 0.85, 1.0), 17)
+	if st["retaliations"] <= 0:
+		HoverInfo.line(v, "No retaliation left this round.", _DOWN, 17)
+	if _hover_action.get("target") == st:  # your unit's attack on it: damage and kills (as in the status line)
+		HoverInfo.line(v, _status.text, UI.GOLD, 18)
+	return v
+
+func _hero_info(side: int) -> Control:
+	var hh: Dictionary = L.heroes[side]
+	var v := HoverInfo.box(hh["name"])
+	HoverInfo.line(v, "Level %d %s" % [hh["level"], hh["class"]], UI.TEXT, 18)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	row.add_child(UI.icon(Assets.hero_portrait(hh["id"]), Vector2(84, 84)))
+	var g := _stat_grid()
+	for stat in ["attack", "defense", "power", "knowledge"]:
+		_grid_row(g, stat.capitalize(), _stat_cell(int(hh.get(stat, 0)), GameState.hero_stat(hh, stat)))
+	_grid_row(g, "Spell points", UI.label("%d / %d" % [hh["mana"], GameState.max_mana(hh)], 18))
+	var lk := L.luck(side)
+	if lk != 0:
+		_grid_row(g, "Luck", UI.label("%+d" % lk, 18))
+	row.add_child(g)
+	v.add_child(row)
+	HoverInfo.line(v, "Every creature in this army gets the hero's Attack and Defense.", Color(0.85, 0.82, 0.72), 17)
+	var sk := []
+	for k in hh.get("skills", {}):
+		var lvl: int = hh["skills"][k]
+		if lvl > 0 and GameData.SKILLS.has(k):
+			sk.append("%s %s" % [["", "Basic", "Advanced", "Expert"][mini(3, lvl)], GameData.SKILLS[k]["name"]])
+	if sk.size() > 0:
+		HoverInfo.line(v, "Skills: " + ", ".join(sk), Color(0.75, 0.85, 1.0), 17)
+	var arts: Array = hh.get("artifacts", []).map(func(a): return GameData.ARTIFACTS[a]["name"])
+	if arts.size() > 0:
+		HoverInfo.line(v, "Artifacts: " + ", ".join(arts), Color(1.0, 0.85, 0.5), 17)
+	if L.hero_cast[side]:
+		HoverInfo.line(v, "Has cast a spell this round.", Color(0.8, 0.75, 0.65), 17)
+	return v
 
 func _update_hover() -> void:
 	_grid.hover = _hover
