@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(__file__))
-from imagegen_prep import PAD_W, PAD_H, VIEW_H, TOP, VARIANTS, OTHERS
+from imagegen_prep import PAD_W, PAD_H, VIEW_H, TOP, VARIANTS, OTHERS, depth
 
 BACKUP = "tools/art/raw/pre_paint"
 EXTRACT = {"A": ["village_hall", "fort", "mage_guild_1"] + OTHERS, "B": ["town_hall", "citadel", "mage_guild_2"], "C": ["city_hall"]}
@@ -122,7 +122,7 @@ def ingest_town(batch, fac, var, src):
         print("  town bg", fac)
         return
     layout = json.load(open(f"assets/town/layout_{fac}.json"))
-    shown = sorted([i for i in VARIANTS[var] if i in layout], key=lambda i: layout[i][1] + layout[i][3])
+    shown = sorted([i for i in VARIANTS[var] if i in layout], key=lambda i: depth(layout, i))
     pv = np.asarray(view, dtype=np.float32)
     for sid in EXTRACT[var]:
         if sid not in layout:

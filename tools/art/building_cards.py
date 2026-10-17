@@ -25,9 +25,11 @@ DESC = {  # what the cut-off buildings are, for the painter
     ("necropolis", "dwelling_4"): "a vampire estate: a gothic black manor with pointed towers, red-lit windows and bats",
 }
 
+EDGE = {"haven": ("dwelling_1", "dwelling_4")}  # the Necropolis layout keeps every building inside the frame
+
 def _edge_ids(fac, layout):
     """Buildings cut off by the screen edge so badly that their card would be a sliver (decided by eye)."""
-    return [sid for sid in ("dwelling_1", "dwelling_4") if sid in layout]
+    return [sid for sid in EDGE.get(fac, ()) if sid in layout]
 
 def crop_for(rect, aspect=CARD[0] / CARD[1]):
     x, y, w, h = rect

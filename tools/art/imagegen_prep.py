@@ -22,11 +22,15 @@ VARIANTS = {  # variant -> the buildings shown (upgrade slots + everything else)
     "C": ["city_hall", "citadel", "mage_guild_2"] + OTHERS,
 }
 
+def depth(layout, sid):
+    """Draw order, like town_screen.gd: far-to-near by the rect's bottom edge, the fortress always first."""
+    return -1 if sid in ("fort", "citadel") else layout[sid][1] + layout[sid][3]
+
 def town_view(faction, ids):
     """Composite like town_screen.gd: background, then built sprites far-to-near by their rect's bottom edge."""
     img = Image.open(f"assets/town/{faction}_bg.png").convert("RGBA")
     layout = json.load(open(f"assets/town/layout_{faction}.json"))
-    for sid in sorted([i for i in ids if i in layout], key=lambda i: layout[i][1] + layout[i][3]):
+    for sid in sorted([i for i in ids if i in layout], key=lambda i: depth(layout, i)):
         x, y, w, h = layout[sid]
         spr = Image.open(f"assets/town/{faction}_{sid}.png").convert("RGBA").resize((w, h))
         img.alpha_composite(spr, (x, y))

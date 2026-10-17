@@ -262,6 +262,56 @@ func tile_center(tile: Vector2i) -> Vector2:
 func tile_at(p: Vector2) -> Vector2i:
 	return Vector2i(floori(p.x / TILE), floori(p.y / TILE))
 
+const PICKABLE := ["monster", "resource", "chest", "campfire", "artifact"]
+var _alpha_cache := {}
+
+## The tile of the hero or small map object (monster, pickup) whose sprite has a solid pixel at world point p,
+## front-most first; (-1, -1) if none. Sprites are taller than their tile, so tile_at() alone misses them.
+func sprite_tile_at(p: Vector2) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	var best_y := -INF
+	var cands := []
+	for uid in _object_nodes:
+		var o: Dictionary = world["objects"].get(uid, {})
+		if o.get("type", "") in PICKABLE:
+			cands.append([_object_nodes[uid], o["pos"]])
+	for uid in _hero_nodes:
+		if world["heroes"].has(uid):
+			cands.append([_hero_nodes[uid], world["heroes"][uid]["pos"]])
+	# only the object's own column, up to two tiles above it: a click beside a sprite still means that tile
+	var pt := tile_at(p)
+	for c in cands:
+		var n: Node2D = c[0]
+		var pos: Vector2i = c[1]
+		if not is_instance_valid(n) or n.position.y <= best_y or pt.x != pos.x or pt.y > pos.y or pt.y < pos.y - 2:
+			continue
+		for s in n.get_children():
+			if s is Sprite2D and _solid(s, p):
+				best = c[1]
+				best_y = n.position.y
+				break
+	return best
+
+func _solid(s: Sprite2D, p: Vector2) -> bool:
+	var lp: Vector2 = s.get_global_transform().affine_inverse() * p
+	var r := s.get_rect()
+	if not r.has_point(lp):
+		return false
+	var tex := s.texture
+	if not _alpha_cache.has(tex):
+		var img := tex.get_image()
+		if img and img.is_compressed():
+			img.decompress()
+		_alpha_cache[tex] = img
+	var img: Image = _alpha_cache[tex]
+	if img == null:
+		return true
+	var px := Vector2i(((lp - r.position) / r.size * Vector2(img.get_size())).floor())
+	if s.flip_h:
+		px.x = img.get_width() - 1 - px.x
+	px = px.clamp(Vector2i.ZERO, img.get_size() - Vector2i.ONE)
+	return img.get_pixelv(px).a > 0.5
+
 func hero_node(uid: int) -> Node2D:
 	return _hero_nodes.get(uid)
 

@@ -5,6 +5,7 @@ extends Node
 ## Multiple shots: --shots=3 --interval=1.5 -> writes shots/battle_0.png, _1, _2
 ## --setup=<name> is exposed as Shot.setup so scenes can build a demo state when launched directly.
 ## --click=x,y;x,y simulates left clicks (in 1920x1080 viewport coords) one per interval before each shot.
+## --hover=x,y;x,y moves the mouse there (after that shot's click, if any) before each shot; "-" skips one.
 
 var setup := ""
 var active := false
@@ -29,6 +30,7 @@ func _run() -> void:
 	var interval := float(args.get("interval", "1.5"))
 	var clicks: PackedStringArray = args.get("click", "").split(";", false)
 	var keys: PackedStringArray = args.get("keys", "").split(";", false)
+	var hovers: PackedStringArray = args.get("hover", "").split(";", false)
 	await get_tree().create_timer(delay).timeout
 	var base: String = args["shot"]
 	for i in count:
@@ -36,6 +38,12 @@ func _run() -> void:
 			var xy := clicks[i].split(",")
 			_click(Vector2(float(xy[0]), float(xy[1])))
 			await get_tree().create_timer(0.6).timeout
+		if i < hovers.size() and hovers[i] != "-":
+			var hp := hovers[i].split(",")
+			var m := InputEventMouseMotion.new()
+			m.position = get_viewport().get_final_transform() * Vector2(float(hp[0]), float(hp[1]))
+			Input.parse_input_event(m)
+			await get_tree().create_timer(0.8).timeout
 		if i < keys.size() and keys[i] != "":
 			_key(keys[i])
 			await get_tree().create_timer(0.6).timeout

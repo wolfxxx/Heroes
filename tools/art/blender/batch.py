@@ -6,7 +6,7 @@ LOG = os.path.join(B, "..", "raw", "batch_log.txt")
 os.makedirs(os.path.dirname(LOG), exist_ok=True)
 
 def _load():
-    for f in ("studio", "figures", "buildings", "props", "battlefield", "townscreen", "icons", "imported"):
+    for f in ("studio", "figures", "buildings", "props", "battlefield", "townscreen", "necro_town", "icons", "imported"):
         exec(open(os.path.join(B, f + ".py")).read(), globals())
 
 def _log(msg):

@@ -216,13 +216,16 @@ func _rebuild_buildings() -> void:
 		var la: Array = TownLayout.POS[a[1]]
 		var lb: Array = TownLayout.POS[b[1]]
 		return la[2] < lb[2] if la[2] != lb[2] else la[0].y < lb[0].y)
-	# Rendered towns ship a layout (pixel rect per sprite); draw far-to-near by the rect's bottom edge.
+	# Rendered towns ship a layout (pixel rect per sprite); draw far-to-near by the rect's bottom edge, the fortress
+	# always first (its wide walls reach low on screen, but everything else stands in front of them).
 	var rendered := _rendered_layout()
 	if not rendered.is_empty():
-		items.sort_custom(func(a, b):
-			var ra = rendered.get(TownLayout.sprite_id(a[0]), [0, 0, 0, 0])
-			var rb = rendered.get(TownLayout.sprite_id(b[0]), [0, 0, 0, 0])
-			return ra[1] + ra[3] < rb[1] + rb[3])
+		var depth := func(id: String) -> float:
+			if TownLayout.slot_of(id) == "fort":
+				return -1.0
+			var r = rendered.get(TownLayout.sprite_id(id), [0, 0, 0, 0])
+			return r[1] + r[3]
+		items.sort_custom(func(a, b): return depth.call(a[0]) < depth.call(b[0]))
 	for it in items:
 		var id: String = it[0]
 		var lay: Array = TownLayout.POS[it[1]]
@@ -286,6 +289,7 @@ func _on_view_input(e: InputEvent) -> void:
 		var id := _building_at(e.position)
 		if id != "":
 			Audio.sfx("click", -6)
+			_hover_id = ""  # show the info again when the dialog closes
 			_open_building(id)
 
 func _set_hover(id: String) -> void:
@@ -295,6 +299,47 @@ func _set_hover(id: String) -> void:
 	for b in _bld_nodes:
 		b["node"].modulate = Color(1.25, 1.2, 1.05) if b["id"] == id else Color.WHITE
 	_status.text = GameData.building_name(town["faction"], id) if id != "" else ""
+	if id == "":
+		HoverInfo.hide_for(self)
+	else:
+		HoverInfo.show_for(self, _building_info(id, true))
+
+const CLICK_HINT := {"hall": "Click to build.", "fort": "Click to see all dwellings.", "tavern": "Click to hire a hero.",
+	"marketplace": "Click to trade resources.", "mage_guild": "Click to see the spells.",
+	"blacksmith": "Click to buy war machines."}
+
+## Hover panel for a building: what it does; until built its requirements, cost and status; in the town view
+## (`in_town`) what clicking it does.
+func _building_info(id: String, in_town := false) -> Control:
+	var b: Dictionary = GameData.BUILDINGS[id]
+	var built := TownLogic.has_building(town, id)
+	var v: VBoxContainer
+	if b.has("dwelling_tier"):
+		var tier: int = b["dwelling_tier"]
+		var cid := GameData.faction_creature(town["faction"], tier)
+		var c: Dictionary = GameData.CREATURES[cid]
+		v = HoverInfo.creature(cid, -1, GameData.building_name(town["faction"], id))
+		HoverInfo.line(v, "Recruits %s, +%d per week." % [c["plural"], c["growth"]], UI.TEXT, 18)
+		if built:
+			HoverInfo.line(v, "%d available. Click to recruit." % town["available"][tier - 1] if in_town else
+				"%d available." % town["available"][tier - 1], UI.GOLD, 18)
+	else:
+		v = HoverInfo.box(GameData.building_name(town["faction"], id))
+		HoverInfo.line(v, b.get("desc", ""))
+		if built and in_town:
+			HoverInfo.line(v, CLICK_HINT.get(TownLayout.slot_of(id), ""), UI.GOLD, 18)
+	if not built:
+		for req in b["requires"]:
+			var ok := TownLogic.has_building(town, req)
+			HoverInfo.line(v, ("Has " if ok else "Requires ") + GameData.building_name(town["faction"], req),
+				Color(0.6, 0.9, 0.55) if ok else Color(1, 0.55, 0.45), 18)
+		var cr := HBoxContainer.new()
+		cr.add_child(UI.label("Cost ", 18, UI.GOLD))
+		cr.add_child(HoverInfo.cost_row(b["cost"], player["resources"]))
+		v.add_child(cr)
+		var st := _build_status(id)
+		HoverInfo.line(v, st[0], st[1].lightened(0.35), 19)
+	return v
 
 func _open_building(id: String) -> void:
 	var b: Dictionary = GameData.BUILDINGS[id]
@@ -364,8 +409,8 @@ func _open_build() -> void:
 		card.status = st[0]
 		card.status_col = st[1]
 		card.custom_minimum_size = Vector2(262, 226)
-		card.tooltip_text = GameData.BUILDINGS[id].get("desc", "")
 		var bid: String = id
+		HoverInfo.attach(card, func(): return _building_info(bid))
 		card.pressed.connect(func(): m.close(bid))
 		g.add_child(card)
 	m.add_buttons([["Close", ""]])
@@ -477,6 +522,10 @@ func _open_recruit_all() -> void:
 		card.available = town["available"][tier - 1] if built else -1
 		card.custom_minimum_size = Vector2(372, 262)
 		card.disabled = not built
+		HoverInfo.attach(card, func():
+			var v := HoverInfo.creature(cid, -1, card.title)
+			HoverInfo.line(v, ("%d available. Click to recruit." % card.available) if built else "Not built yet.", UI.GOLD, 18)
+			return v)
 		var t := tier
 		card.pressed.connect(func(): m.close(t))
 		g.add_child(card)

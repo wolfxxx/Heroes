@@ -174,10 +174,13 @@ TOWN = ("Repaint this fantasy town as a richly hand-painted town screen for a st
         "the top and the ground into the plain band at the bottom. Landscape 3:2. No text, no border.")
 
 FLAVOUR = {
-    ("bg", "necropolis"): " Gloomy cursed land at dusk: purple-green sky, dead trees, pale moonlight, mist.",
+    ("bg", "necropolis"): " Gloomy cursed land at dusk: purple-green sky, dead trees, pale moonlight, mist. A black rock crag "
+                          "runs across the back with a stone ramp up to it; a cracked flagstone way, gravestones, bone pikes "
+                          "with skulls and stone braziers with green flame; dark mud and dead grass, no cobbled plaza.",
     ("town", "haven"): " A bright noble kingdom of white stone, blue roofs and gold trim on a sunny day.",
-    ("town", "necropolis"): " A dark necromancer citadel of black stone with green ghost-light in the windows, bones and "
-                            "gravestones, under a purple-green dusk sky with pale moonlight.",
+    ("town", "necropolis"): " A dead necromancer town of black stone, gothic pointed arches and needle spires, with green "
+                            "ghost-light in the windows, bones, skulls and gravestones, on dark mud and cracked flagstones "
+                            "below a black crag, under a purple-green dusk sky with pale moonlight.",
 }
 
 GROUP_STYLE = ("\nThe second image is the same town already painted: match its painting style, colours, lighting, materials "
@@ -245,11 +248,15 @@ def prompt_for(name):
     return TOWN + FLAVOUR.get(("town", fac), ""), "3:2"
 
 def style_ref(name):
-    """Group images borrow the painted batch-1 town (variant B shows the most buildings) as a style reference."""
+    """Group images borrow the painted full town (variant B shows the most buildings) as a style reference: batch 10
+    for the re-laid-out Necropolis, else batch 1."""
     if not name.startswith("group_"):
         return None
-    p = f"imagegen/batch1/out/town_{name.split('_')[1]}_B.png"
-    return Image.open(p).convert("RGB") if os.path.exists(p) else None
+    fac = name.split("_")[1]
+    for p in (f"imagegen/batch10/out/town_{fac}_B.png", f"imagegen/batch1/out/town_{fac}_B.png"):
+        if os.path.exists(p):
+            return Image.open(p).convert("RGB")
+    return None
 
 def paint(client, model, src, prompt, aspect, size, extra=None):
     ref = Image.open(src).convert("RGB")
@@ -283,11 +290,15 @@ def main():
     names = a.names or sorted(os.path.splitext(os.path.basename(p))[0] for p in glob.glob(f"{a.batch}/in/*.png")
                               if not os.path.basename(p).startswith("raw_"))
     os.makedirs(f"{a.batch}/out", exist_ok=True)
+    np_ = f"{a.batch}/in/notes.json"
+    notes = json.load(open(np_)) if os.path.exists(np_) else {}
     for n in names:
         dst = f"{a.batch}/out/{n}.png"
         if os.path.exists(dst) and not a.force:
             print("skip", n); continue
         prompt, aspect = prompt_for(n)
+        if notes.get(n):  # per-image notes from the prep script (e.g. what each blockout building is)
+            prompt += NL + notes[n]
         prompt += ("\n" + a.note) if a.note else ""
         t = time.time()
         img = paint(client, a.model, f"{a.batch}/in/{n}.png", prompt, aspect, a.size, style_ref(n))

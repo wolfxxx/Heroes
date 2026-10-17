@@ -16,6 +16,12 @@ var _plan := {}
 var _plan_target := Vector2i(-1, -1)
 var _drag_from := Vector2.ZERO
 var _dragging := false
+var _left_down := false      # left button held on the map: a click on release, or a drag once it moves
+var _left_tile := Vector2i(-1, -1)
+var _info_tile := Vector2i(-2, -2)
+var _pending_click := Vector2i(-1, -1)  # clicked while the hero was still moving: planned when it stops
+const DRAG_START := 10.0
+const EDGE := 14.0           # edge-scroll band (screen pixels), also just outside the window
 var _cam_target := Vector2.ZERO
 
 func _ready() -> void:
@@ -109,17 +115,30 @@ func _process(delta: float) -> void:
 		if Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D): move.x += 1
 		if Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_W): move.y -= 1
 		if Input.is_key_pressed(KEY_DOWN) or Input.is_key_pressed(KEY_S) and not Input.is_key_pressed(KEY_CTRL): move.y += 1
-		var mp := get_viewport().get_mouse_position()
-		var vs := get_viewport().get_visible_rect().size
-		if DisplayServer.window_is_focused() and Rect2(Vector2.ZERO, vs).has_point(mp) and not Shot.active:
-			if mp.x < 6: move.x -= 1
-			if mp.x > vs.x - 6: move.x += 1
-			if mp.y < 6: move.y -= 1
-			if mp.y > vs.y - 6: move.y += 1
+		if DisplayServer.window_is_focused() and not Shot.active and not _dragging:
+			move += _edge_scroll()
 	if move != Vector2.ZERO:
 		_cam_target = _clamp_cam(_cam_target + move.normalized() * 900.0 * delta / cam.zoom.x)
 	cam.position = cam.position.lerp(_cam_target, minf(1.0, delta * 10.0))
+	var mpos := get_viewport().get_mouse_position()
+	if _info_tile != Vector2i(-2, -2) and (busy or _modal_open() or mpos.x > MAP_VIEW_W or mpos.y > MAP_VIEW_H):
+		_info_tile = Vector2i(-2, -2)
+		HoverInfo.hide_for(self)
 	hud.update_minimap_view(cam.position, Vector2(MAP_VIEW_W, MAP_VIEW_H) / cam.zoom)
+
+## Edge scrolling, measured on the screen: the cursor at (or up to 60 px past) a window edge scrolls that way.
+func _edge_scroll() -> Vector2:
+	var m := DisplayServer.mouse_get_position() - DisplayServer.window_get_position()
+	var ws := Vector2(DisplayServer.window_get_size())
+	var v := Vector2.ZERO
+	var out := 60.0
+	if m.x < -out or m.y < -out or m.x > ws.x + out or m.y > ws.y + out:
+		return v  # far outside: the player is elsewhere (another monitor, another window)
+	if m.x < EDGE: v.x -= 1
+	if m.x > ws.x - EDGE: v.x += 1
+	if m.y < EDGE: v.y -= 1
+	if m.y > ws.y - EDGE: v.y += 1
+	return v
 
 func _modal_open() -> bool:
 	var l := get_tree().root.get_node_or_null("ModalLayer")
@@ -132,12 +151,20 @@ func _unhandled_input(e: InputEvent) -> void:
 	if _modal_open():
 		return
 	if e is InputEventMouseMotion:
+		# left-drag (or middle-drag) pans the map; a left press that doesn't move is a click
+		if _left_down and not _dragging and e.position.distance_to(_drag_from) > DRAG_START:
+			_dragging = true
+			HoverInfo.hide_for(self)
 		if _dragging:
 			_cam_target = _clamp_cam(_cam_target - e.relative / cam.zoom)
 			cam.position = _cam_target
-		var t := _pick(view.tile_at(_event_world(e)))
+			return
+		var t := _pick(view.tile_at(_event_world(e)), _event_world(e))
 		view.set_hover(t if rules.inside(t) else Vector2i(-1, -1))
 		hud.set_status(_describe_tile(t))
+		if t != _info_tile and not busy:
+			_info_tile = t
+			HoverInfo.show_for(self, _tile_info(t), 0.3)
 	elif e is InputEventMouseButton:
 		if e.button_index == MOUSE_BUTTON_MIDDLE:
 			_dragging = e.pressed
@@ -145,10 +172,23 @@ func _unhandled_input(e: InputEvent) -> void:
 			_zoom(1.1)
 		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			_zoom(1.0 / 1.1)
-		elif e.pressed and e.button_index == MOUSE_BUTTON_LEFT and not busy:
-			_click(_pick(view.tile_at(_event_world(e))), e.double_click)
+		elif e.button_index == MOUSE_BUTTON_LEFT:
+			if e.pressed:
+				_left_down = true
+				_drag_from = e.position
+				_left_tile = _pick(view.tile_at(_event_world(e)), _event_world(e))
+			elif _left_down:
+				_left_down = false
+				var was_drag := _dragging
+				_dragging = false
+				_info_tile = Vector2i(-2, -2)
+				if not was_drag:
+					if busy:
+						_pending_click = _left_tile
+					else:
+						_click(_left_tile, false)
 		elif e.pressed and e.button_index == MOUSE_BUTTON_RIGHT:
-			_right_click(_pick(view.tile_at(_event_world(e))))
+			_right_click(_pick(view.tile_at(_event_world(e)), _event_world(e)))
 	elif e is InputEventKey and e.pressed and not e.echo:
 		if busy:
 			return
@@ -171,9 +211,13 @@ func _unhandled_input(e: InputEvent) -> void:
 					GameState.save_game()
 					hud.toast("Game saved")
 
-## Creature and hero sprites stand above their tile: a click on their body (the tile above an empty
-## tile) means the unit below.
-func _pick(t: Vector2i) -> Vector2i:
+## Creature, hero and treasure sprites stand above their tile: a point on a sprite means that unit (front-most
+## first), otherwise the tile itself, or the unit below when the tile is empty.
+func _pick(t: Vector2i, world_p = null) -> Vector2i:
+	if world_p != null:
+		var s := view.sprite_tile_at(world_p)
+		if s != Vector2i(-1, -1):
+			return s
 	if not rules.inside(t) or not rules.at(t).is_empty() or not rules.town_covering(t).is_empty() or not rules.object_covering(t).is_empty():
 		return t
 	var below := t + Vector2i(0, 1)
@@ -248,6 +292,82 @@ func _right_click(t: Vector2i) -> void:
 	var hh := rules.hero_at(t)
 	if not hh.is_empty():
 		hud.toast("%s (Level %d %s), %s" % [hh["name"], hh["level"], hh["class"], world["players"][hh["owner"]]["name"]])
+
+## Hover panel for a map tile: what the hero, town or object there is and what visiting it does (null: nothing).
+func _tile_info(t: Vector2i):
+	if not rules.inside(t) or not rules.is_explored(human_player(), t):
+		return null
+	var hh := rules.hero_at(t)
+	if not hh.is_empty():
+		var v := HoverInfo.box(hh["name"])
+		HoverInfo.line(v, "Level %d %s" % [hh["level"], hh["class"]])
+		HoverInfo.line(v, world["players"][hh["owner"]]["name"], Color(0.8, 0.75, 0.65))
+		return v
+	var town := rules.town_covering(t)
+	if not town.is_empty():
+		var v := HoverInfo.box(town["name"])
+		HoverInfo.line(v, "%s town" % GameData.FACTIONS[town["faction"]]["name"])
+		HoverInfo.line(v, "Neutral" if town["owner"] < 0 else world["players"][town["owner"]]["name"], Color(0.8, 0.75, 0.65))
+		return v
+	var o := rules.object_covering(t)
+	if o.is_empty():
+		if rules.is_guarded(t):
+			return "Guarded: stepping here means a fight with the monsters next to it."
+		return null
+	match o["type"]:
+		"monster":
+			var v := HoverInfo.creature(o["creature"], -1, "%s %s" % [UI.count_word(o["count"]), GameData.CREATURES[o["creature"]]["plural"]])
+			HoverInfo.line(v, "Click to attack.", Color(1, 0.6, 0.5), 18)
+			return v
+		"resource":
+			var v := HoverInfo.box(GameData.RESOURCE_NAMES[o["res"]])
+			HoverInfo.line(v, "A pile of %s. Walk over it to pick it up." % GameData.RESOURCE_NAMES[o["res"]].to_lower())
+			return v
+		"campfire":
+			var v := HoverInfo.box("Campfire")
+			HoverInfo.line(v, "Abandoned supplies: gold and %s." % GameData.RESOURCE_NAMES[o["res"]].to_lower())
+			return v
+		"chest":
+			var v := HoverInfo.box("Treasure Chest")
+			HoverInfo.line(v, "Keep the gold, or give it away for experience.")
+			return v
+		"artifact":
+			var v := HoverInfo.box("Artifact")
+			HoverInfo.line(v, "A magical item for your hero to carry.")
+			return v
+		"mine":
+			var m: Dictionary = GameData.MINES[o["mine"]]
+			var v := HoverInfo.box(m["name"])
+			var row := HBoxContainer.new()
+			row.add_child(UI.icon(Assets.res_icon(m["resource"]), Vector2(26, 26)))
+			row.add_child(UI.label(" +%d %s per day" % [m["amount"], GameData.RESOURCE_NAMES[m["resource"]].to_lower()], 19))
+			v.add_child(row)
+			HoverInfo.line(v, "Unclaimed: visit to claim it." if o["owner"] < 0 else "Owned by %s." % world["players"][o["owner"]]["name"],
+				Color(0.8, 0.75, 0.65))
+			return v
+		"dwelling":
+			var c: Dictionary = GameData.CREATURES[o["creature"]]
+			var v := HoverInfo.creature(o["creature"], -1, "%s dwelling" % c["name"])
+			HoverInfo.line(v, "%d available to recruit." % o["available"], UI.GOLD, 18)
+			return v
+		"shrine":
+			var sp: Dictionary = GameData.SPELLS[o["spell"]]
+			var v := HoverInfo.box("Shrine of Magic")
+			HoverInfo.line(v, "Teaches %s (level %d): %s" % [sp["name"], sp["level"], sp["desc"]])
+			return v
+		"learning_stone":
+			var v := HoverInfo.box("Learning Stone")
+			HoverInfo.line(v, "+1000 experience, once per hero.")
+			return v
+		"windmill":
+			var v := HoverInfo.box("Windmill")
+			HoverInfo.line(v, "The miller shares resources once a week.")
+			return v
+		"watchtower":
+			var v := HoverInfo.box("Watchtower")
+			HoverInfo.line(v, "Reveals the land around it.")
+			return v
+	return _describe_tile(t)
 
 func _describe_tile(t: Vector2i) -> String:
 	if not rules.inside(t):
@@ -346,7 +466,11 @@ func _execute_move() -> void:
 			_make_plan(hero["dest"])
 		else:
 			_plan = {}
+			_plan_target = Vector2i(-1, -1)
 			view.clear_path()
+		if _pending_click != Vector2i(-1, -1) and not _modal_open():
+			_make_plan(_pending_click)  # only show the path: walking needs a second click as always
+	_pending_click = Vector2i(-1, -1)
 	hud.refresh()
 
 ## Moves a hero along plan up to its reach, performing the final interaction.

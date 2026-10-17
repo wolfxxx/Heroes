@@ -64,6 +64,10 @@ leaves the `_dead` sprite on the hex as a corpse.
   tavern, marketplace, mage_guild_1, mage_guild_2 (also shown for guild levels 3-4), blacksmith, dwelling_1 .. dwelling_7.
   Rendered buildings are cropped layers of one 1920x810 scene; their pixel rects live in
   `town/layout_<faction>.json` (written by tools/art/town_crop.py). `scripts/town/town_layout.gd` is the fallback.
+  Each faction has its own site: Haven is `tools/art/blender/townscreen.py` (round plaza before a white castle),
+  Necropolis is `tools/art/blender/necro_town.py` (a moor below a black crag, skull gate, its own slots and buildings).
+  The blockouts are painted over in non-overlapping groups (`tools/art/town_groups.py <faction> --out ... --full ...`,
+  which also writes notes.json telling the painter what each building is).
 
 ## Icons & UI
 - `icons/res_<resource>.png` — 64x64 resource icons.

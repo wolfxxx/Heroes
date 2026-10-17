@@ -11,15 +11,16 @@ SLOTS = {
     "dwelling_4": (16.5, 0.0), "dwelling_5": (6.5, 8.0), "dwelling_6": (-6.5, 8.5), "dwelling_7": (16, 12),
 }
 
-def town_camera():
+def town_camera(wide=False):
+    """wide: the Necropolis site is spread further, seen from a little further back."""
     sc = bpy.context.scene
     cam = bpy.data.objects.get("TownCam") or bpy.data.objects.new("TownCam", bpy.data.cameras.new("TownCam"))
     if cam.name not in sc.collection.objects:
         sc.collection.objects.link(cam)
     cam.data.type = "PERSP"
-    cam.data.lens = 30
+    cam.data.lens = 27 if wide else 30
     cam.data.clip_end = 2000
-    cam.location = (0, -22, 8.0)
+    cam.location = (0, -23, 8.4) if wide else (0, -22, 8.0)
     cam.rotation_euler = Euler((math.radians(79), 0, 0), "XYZ")
     sc.camera = cam
     sc.render.resolution_x = VIEW_W
@@ -232,6 +233,8 @@ def b_dwelling(f, tier):
     return out
 
 def building(f, sid):
+    if f == "necropolis":
+        return necro_building(sid)  # necro_town.py
     if sid in ("village_hall", "town_hall", "city_hall"):
         return b_hall(f, {"village_hall": 1, "town_hall": 2, "city_hall": 3}[sid]), "hall"
     if sid in ("fort", "citadel"):
@@ -317,7 +320,8 @@ def town_backdrop(f):
     town_camera()
 
 def render_town(f):
-    town_backdrop(f)
+    necropolis = f == "necropolis"
+    necro_backdrop() if necropolis else town_backdrop(f)  # necro_town.py
     render(f"town/{f}_bg.png")
     layout = {}
     base_objs = set(o.name for o in bpy.context.scene.objects)
@@ -327,7 +331,7 @@ def render_town(f):
             o.is_shadow_catcher = True
     for sid in SPRITES:
         objs, slot = building(f, sid)
-        x, y = SLOTS[slot]
+        x, y = (NECRO_SLOTS if necropolis else SLOTS)[slot]
         at(objs, x, y, 0.0, 1.0)
         for o in bpy.context.scene.objects:
             if o.name not in base_objs and o not in objs and o.type == "MESH":

@@ -139,6 +139,9 @@ class _Slot extends Control:
 	var index := 0
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_STOP
+		HoverInfo.attach(self, func():
+			var st = strip.army[index] if index < strip.army.size() else null
+			return HoverInfo.creature(st["id"], st["count"]) if st else null)
 	func _gui_input(e: InputEvent) -> void:
 		if e is InputEventMouseButton and e.pressed:
 			if e.button_index == MOUSE_BUTTON_LEFT:
