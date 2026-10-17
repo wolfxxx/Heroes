@@ -269,16 +269,20 @@ func _hero_card(h: Dictionary) -> Control:
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_theme_constant_override("separation", -4)
 	hb.add_child(v)
-	var sel := b.button_pressed  # the selected card is bright gold: dark ink text, no shadow
-	var l := UI.label(h["name"], 19, Color(0.16, 0.08, 0.02) if sel else UI.TEXT)
+	var l := UI.label(h["name"], 19)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(l)
-	var lv := UI.label("Level %d" % h["level"], 16, Color(0.3, 0.18, 0.06) if sel else Color(0.8, 0.75, 0.62))
+	var lv := UI.label("Level %d" % h["level"], 16)
 	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(lv)
-	if sel:
+	# the selected card is bright gold: dark ink text without shadow (follows the toggle, which can change later)
+	var ink := func(sel: bool):
+		l.add_theme_color_override("font_color", Color(0.16, 0.08, 0.02) if sel else UI.TEXT)
+		lv.add_theme_color_override("font_color", Color(0.2, 0.09, 0.02) if sel else Color(0.8, 0.75, 0.62))
 		for x in [l, lv]:
-			x.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
+			x.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0) if sel else Color(0, 0, 0, 0.7))
+	ink.call(b.button_pressed)
+	b.toggled.connect(ink)
 	return b
 
 func _bar(frac: float, col: Color, width: float) -> Control:
@@ -516,8 +520,15 @@ func open_hero_screen(h: Dictionary) -> void:
 		ah.add_child(ic)
 	var sv := VBoxContainer.new()
 	row.add_child(sv)
-	sv.add_child(UI.label("Spells", 24, UI.GOLD))
-	var sh := HBoxContainer.new()
+	var st := HBoxContainer.new()
+	st.add_theme_constant_override("separation", 16)
+	sv.add_child(st)
+	st.add_child(UI.label("Spells", 24, UI.GOLD))
+	if not h["spells"].is_empty():
+		var bk := UI.button("Open spellbook", func(): SpellBook.open(self, h), 18)
+		st.add_child(bk)
+	var sh := HFlowContainer.new()  # wraps instead of widening the dialog for a hero who knows many spells
+	sh.custom_minimum_size.x = 400
 	sv.add_child(sh)
 	if h["spells"].is_empty():
 		sh.add_child(UI.label("None", 18))

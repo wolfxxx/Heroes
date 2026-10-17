@@ -3,7 +3,8 @@ class_name HoverInfo
 ## An info panel that follows the cursor while it rests on something: buildings, build cards, creature stacks,
 ## map objects. Unlike tooltips it appears at once (or after a short `delay`) and can hold icons and colour.
 ##   HoverInfo.attach(control, func(): return HoverInfo.creature("skeleton", 12))
-##   HoverInfo.show_for(owner, content, delay) / HoverInfo.hide_for(owner)   for things that aren't Controls
+##   HoverInfo.show_for(owner, content, delay, side) / HoverInfo.hide_for(owner)   for things that aren't Controls
+## side: 1 = right of the cursor (default), -1 = left of it (each falls back to the other if there's no room).
 ## Content is a Control, a String, or null (nothing to show).
 
 const WIDTH := 400.0
@@ -25,7 +26,8 @@ static func attach(c: Control, build: Callable, delay := 0.0) -> void:
 	c.mouse_exited.connect(func(): hide_for(c))
 	c.tree_exiting.connect(func(): hide_for(c))
 
-static func show_for(owner: Object, content, delay := 0.0) -> void:
+static func show_for(owner: Object, content, delay := 0.0, side := 1) -> void:
+	_layer().side = side
 	_layer().present(owner, content, delay)
 
 static func hide_for(owner: Object) -> void:
@@ -107,6 +109,7 @@ class _Layer extends CanvasLayer:
 	var content: Control
 	var wait := 0.0
 	var mouse := Vector2.ZERO  # from motion events (follows simulated input too, unlike the OS cursor)
+	var side := 1
 
 	func _init() -> void:
 		layer = 120
@@ -132,7 +135,7 @@ class _Layer extends CanvasLayer:
 			content.queue_free()
 			content = null
 		owner_obj = o
-		if c == null or (c is String and c == ""):
+		if c == null or (c is String and c == "") or _under_modal(o):
 			panel.visible = false
 			return
 		if c is String:
@@ -157,6 +160,13 @@ class _Layer extends CanvasLayer:
 				content.queue_free()
 				content = null
 
+	## Owner hidden behind an open dialog (e.g. the map tile under a hero screen): its panel must not show.
+	func _under_modal(o) -> bool:
+		var ml := get_tree().root.get_node_or_null("ModalLayer")
+		if ml == null or ml.get_child_count() == 0:
+			return false
+		return not (o is Node and ml.get_child(ml.get_child_count() - 1).is_ancestor_of(o))
+
 	func _ignore_mouse(n: Node) -> void:
 		if n is Control:
 			n.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -167,6 +177,9 @@ class _Layer extends CanvasLayer:
 		if content == null:
 			return
 		if owner_obj != null and owner_obj is Object and not is_instance_valid(owner_obj):
+			dismiss(owner_obj)
+			return
+		if _under_modal(owner_obj):
 			dismiss(owner_obj)
 			return
 		if wait > 0.0:
@@ -183,8 +196,9 @@ class _Layer extends CanvasLayer:
 		var sz := panel.get_combined_minimum_size()
 		panel.size = sz
 		var p := m + Vector2(26, 26)
-		if p.x + sz.x > vs.x - 8:
-			p.x = m.x - sz.x - 16
+		var left := m.x - sz.x - 16
+		if (side < 0 and left >= 8) or p.x + sz.x > vs.x - 8:
+			p.x = left
 		if p.y + sz.y > vs.y - 8:
 			p.y = maxf(8, vs.y - sz.y - 8)
 		panel.position = p

@@ -55,11 +55,20 @@ leaves the `_dead` sprite on the hex as a corpse.
   keyed, cut, given a cast shadow and an anchor. Which terrain gets which: `WorldGen.DECOR_KINDS`.
 - Roads are not a texture of their own: `MapView` turns road tiles into smoothed polylines and a distance field, and
   `terrain.gdshader` paints cobbles there (gravel shoulder from `terrain/road.png`).
+- `map/flag_pole.png` + `map/flag_cloth.png` — owner banner, 4 waving frames of 91x112 side by side; the cloth is
+  grey shading multiplied by the player colour (`MapView._Flag`). Painted by `tools/art/flag_paint.py` (imagegen/batch16).
+- `terrain/snow.png` is painted (`tools/art/snow_paint.py`, imagegen/batch15, made seamless); the old graded photo is in
+  `tools/art/raw/terrain/snow_old_graded.png`.
 - `map/monster_<creature_id>.png` optional — default is to reuse the creature sprite scaled.
 
 ## Battle
 - `battle/bg_<terrain>.png` — 1920x1080 painted battlefield backdrop (side/elevated view, open flat ground in the
   middle where the hex grid goes, horizon/scenery in the top ~25%). terrains: grass dirt sand snow swamp.
+- `battle/fx_<fire|frost|spark|arcane|holy|dark>.png` — spell effects, 4x4 flipbooks of 256 px frames on black,
+  drawn with additive blending (`battle.gd` FX_OF / _play_fx). Painted by `tools/art/vfx_paint.py` (imagegen/batch13).
+- `ui/spellbook.png` — 1536x1024 open leather spellbook with five school tabs (all, air, fire, water, earth), keyed
+  from magenta. Page and tab rectangles are in `scripts/ui/spell_book.gd`. `icons/spell_<id>.png` (128 px) are painted
+  miniatures. Both by `tools/art/spellbook_paint.py` (imagegen/batch14; `paint <spell_id>` repaints one miniature).
 - `battle/obstacle_1..4.png` — rocks/stumps/skulls placed on hexes, transparent, ~160x128.
 
 ## Town screens

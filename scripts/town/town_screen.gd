@@ -520,7 +520,8 @@ func _open_recruit_all() -> void:
 		card.title = GameData.dwelling_name(town["faction"], tier)
 		card.c = GameData.CREATURES[cid]
 		card.available = town["available"][tier - 1] if built else -1
-		card.custom_minimum_size = Vector2(372, 262)
+		card.growth = int(card.c["growth"] * (1.5 if TownLogic.has_building(town, "citadel") else 1.0))
+		card.custom_minimum_size = Vector2(372, 300)
 		card.disabled = not built
 		HoverInfo.attach(card, func():
 			var v := HoverInfo.creature(cid, -1, card.title)
@@ -810,16 +811,22 @@ class _DwellingCard extends Button:
 	var title := ""
 	var c: Dictionary
 	var available := -1
+	var growth := 0
 	func _ready() -> void:
 		focus_mode = Control.FOCUS_NONE
 		flat = true
 		mouse_entered.connect(queue_redraw)
 		mouse_exited.connect(queue_redraw)
+	## Title band on top, the dwelling art with its creature, and under it: creature, stats, cost and growth.
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		var dim := Color.WHITE if available >= 0 else Color(0.38, 0.36, 0.36)
 		draw_rect(r, Color(0.07, 0.05, 0.03))
-		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - 64))
+		var f := UI.font()
+		var tf := UI.title_font()
+		draw_rect(Rect2(Vector2(5, 5), Vector2(size.x - 10, 30)), Color(0.15, 0.1, 0.05))
+		draw_string(tf, Vector2(5, 28), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 20, UI.GOLD)
+		var pr := Rect2(Vector2(5, 37), Vector2(size.x - 10, size.y - 37 - 92))
 		if pic:
 			var ts := Vector2(pic.get_size())
 			var sc := maxf(pr.size.x / ts.x, pr.size.y / ts.y)
@@ -829,18 +836,21 @@ class _DwellingCard extends Button:
 			var sc2 := minf(pr.size.y * 0.95 / cs.y, pr.size.x * 0.8 / cs.x)
 			var feet := Vector2(pr.position.x + pr.size.x * 0.5, pr.end.y - 4)
 			draw_texture_rect(creature, Rect2(feet - anchor * cs * sc2, cs * sc2), false, dim)
-		var f := UI.font()
-		draw_rect(Rect2(Vector2(5, 5), Vector2(size.x - 10, 28)), Color(0, 0, 0, 0.55))
-		draw_string(f, Vector2(5, 26), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, UI.GOLD)
-		draw_rect(Rect2(Vector2(5, size.y - 59), Vector2(size.x - 10, 54)), Color(0.12, 0.09, 0.06))
+		var y0 := size.y - 90
+		draw_rect(Rect2(Vector2(5, y0), Vector2(size.x - 10, 85)), Color(0.12, 0.09, 0.06))
+		draw_string(tf, Vector2(14, y0 + 22), c.get("plural", ""), HORIZONTAL_ALIGNMENT_LEFT, 200, 20, UI.TEXT)
 		var avail := ("Available: %d" % available) if available >= 0 else "Not built"
-		draw_string(f, Vector2(14, size.y - 36), c.get("plural", ""), HORIZONTAL_ALIGNMENT_LEFT, 200, 18, UI.TEXT)
-		draw_string(f, Vector2(size.x - 214, size.y - 36), avail, HORIZONTAL_ALIGNMENT_RIGHT, 200, 18,
+		draw_string(f, Vector2(size.x - 214, y0 + 21), avail, HORIZONTAL_ALIGNMENT_RIGHT, 200, 18,
 			UI.GOLD if available > 0 else Color(0.75, 0.7, 0.6))
+		var d: Array = c.get("dmg", [0, 0])
+		var stats := "Att %d   Def %d   Dmg %d-%d   HP %d   Spd %d" % [c.get("attack", 0), c.get("defense", 0), d[0], d[1], c.get("hp", 0), c.get("speed", 0)]
+		draw_string(f, Vector2(14, y0 + 47), stats, HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 16, Color(0.82, 0.78, 0.68))
 		var x := 14.0
 		for res in c.get("cost", {}):
-			draw_texture_rect(Assets.res_icon(res), Rect2(Vector2(x, size.y - 30), Vector2(22, 22)), false)
+			draw_texture_rect(Assets.res_icon(res), Rect2(Vector2(x, y0 + 57), Vector2(22, 22)), false)
 			var amt := str(c["cost"][res])
-			draw_string(f, Vector2(x + 26, size.y - 12), amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UI.TEXT)
+			draw_string(f, Vector2(x + 26, y0 + 75), amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UI.TEXT)
 			x += 34 + f.get_string_size(amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+		draw_string(f, Vector2(size.x - 214, y0 + 75), "+%d / week" % growth, HORIZONTAL_ALIGNMENT_RIGHT, 200, 17,
+			Color(0.55, 0.9, 0.5) if available >= 0 else Color(0.6, 0.58, 0.52))
 		draw_rect(r, UI.GOLD if is_hovered() and available >= 0 else UI.GOLD_DARK, false, 1.5)

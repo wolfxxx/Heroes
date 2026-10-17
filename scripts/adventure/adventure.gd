@@ -31,6 +31,9 @@ func _ready() -> void:
 			s["seed"] = int(Shot.args.get("seed", "12345"))
 			s["faction"] = Shot.args.get("faction", s.get("faction", "haven"))
 		GameState.world = WorldGen.generate(s)
+		if Shot.setup == "all_spells":
+			for h in GameState.world["heroes"].values():
+				h["spells"] = GameData.SPELLS.keys()
 	world = GameState.world
 	RenderingServer.set_default_clear_color(Color(0.02, 0.02, 0.03))
 	rules = AdvRules.new(world)

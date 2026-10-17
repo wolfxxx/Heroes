@@ -320,7 +320,7 @@ func rebuild_objects() -> void:
 		n.position = foot_of(t["pos"])
 		n.add_child(_sprite("map/town_%s.png" % t["faction"], Vector2.ZERO, 5.6 * TILE))
 		if t["owner"] >= 0:
-			_add_flag(n, Vector2(-1.9 * TILE, -2.6 * TILE), t["owner"])
+			_add_flag(n, Vector2(-1.9 * TILE, -1.9 * TILE), t["owner"], 64.0)
 		_sorted.add_child(n)
 		_town_nodes[t["uid"]] = n
 	for o in world["objects"].values():
@@ -350,7 +350,7 @@ func _object_node(o: Dictionary) -> Node2D:
 		"mine":
 			n.add_child(_sprite("map/%s.png" % o["mine"], Vector2.ZERO, 3.1 * TILE))
 			if o["owner"] >= 0:
-				_add_flag(n, Vector2(-1.2 * TILE, -1.8 * TILE), o["owner"])
+				_add_flag(n, Vector2(-1.25 * TILE, -1.0 * TILE), o["owner"], 60.0)
 		"shrine":
 			n.add_child(_sprite("map/shrine.png", Vector2.ZERO, 2.6 * TILE))
 		"windmill":
@@ -367,7 +367,7 @@ func _object_node(o: Dictionary) -> Node2D:
 				path = "creatures/%s.png" % o["creature"]
 			var big: bool = "two_hex" in GameData.CREATURES[o["creature"]]["abilities"]
 			# creature renders are 150 px/unit vs 64 for map art; draw them a bit larger than true scale
-			var ms := _sprite(path, Vector2(0, -WorldGen.TILE * 0.5 + 6), 0, o.get("flip", false), 112.0 if big else 88.0, 0.72)
+			var ms := _sprite(path, Vector2(0, -WorldGen.TILE * 0.5 + 6), 0, o.get("flip", false), 92.0 if big else 72.0, 0.72)
 			outline(ms)
 			n.add_child(ms)
 		_:
@@ -381,19 +381,24 @@ func _hero_node(h: Dictionary) -> Node2D:
 	ring.name = "Ring"
 	ring.visible = h["uid"] == selected_hero
 	n.add_child(ring)
+	# the banner stands behind the hero, flying away from the horse
+	_add_flag(n, Vector2(-24, -16), h["owner"], 100.0, true)
 	var spr := _sprite("heroes/map_%s.png" % h["faction"], Vector2(0, 4), 0, h.get("face_left", false), 118.0, 1.35)
 	spr.name = "Sprite"
 	spr.set_meta("faction", h["faction"])
 	outline(spr)
+	var tc: Color = GameData.PLAYER_COLORS[h["owner"]]
+	spr.material.set_shader_parameter("team", Color(tc.r, tc.g, tc.b, 0.85))  # owner colour ring: whose hero at a glance
 	n.add_child(spr)
-	_add_flag(n, Vector2(-30, -138), h["owner"], 1.5)
 	return n
 
-func _add_flag(parent: Node2D, pos: Vector2, owner: int, sc := 1.25) -> void:
+## Owner banner, painted (tools/art/flag_paint.py): pos = foot of the pole, h = drawn height.
+func _add_flag(parent: Node2D, pos: Vector2, owner: int, h := 60.0, fly_left := false) -> void:
 	var f := _Flag.new()
 	f.color = GameData.PLAYER_COLORS[owner]
 	f.position = pos
-	f.scale = Vector2(sc, sc)
+	var sc := h / float(_Flag.FH)
+	f.scale = Vector2(-sc if fly_left else sc, sc)
 	parent.add_child(f)
 
 func foot_of(tile: Vector2i) -> Vector2:
@@ -546,9 +551,7 @@ func update_fog(player: Dictionary) -> void:
 	data.resize(size.x * size.y)
 	for i in ex.size():
 		data[i] = 255 if ex[i] else 0
-	var img := Image.create_from_data(size.x, size.y, false, Image.FORMAT_L8, data)
-	# upscale smoothly so the fog edge is round instead of stair-stepped
-	img.resize(size.x * 4, size.y * 4, Image.INTERPOLATE_CUBIC)
+	var img := Image.create_from_data(size.x, size.y, false, Image.FORMAT_L8, data)  # fog.gdshader rounds the edge
 	if _fog_img.get_width() != img.get_width():
 		_fog_img = img
 		_fog_tex = ImageTexture.create_from_image(_fog_img)
@@ -607,22 +610,21 @@ class _Ring extends Node2D:
 		draw_arc(Vector2.ZERO, 34, 0, TAU, 48, Color(1, 0.85, 0.35, a), 3.0, true)
 
 class _Flag extends Node2D:
+	const FW := 91  # one frame of map/flag_pole.png and map/flag_cloth.png (4 frames side by side)
+	const FH := 112
+	const POLE_X := 4.0  # the pole's x in a frame
 	var color := Color.RED
+	var _frame := -1
 	func _process(_d: float) -> void:
-		queue_redraw()
+		var f := int(Time.get_ticks_msec() / 150.0 + get_instance_id() % 4) % 4
+		if f != _frame:
+			_frame = f
+			queue_redraw()
 	func _draw() -> void:
-		var t := Time.get_ticks_msec() / 1000.0 + position.x * 0.01
-		draw_line(Vector2(0, 0), Vector2(0, 34), Color(0.25, 0.18, 0.1), 3.0)
-		var pts := PackedVector2Array()
-		var n := 6
-		for i in n + 1:
-			var x := i * 4.0
-			pts.append(Vector2(x, 2 + sin(t * 5.0 + i * 0.9) * 1.6 * i / n))
-		for i in range(n, -1, -1):
-			var x := i * 4.0
-			pts.append(Vector2(x, 16 + sin(t * 5.0 + i * 0.9) * 1.6 * i / n))
-		draw_colored_polygon(pts, color)
-		draw_polyline(pts, color.darkened(0.5), 1.0)
+		var src := Rect2(_frame * FW, 0, FW, FH)
+		var dst := Rect2(-POLE_X, -FH, FW, FH)
+		draw_texture_rect_region(Assets.tex("map/flag_pole.png"), dst, src)
+		draw_texture_rect_region(Assets.tex("map/flag_cloth.png"), dst, src, color.lightened(0.1))
 
 class _PathOverlay extends Node2D:
 	var view

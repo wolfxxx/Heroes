@@ -7,8 +7,8 @@ const X0 := 264.0
 const Y0 := 272.0
 const TIER_H := [0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]
 ## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
-const FIG_H := [0, 132.0, 138.0, 150.0, 158.0, 165.0, 220.0, 240.0]
-const FIG_MAX_W := 2.6  # widest solid figure in hexes (1-hex units; 2-hex units get one more hex)
+const FIG_H := [0, 112.0, 118.0, 128.0, 135.0, 142.0, 188.0, 205.0]
+const FIG_MAX_W := 2.1  # widest solid figure in hexes (1-hex units; 2-hex units get one more hex)
 
 static var _sizes = null
 
@@ -76,7 +76,7 @@ func _demo_setup() -> Dictionary:
 		var c: Array = GameData.FACTIONS[h["faction"]]["creatures"]
 		for i in 7:
 			h["army"][i] = {"id": c[i], "count": [30, 18, 9, 6, 4, 2, 1][i]}
-		h["spells"] = ["magic_arrow", "bless", "lightning_bolt", "fireball", "haste", "cure"]
+		h["spells"] = GameData.SPELLS.keys() if Shot.setup == "all_spells" else ["magic_arrow", "bless", "lightning_bolt", "fireball", "haste", "cure"]
 		h["power"] = 3
 		h["knowledge"] = 4
 		h["mana"] = 40
@@ -163,11 +163,21 @@ func _build_scene() -> void:
 		add_child(s)
 		var sz := Vector2(s.texture.get_size()) * sc
 		_hero_rects[side] = Rect2(s.position - sz * 0.5, sz).grow(-sz.x * 0.12)
-		var nl := UI.label(hh["name"], 20, UI.GOLD)
-		nl.position = Vector2(10 if side == 0 else 1710, 292)
-		nl.size = Vector2(200, 30)
+		var nl := UI.label(hh["name"], 22, UI.GOLD, true)
+		var plate := StyleBoxFlat.new()  # dark plate: the name must read over any backdrop
+		plate.bg_color = Color(0.05, 0.035, 0.02, 0.78)
+		plate.border_color = Color(0.85, 0.25, 0.2, 0.9) if side == 0 else Color(0.3, 0.5, 1.0, 0.9)
+		plate.border_width_bottom = 3
+		plate.set_corner_radius_all(5)
+		plate.content_margin_left = 12
+		plate.content_margin_right = 12
+		nl.add_theme_stylebox_override("normal", plate)
+		nl.add_theme_constant_override("outline_size", 5)
+		nl.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 		nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		add_child(nl)
+		nl.size = nl.get_combined_minimum_size()
+		nl.position = Vector2((110 if side == 0 else 1810) - nl.size.x * 0.5, 292)
 
 func _make_unit(st: Dictionary) -> void:
 	var c: Dictionary = GameData.CREATURES[st["id"]]
@@ -175,6 +185,7 @@ func _make_unit(st: Dictionary) -> void:
 	n.position = hex_pos(st["hex"]) + Vector2(0, 24)
 	var shadow := _Shadow.new()
 	shadow.big = "two_hex" in c["abilities"]
+	shadow.side = st["side"]
 	shadow.name = "Shadow"
 	n.add_child(shadow)
 	var s := Sprite2D.new()
@@ -212,7 +223,7 @@ func _make_unit(st: Dictionary) -> void:
 	var badge := _Badge.new()
 	badge.name = "Badge"
 	badge.st = st
-	badge.position = Vector2(28, 14)
+	badge.position = Vector2(34 if st["side"] == 0 else -34, 18)
 	badge.z_index = 5
 	n.add_child(badge)
 	_sorted.add_child(n)
@@ -485,9 +496,9 @@ func _update_info() -> void:
 	if key == "":
 		HoverInfo.hide_for(self)
 	elif key.begins_with("s"):
-		HoverInfo.show_for(self, _stack_info(L.stack_at(_hover)), 0.25)
+		HoverInfo.show_for(self, _stack_info(L.stack_at(_hover)), 0.25, -1 if _hover.x >= L.COLS / 2 else 1)
 	else:
-		HoverInfo.show_for(self, _hero_info(int(key.substr(1))), 0.25)
+		HoverInfo.show_for(self, _hero_info(int(key.substr(1))), 0.25, -1 if key == "h1" else 1)
 
 ## Forget the shown panel (the stats changed): the next mouse move builds it again.
 func _reset_info() -> void:
@@ -750,60 +761,8 @@ func _on_spells() -> void:
 		return
 	var side: int = cur["side"]
 	var h = L.heroes[side]
-	# A two-page parchment spellbook, like HoMM's.
-	var m := Modal.custom(self, "", 1180)
-	if Assets.has("ui/parchment.png"):
-		var sb := StyleBoxTexture.new()
-		sb.texture = Assets.tex("ui/parchment.png")
-		sb.set_texture_margin_all(40)
-		sb.set_content_margin_all(40)
-		m.panel.add_theme_stylebox_override("panel", sb)
-	var ink := Color(0.25, 0.14, 0.06)
-	var title := UI.label("%s's Spellbook  —  %d mana" % [h["name"], h["mana"]], 30, Color(0.45, 0.1, 0.05), true)
-	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	m.body.add_child(title)
-	var pages := HBoxContainer.new()
-	pages.add_theme_constant_override("separation", 30)
-	m.body.add_child(pages)
-	var spells: Array = h["spells"].duplicate()
-	spells.sort_custom(func(a, b): return GameData.SPELLS[a]["level"] < GameData.SPELLS[b]["level"])
-	var half := int(ceil(spells.size() / 2.0))
-	for page in 2:
-		var g := GridContainer.new()
-		g.columns = 2
-		g.custom_minimum_size = Vector2(520, 360)
-		g.add_theme_constant_override("h_separation", 16)
-		g.add_theme_constant_override("v_separation", 14)
-		pages.add_child(g)
-		if page == 0:
-			var spine := ColorRect.new()
-			spine.color = Color(0.45, 0.32, 0.18, 0.6)
-			spine.custom_minimum_size = Vector2(3, 360)
-			pages.add_child(spine)
-		for s in spells.slice(page * half, (page + 1) * half):
-			var sp: Dictionary = GameData.SPELLS[s]
-			var b := Button.new()
-			b.flat = true
-			b.custom_minimum_size = Vector2(250, 170)
-			b.text = "%s\nLevel %d  ·  %d mana" % [sp["name"], sp["level"], sp["mana"]]
-			b.icon = Assets.spell_icon(s)
-			b.expand_icon = true
-			b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-			b.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-			b.add_theme_constant_override("icon_max_width", 90)
-			b.add_theme_font_size_override("font_size", 19)
-			for st in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-				b.add_theme_color_override(st, ink if st == "font_color" else Color(0.55, 0.12, 0.05))
-			b.add_theme_color_override("font_disabled_color", Color(0.45, 0.4, 0.35, 0.7))
-			b.tooltip_text = sp["desc"]
-			b.disabled = sp["mana"] > h["mana"]
-			var sid: String = s
-			b.pressed.connect(func(): m.close(sid))
-			g.add_child(b)
-	m.add_buttons([["Close", ""]])
-	m.set_meta("cancel", "")
-	var r = await m.closed
+	var r = await SpellBook.open(self, h, func(sp): return GameData.SPELLS[sp]["mana"] <= h["mana"],
+		func(sp): return ("Now: %d damage." % L.spell_damage(side, sp)) if GameData.SPELLS[sp].has("damage") else "").closed
 	if r == null or r == "":
 		return
 	if GameData.SPELLS[r]["target"] == "all_living":
@@ -953,13 +912,10 @@ func _anim_attack(ev: Dictionary) -> void:
 		_hit_flash(d, dir, big)
 	if big:
 		_shake(7.0 if ev["killed"] > 0 else 4.0)
-	var col := Color(1, 0.85, 0.3) if ev["lucky"] else Color(1, 0.35, 0.3)
 	var txt := "-%d" % ev["dmg"]
-	if ev["killed"] > 0:
-		txt += "  (%d)" % ev["killed"]
 	if ev["lucky"]:
 		txt = "Lucky! " + txt
-	_float_text(nd.position + Vector2(0, -_top(d) - 10), txt, col)
+	_damage_text(d, txt, ev["killed"], ev["lucky"])
 	_refresh_badge(d)
 	await get_tree().create_timer(0.3).timeout
 
@@ -970,8 +926,8 @@ func _hit_flash(d: Dictionary, dir := Vector2.ZERO, big := false) -> void:
 	var nd := _unit(d)
 	var s: Sprite2D = nd.get_node("Sprite")
 	var tw := s.create_tween()
-	tw.tween_property(s, "modulate", Color(1.8, 0.6, 0.6), 0.06)
-	tw.tween_property(s, "modulate", Color.WHITE, 0.2)
+	tw.tween_property(s, "modulate", Color(1.4, 1.25, 1.2), 0.05)
+	tw.tween_property(s, "modulate", Color.WHITE, 0.22)
 	var home: Vector2 = s.get_meta("home", Vector2.ZERO)
 	var tw2 := s.create_tween()
 	if dir != Vector2.ZERO:
@@ -1047,44 +1003,78 @@ func _anim_spell(ev: Dictionary) -> void:
 		centers.append(hex_pos(ev["hex"]) + Vector2(0, -30))
 	for t in targets:
 		centers.append(_unit(t).position + Vector2(0, -70))
+	var area: bool = sp == "death_cloud" or (GameData.SPELLS.has(sp) and GameData.SPELLS[sp]["target"] == "area")
+	var fx: String = FX_OF.get(sp, "arcane")
 	for c in centers:
-		var burst := _Burst.new()
-		burst.color = col
-		burst.position = c
-		burst.bolt = sp == "lightning_bolt"
-		burst.radius = 150.0 if (GameData.SPELLS.has(sp) and GameData.SPELLS[sp]["target"] == "area") else 70.0
-		_fx.add_child(burst)
+		if sp == "lightning_bolt":
+			var burst := _Burst.new()  # the bolt from the sky; the painted sparks are the impact
+			burst.bolt = true
+			burst.position = c
+			_fx.add_child(burst)
+		var p: Vector2 = c
+		if fx == "holy":
+			p += Vector2(0, -20)  # a column rising from the feet: its ring sits at the bottom of the frame
+		_play_fx(fx, p, 1.3 if area else 0.95)
 	await get_tree().create_timer(0.35).timeout
 	for t in targets:
 		if ev["dmg"].has(t["uid"]):
 			_hit_flash(t)
-			var txt := "-%d" % ev["dmg"][t["uid"]]
-			if ev["killed"].get(t["uid"], 0) > 0:
-				txt += "  (%d)" % ev["killed"][t["uid"]]
-			_float_text(_unit(t).position + Vector2(0, -_top(t) - 10), txt, Color(1, 0.4, 0.35))
+			_damage_text(t, "-%d" % ev["dmg"][t["uid"]], ev["killed"].get(t["uid"], 0))
 			_refresh_badge(t)
 		else:
 			var s: Sprite2D = _unit(t).get_node("Sprite")
 			var tw := s.create_tween()
-			tw.tween_property(s, "modulate", col.lightened(0.4) * 1.5, 0.15)
+			tw.tween_property(s, "modulate", col.lightened(0.5) * 1.25, 0.15)
 			tw.tween_property(s, "modulate", Color.WHITE, 0.4)
 	await get_tree().create_timer(0.45).timeout
+
+## Painted spell effects (assets/battle/fx_<name>.png, 4x4 flipbooks on black, drawn additively).
+const FX_OF := {"fireball": "fire", "meteor_shower": "fire", "frost_ring": "frost", "ice_bolt": "frost",
+	"lightning_bolt": "spark", "magic_arrow": "arcane", "bless": "holy", "cure": "holy", "resurrection": "holy",
+	"shield": "holy", "stone_skin": "holy", "haste": "holy", "curse": "dark", "slow": "dark", "weakness": "dark",
+	"death_ripple": "dark", "death_cloud": "dark"}
+
+func _play_fx(fx: String, p: Vector2, sc: float, dur := 0.8) -> void:
+	if not Assets.has("battle/fx_%s.png" % fx):
+		return
+	var s := Sprite2D.new()
+	s.texture = Assets.tex("battle/fx_%s.png" % fx)
+	s.hframes = 4
+	s.vframes = 4
+	s.position = p
+	s.scale = Vector2.ONE * sc
+	s.z_index = 25
+	var m := CanvasItemMaterial.new()
+	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	s.material = m
+	_fx.add_child(s)
+	var tw := s.create_tween()
+	tw.tween_property(s, "frame", 15, dur)
+	tw.tween_callback(s.queue_free)
 
 func _refresh_badge(st: Dictionary) -> void:
 	var n := _unit(st)
 	if n:
 		n.get_node("Badge").queue_redraw()
 
-func _float_text(p: Vector2, t: String, col: Color) -> void:
+## Damage over a stack: a large number, and how many died on a second line.
+func _damage_text(d: Dictionary, txt: String, killed: int, lucky := false) -> void:
+	if killed > 0:
+		txt += "\n%d killed" % killed
+	_float_text(_unit(d).position + Vector2(0, -_top(d) - 20), txt, Color(1, 0.85, 0.3) if lucky else Color(1, 0.95, 0.85), 36)
+
+func _float_text(p: Vector2, t: String, col: Color, size := 30) -> void:
 	var l := Label.new()
 	l.text = t
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.add_theme_font_override("font", UI.title_font())
-	l.add_theme_font_size_override("font_size", 30)
+	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", col)
-	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
-	l.add_theme_constant_override("outline_size", 8)
+	l.add_theme_color_override("font_outline_color", Color(0.15, 0.02, 0.0, 1.0))
+	l.add_theme_constant_override("outline_size", 10 if size > 30 else 8)
+	l.add_theme_constant_override("line_spacing", -10)
 	var bg := StyleBoxFlat.new()  # soft dark backing so numbers stay readable over busy sprites
-	bg.bg_color = Color(0, 0, 0, 0.42)
+	bg.bg_color = Color(0, 0, 0, 0.3)
 	bg.set_corner_radius_all(8)
 	bg.content_margin_left = 10
 	bg.content_margin_right = 10
@@ -1092,10 +1082,27 @@ func _float_text(p: Vector2, t: String, col: Color) -> void:
 	l.z_index = 30
 	_fx.add_child(l)
 	l.reset_size()
-	l.position = p - Vector2(l.size.x * 0.5, 0)
+	# don't land on a number that just appeared (area spells hit neighbouring stacks at once): stack above it
+	var r := Rect2(p - Vector2(l.size.x * 0.5, 0), l.size)
+	var now := Time.get_ticks_msec()
+	for k in 8:
+		var hit := false
+		for o in _fx.get_children():
+			if o != l and o.has_meta("float_rect") and now - int(o.get_meta("born")) < 700 and r.intersects(o.get_meta("float_rect").grow(-2)):
+				r.position.y = o.get_meta("float_rect").position.y - r.size.y - 2
+				hit = true
+		if not hit:
+			break
+	l.set_meta("float_rect", r)
+	l.set_meta("born", now)
+	p.y = r.position.y
+	l.position = r.position
 	var tw := l.create_tween().set_parallel(true)
-	tw.tween_property(l, "position:y", p.y - 70, 1.1).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 0.5).set_delay(0.7)
+	l.pivot_offset = l.size * 0.5
+	l.scale = Vector2(0.6, 0.6)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "position:y", p.y - 70, 1.3).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 0.5).set_delay(1.0)
 	tw.chain().tween_callback(l.queue_free)
 
 ## Spell name as a banner under the turn queue (not over the units), tinted by the caster's side.
@@ -1241,6 +1248,7 @@ class _Grid extends Node2D:
 
 class _Shadow extends Node2D:
 	var big := false
+	var side := 0
 	var active := false:
 		set(v):
 			active = v
@@ -1252,6 +1260,8 @@ class _Shadow extends Node2D:
 		var w := 62.0 if big else 44.0
 		draw_set_transform(Vector2(0, -2), 0, Vector2(1, 0.32))
 		draw_circle(Vector2.ZERO, w, Color(0, 0, 0, 0.35))
+		# side colour (as the count badge): whose stack is whose, even when sprites overlap
+		draw_arc(Vector2.ZERO, w - 2, 0, TAU, 40, Color(0.85, 0.25, 0.2, 0.75) if side == 0 else Color(0.3, 0.5, 1.0, 0.75), 5.0, true)
 		if active:
 			var a := 0.55 + 0.35 * sin(Time.get_ticks_msec() / 160.0)
 			draw_arc(Vector2.ZERO, w + 4, 0, TAU, 40, Color(1, 0.85, 0.3, a), 4.0, true)
@@ -1288,9 +1298,11 @@ class _QueueIcon extends Control:
 		var col := Color(0.8, 0.2, 0.15) if st["side"] == 0 else Color(0.25, 0.4, 0.95)
 		draw_rect(r, UI.GOLD if first else col, false, 4.0 if first else 3.0)
 		var txt := str(st["count"])
-		var f := UI.font()
-		draw_rect(Rect2(Vector2(0, size.y - 20), Vector2(size.x, 20)), Color(0, 0, 0, 0.6))
-		draw_string(f, Vector2(0, size.y - 4), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, 17, Color.WHITE)
+		var f := UI.title_font()
+		var fs := 26 if first else 23
+		draw_rect(Rect2(Vector2(3, size.y - 28), Vector2(size.x - 6, 25)), Color(0, 0, 0, 0.65))
+		draw_string_outline(f, Vector2(0, size.y - 7), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, 5, Color(0, 0, 0, 0.9))
+		draw_string(f, Vector2(0, size.y - 7), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 0.96, 0.85))
 
 class _Projectile extends Node2D:
 	var from := Vector2.ZERO
@@ -1343,6 +1355,8 @@ class _Burst extends Node2D:
 			draw_polyline(pts, Color(0.85, 0.95, 1.0, a2), 7.0)
 			draw_polyline(pts, Color(1, 1, 1, a2), 3.0)
 			draw_circle(Vector2.ZERO, 60.0 * (1.0 - t), Color(0.9, 0.95, 1.0, 0.55 * a2))  # impact flash
+		if bolt:
+			return
 		draw_circle(Vector2.ZERO, radius * (0.3 + t * 0.9), Color(color, 0.35 * a))
 		draw_arc(Vector2.ZERO, radius * (0.2 + t), 0, TAU, 48, Color(color.lightened(0.4), a), 4.0 * a + 1.0)
 		for s in _seeds:

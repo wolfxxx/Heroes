@@ -25,7 +25,7 @@ static func _make(owner_node: Node, title: String, width := 640.0) -> Modal:
 	m.set_anchors_preset(Control.PRESET_FULL_RECT)
 	m.mouse_filter = Control.MOUSE_FILTER_STOP
 	var dim := ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.62)
+	dim.color = Color(0.02, 0.015, 0.01, 0.74)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	m.add_child(dim)
 	var center := CenterContainer.new()

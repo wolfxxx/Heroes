@@ -7,6 +7,8 @@ uniform vec4 ink : source_color = vec4(0.09, 0.06, 0.03, 0.95);
 uniform vec4 rim : source_color = vec4(1.0, 0.86, 0.6, 1.0);
 uniform float rim_strength = 0.35;
 uniform float saturation = 1.15;
+// optional owner-colour ring outside the ink (heroes on the map): alpha 0 = off
+uniform vec4 team : source_color = vec4(0.0);
 
 varying vec4 vcol;
 
@@ -32,5 +34,16 @@ void fragment() {
 	float oa = ink.a * clamp(m - a, 0.0, 1.0);
 	float alpha = a + oa * (1.0 - a);
 	vec3 rgb = (col * a + ink.rgb * oa * (1.0 - a)) / max(alpha, 0.0001);
+	if (team.a > 0.0) {
+		float m2 = 0.0;
+		for (int i = 0; i < 12; i++) {
+			float ang = float(i) * 0.523599;
+			m2 = max(m2, smoothstep(0.55, 0.85, texture(TEXTURE, UV + vec2(cos(ang), sin(ang)) * t * 1.8).a));  // solid figure only, not its soft shadow
+		}
+		float ta = team.a * clamp(m2 - smoothstep(0.55, 0.85, alpha), 0.0, 1.0);
+		float a2 = alpha + ta * (1.0 - alpha);
+		rgb = (rgb * alpha + team.rgb * ta * (1.0 - alpha)) / max(a2, 0.0001);
+		alpha = a2;
+	}
 	COLOR = vec4(rgb, alpha) * vcol;
 }

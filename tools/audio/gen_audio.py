@@ -15,6 +15,7 @@ OUT = "assets/audio"
 
 SFX = {
     "click": ("short soft wooden UI click, medieval game menu button", 0.5),
+    "page": ("single page of an old thick parchment book turning over, a quick soft paper flip", 0.7),
     "build": ("construction sounds, hammering on wood and stone, short fantasy game building completed fanfare", 2.5),
     "recruit": ("armored soldiers marching footsteps and a short brass fanfare, recruiting troops in a fantasy strategy game", 2.0),
     "gold_pickup": ("pile of gold coins being scooped up, jingling coins", 1.2),
