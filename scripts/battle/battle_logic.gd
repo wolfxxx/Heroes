@@ -60,12 +60,17 @@ func _deploy(army: Array, side: int) -> void:
 		_uid += 1
 		var st := {
 			"uid": _uid, "id": a["id"], "side": side, "slot": i, "count": a["count"], "hp_top": c["hp"],
-			"hex": Vector2i((1 if wide else 0) if side == 0 else COLS - (2 if wide else 1), SLOT_ROWS[i]), "shots": c["shots"],
+			"hex": Vector2i((1 if wide else 0) if side == 0 else COLS - (2 if wide else 1), SLOT_ROWS[i]) + _stagger(i, side), "shots": c["shots"],
 			"retaliations": 2 if "two_retaliations" in c["abilities"] else 1, "effects": {},
 			"alive": true, "defending": false, "waited": false, "acted": false,
 		}
 		stacks.append(st)
 		start_counts[st["uid"]] = st["count"]
+
+## The middle slot (row 5, between the stacks on rows 4 and 6) stands one hex forward, so the three middle stacks
+## don't merge into one heap of figures.
+static func _stagger(slot: int, side: int) -> Vector2i:
+	return Vector2i(1 if side == 0 else -1, 0) if slot == 3 else Vector2i.ZERO
 
 func cdata(s: Dictionary) -> Dictionary:
 	return GameData.CREATURES[s["id"]]

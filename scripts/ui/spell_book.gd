@@ -74,8 +74,8 @@ class _Book extends Control:
 			add_child(c)
 		# a wax-seal close button under the bookmarks (Esc, right click and a click beside the book also close it)
 		var x := _Seal.new()
-		x.position = Vector2(1404, 906)
-		x.size = Vector2(84, 84)
+		x.position = Vector2(1424, 928)
+		x.size = Vector2(72, 72)
 		x.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		x.pressed.connect(func(): m.close(""))
 		HoverInfo.attach(x, func(): return "Close the book  (Esc, right click)", 0.3)

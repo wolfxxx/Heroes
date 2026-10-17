@@ -7,7 +7,7 @@ const X0 := 264.0
 const Y0 := 272.0
 const TIER_H := [0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]
 ## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
-const FIG_H := [0, 112.0, 118.0, 128.0, 135.0, 142.0, 188.0, 205.0]
+const FIG_H := [0, 104.0, 110.0, 118.0, 124.0, 130.0, 172.0, 190.0]
 ## Widest figure in hexes, wings and capes included: 1-hex and 2-hex units (a stack mustn't swallow its neighbours).
 const VIS_MAX_W := [1.6, 2.5]
 
@@ -218,7 +218,7 @@ func _make_unit(st: Dictionary) -> void:
 		if fig.y > 0:
 			sc = FIG_H[c["tier"]] / fig.y
 			if wide:  # the body of a large unit spans most of its two hexes
-				sc = clampf(1.9 * HEX_W / fig.x, sc, 1.2 * sc)
+				sc = clampf(1.9 * HEX_W / fig.x, sc, 1.1 * sc)
 			sc = minf(sc, HEX_W * VIS_MAX_W[1 if wide else 0] / fig_vis_w(st["id"]))
 		s.scale = Vector2.ONE * sc
 		s.offset = (Vector2(0.5, 0.5) - anc) * tsz
@@ -237,9 +237,10 @@ func _make_unit(st: Dictionary) -> void:
 	var badge := _Badge.new()
 	badge.name = "Badge"
 	badge.st = st
-	# at the front corner of the footprint, facing the enemy (as the classic count plates)
-	badge.position = Vector2((HEX_W * (0.5 if wide else 0.0) + 26) * (1 if st["side"] == 0 else -1), 20)
-	badge.z_index = 5
+	# beside the feet at the front of the footprint, facing the enemy (as the classic count plates): on the stack's
+	# own ground, not on the figure in the row below; above floating numbers so a count is never hidden
+	badge.position = Vector2((HEX_W * (0.5 if wide else 0.0) + 30) * (1 if st["side"] == 0 else -1), -2)
+	badge.z_index = 60
 	n.add_child(badge)
 	_sorted.add_child(n)
 	units[st["uid"]] = n
@@ -362,7 +363,7 @@ func _refresh_queue() -> void:
 		var q := _QueueIcon.new()
 		q.st = s
 		q.first = i == 0
-		q.custom_minimum_size = Vector2(92 if i == 0 else 80, 92 if i == 0 else 80)
+		q.custom_minimum_size = Vector2(110 if i == 0 else 84, 110 if i == 0 else 84)
 		_queue_box.add_child(q)
 
 func _set_log(t: String) -> void:
@@ -984,6 +985,7 @@ func _anim_death(st: Dictionary) -> void:
 	var s: Sprite2D = n.get_node("Sprite")
 	n.get_node("Badge").visible = false
 	n.get_node("Shadow").visible = false
+	_drop_from_queue(st)
 	if n.has_meta("breath"):
 		n.get_meta("breath").kill()
 		s.scale = n.get_meta("base_scale")
@@ -1079,12 +1081,20 @@ func _play_fx(fx: String, p: Vector2, sc: float, dur := 0.8) -> void:
 	tw.tween_property(s, "frame", 15, dur)
 	tw.tween_callback(s.queue_free)
 
+## A slain stack leaves the turn queue at once (not with the next turn).
+func _drop_from_queue(st: Dictionary) -> void:
+	for q in _queue_box.get_children():
+		if q.st["uid"] == st["uid"]:
+			q.queue_free()
+
 func _refresh_badge(st: Dictionary) -> void:
 	var n := _unit(st)
 	if n:
 		n.get_node("Badge").queue_redraw()
 	for q in _queue_box.get_children():
 		q.queue_redraw()
+	if not st["alive"]:
+		_drop_from_queue(st)
 	if _info_key == "s%d" % st["uid"]:  # its hover panel shows the old numbers: rebuild it
 		_reset_info()
 		_update_info()
@@ -1108,7 +1118,7 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	box.add_child(row)
-	for part in [[t, size, col], [sub, 22, Color(1, 0.62, 0.5)]]:
+	for part in [[t, size, col], [sub, 22, Color(1, 0.88, 0.72)]]:
 		if part[0] == "":
 			continue
 		var l := Label.new()
@@ -1126,14 +1136,26 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	# don't land on a label that just appeared (neighbouring stacks hit at once): sit above it
 	var r := Rect2(p - Vector2(box.size.x * 0.5, 0), box.size)
 	var now := Time.get_ticks_msec()
-	for k in 8:
-		var hit := false
+	# (at most two steps up, then aside: a label must stay by its stack, never drift off over empty ground)
+	for k in 4:
+		var hit = null
 		for o in _fx.get_children():
 			if o != box and o.has_meta("float_rect") and now - int(o.get_meta("born")) < 700 and r.intersects(o.get_meta("float_rect").grow(-2)):
-				r.position.y = o.get_meta("float_rect").position.y - r.size.y - 2
-				hit = true
-		if not hit:
+				hit = o.get_meta("float_rect")
+		if hit == null:
 			break
+		if k < 2:
+			r.position.y = hit.position.y - r.size.y - 2
+		else:
+			r.position.x = hit.end.x + 4 if r.get_center().x >= hit.get_center().x else hit.position.x - r.size.x - 4
+	# nor on a count badge: slide toward the middle of the field, beside it
+	for k in units:
+		var b: Node2D = units[k].get_node("Badge")
+		if not b.visible or not b.st.get("alive", false):
+			continue
+		var br := Rect2(units[k].position + b.position - Vector2(20, 13), Vector2(40, 26))
+		if r.intersects(br):
+			r.position.x = br.position.x - r.size.x - 4 if br.get_center().x > 960 else br.end.x + 4
 	box.set_meta("float_rect", r)
 	box.set_meta("born", now)
 	box.position = r.position
@@ -1306,7 +1328,7 @@ class _Shadow extends Node2D:
 	func _draw() -> void:
 		var w := 84.0 if big else 44.0
 		draw_set_transform(Vector2(0, -2), 0, Vector2(1, 0.32))
-		draw_circle(Vector2.ZERO, w, Color(0, 0, 0, 0.35))
+		draw_circle(Vector2.ZERO, w, Color(0, 0, 0, 0.45))
 		# side colour (as the count badge): whose stack is whose, even when sprites overlap
 		draw_arc(Vector2.ZERO, w - 2, 0, TAU, 40, Color(0.85, 0.25, 0.2, 0.75) if side == 0 else Color(0.3, 0.5, 1.0, 0.75), 5.0, true)
 		if active:
@@ -1340,16 +1362,22 @@ class _QueueIcon extends Control:
 	var first := false
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
-		draw_rect(r, Color(0.05, 0.04, 0.03))
-		draw_texture_rect(Assets.creature_portrait(st["id"]), r.grow(-3), false, Color(1.25, 1.2, 1.15))  # portraits are dark at this size
-		var col := Color(0.8, 0.2, 0.15) if st["side"] == 0 else Color(0.25, 0.4, 0.95)
-		draw_rect(r, UI.GOLD if first else col, false, 4.0 if first else 3.0)
+		var col := Color(0.85, 0.22, 0.16) if st["side"] == 0 else Color(0.27, 0.45, 1.0)
+		draw_rect(r, col.darkened(0.6))
+		# portraits are dark and sepia at this size: brighter, with the side's colour washed over the top edge
+		draw_texture_rect(Assets.creature_portrait(st["id"]), r.grow(-4), false, Color(1.4, 1.33, 1.25))
+		draw_rect(Rect2(Vector2(4, 4), Vector2(size.x - 8, 10)), Color(col, 0.35))
 		var txt := str(st["count"])
 		var f := UI.title_font()
-		var fs := 26 if first else 23
-		draw_rect(Rect2(Vector2(3, size.y - 28), Vector2(size.x - 6, 25)), Color(0, 0, 0, 0.65))
-		draw_string_outline(f, Vector2(0, size.y - 7), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, 5, Color(0, 0, 0, 0.9))
-		draw_string(f, Vector2(0, size.y - 7), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 0.96, 0.85))
+		var fs := 28 if first else 23
+		var band := 30.0 if first else 26.0
+		draw_rect(Rect2(Vector2(4, size.y - band - 3), Vector2(size.x - 8, band)), Color(col.darkened(0.45), 0.92))
+		draw_rect(r, col, false, 4.0)
+		if first:  # whose turn: a bright gold frame around the side colour
+			draw_rect(r.grow(-1), UI.GOLD, false, 3.0)
+			draw_rect(r.grow(-5), Color(1, 0.9, 0.5, 0.5), false, 1.5)
+		draw_string_outline(f, Vector2(0, size.y - 9), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, 5, Color(0, 0, 0, 0.9))
+		draw_string(f, Vector2(0, size.y - 9), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 0.96, 0.85))
 
 class _Projectile extends Node2D:
 	var from := Vector2.ZERO

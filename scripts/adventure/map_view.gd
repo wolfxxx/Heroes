@@ -638,8 +638,15 @@ class _PathOverlay extends Node2D:
 	func _draw() -> void:
 		var T := float(WorldGen.TILE)
 		if view.hover_tile.x >= 0:
-			draw_rect(Rect2(Vector2(view.hover_tile) * T, Vector2(T, T)), Color(1, 1, 0.8, 0.12), true)
-			draw_rect(Rect2(Vector2(view.hover_tile) * T, Vector2(T, T)), Color(1, 1, 0.8, 0.35), false, 2.0)
+			# corner brackets around the tile under the cursor (a filled square read as a stray patch on the art)
+			var o := Vector2(view.hover_tile) * T
+			var k := T * 0.24
+			for c in [[o, Vector2(1, 1)], [o + Vector2(T, 0), Vector2(-1, 1)], [o + Vector2(0, T), Vector2(1, -1)], [o + Vector2(T, T), Vector2(-1, -1)]]:
+				var p: Vector2 = c[0]
+				var d: Vector2 = c[1]
+				var pts := PackedVector2Array([p + Vector2(d.x * k, 0), p, p + Vector2(0, d.y * k)])
+				draw_polyline(pts, Color(0, 0, 0, 0.45), 4.0)
+				draw_polyline(pts, Color(1, 0.95, 0.75, 0.75), 2.0)
 		var pts: Array = view.path_points
 		for i in range(1, pts.size()):
 			var p: Vector2 = (Vector2(pts[i]) + Vector2(0.5, 0.5)) * T

@@ -6,6 +6,8 @@ class_name HoverInfo
 ##   HoverInfo.show_for(owner, content, delay, side) / HoverInfo.hide_for(owner)   for things that aren't Controls
 ## side: 1 = right of the cursor (default), -1 = left of it (each falls back to the other if there's no room).
 ## clear_x (>= 0): keep the panel on that side of this screen x (e.g. clear of a battle stack and its neighbours).
+## beside: a screen rect (e.g. a card) to put the panel next to, right of it or else left, top-aligned, instead of
+## following the cursor; attach(..., true) does this with the control's own rect.
 ## Content is a Control, a String, or null (nothing to show).
 
 const WIDTH := 400.0
@@ -19,17 +21,18 @@ static func _layer() -> _Layer:
 		tree.root.add_child(l)
 	return l
 
-static func attach(c: Control, build: Callable, delay := 0.0) -> void:
+static func attach(c: Control, build: Callable, delay := 0.0, beside := false) -> void:
 	_layer()  # exist before the first mouse event, to know where the cursor is
 	if c.mouse_filter == Control.MOUSE_FILTER_IGNORE:
 		c.mouse_filter = Control.MOUSE_FILTER_PASS
-	c.mouse_entered.connect(func(): show_for(c, build.call(), delay))
+	c.mouse_entered.connect(func(): show_for(c, build.call(), delay, 1, -1.0, c.get_global_rect() if beside else Rect2()))
 	c.mouse_exited.connect(func(): hide_for(c))
 	c.tree_exiting.connect(func(): hide_for(c))
 
-static func show_for(owner: Object, content, delay := 0.0, side := 1, clear_x := -1.0) -> void:
+static func show_for(owner: Object, content, delay := 0.0, side := 1, clear_x := -1.0, beside := Rect2()) -> void:
 	_layer().side = side
 	_layer().clear_x = clear_x
+	_layer().beside = beside
 	_layer().present(owner, content, delay)
 
 static func hide_for(owner: Object) -> void:
@@ -113,6 +116,7 @@ class _Layer extends CanvasLayer:
 	var mouse := Vector2.ZERO  # from motion events (follows simulated input too, unlike the OS cursor)
 	var side := 1
 	var clear_x := -1.0
+	var beside := Rect2()
 
 	func _init() -> void:
 		layer = 120
@@ -198,6 +202,14 @@ class _Layer extends CanvasLayer:
 		var vs := vp.get_visible_rect().size
 		var sz := panel.get_combined_minimum_size()
 		panel.size = sz
+		if beside.size != Vector2.ZERO:
+			var q := Vector2(beside.end.x + 10, beside.position.y)
+			if q.x + sz.x > vs.x - 8:
+				q.x = beside.position.x - sz.x - 10
+			q.x = clampf(q.x, 8, maxf(8, vs.x - sz.x - 8))
+			q.y = clampf(q.y, 8, maxf(8, vs.y - sz.y - 8))
+			panel.position = q
+			return
 		var p := m + Vector2(26, 26)
 		var left := m.x - sz.x - 16
 		if clear_x >= 0.0:

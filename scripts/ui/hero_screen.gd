@@ -8,7 +8,9 @@ const SKILL_LEVEL := ["", "Basic", "Advanced", "Expert"]
 const DOLL := Vector2(390, 520)
 ## Artifact sockets on the paper-doll (fractions of the painting): over the body part they dress.
 const SOCKETS := {"head": Vector2(0.5, 0.19), "misc": Vector2(0.5, 0.385), "weapon": Vector2(0.235, 0.555),
-	"shield": Vector2(0.765, 0.555), "ring": Vector2(0.765, 0.72), "feet": Vector2(0.5, 0.875)}
+	"shield": Vector2(0.765, 0.555), "ring": Vector2(0.765, 0.72), "ring2": Vector2(0.235, 0.72), "feet": Vector2(0.5, 0.875)}
+const SOCKET_NAME := {"head": "Head", "misc": "Charm", "weapon": "Weapon", "shield": "Shield", "ring": "Ring", "ring2": "Ring", "feet": "Feet"}
+const BACKPACK := 5
 const STAT_TIP := {"attack": "Attack: added to the Attack of every creature in the army.",
 	"defense": "Defense: added to the Defense of every creature in the army.",
 	"power": "Spell Power: how strong and how long-lasting the hero's spells are.",
@@ -87,6 +89,7 @@ static func open(owner: Node, h: Dictionary) -> Modal:
 	right.add_theme_constant_override("separation", 10)
 	row.add_child(right)
 	right.add_child(_doll(h))
+	right.add_child(_backpack(h))
 	var sb := HBoxContainer.new()
 	sb.add_theme_constant_override("separation", 14)
 	sb.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -111,18 +114,18 @@ static func open(owner: Node, h: Dictionary) -> Modal:
 static func _meter(title: String, value: String, frac: float, col: Color) -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 2)
-	v.custom_minimum_size.x = 150
+	v.custom_minimum_size.x = 170
 	var t := HBoxContainer.new()
-	t.add_child(UI.label(title, 16, UI.GOLD))
+	t.add_child(UI.label(title, 18, UI.GOLD))
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	t.add_child(sp)
-	t.add_child(UI.label(value, 16))
+	t.add_child(UI.label(value, 18))
 	v.add_child(t)
 	var bar := _Bar.new()
 	bar.frac = frac
 	bar.col = col
-	bar.custom_minimum_size = Vector2(150, 8)
+	bar.custom_minimum_size = Vector2(170, 9)
 	v.add_child(bar)
 	return v
 
@@ -140,52 +143,70 @@ static func _skill_cell(id: String, lvl: int) -> Control:
 	var v := VBoxContainer.new()
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_theme_constant_override("separation", 0)
-	v.add_child(UI.label(SKILL_LEVEL[mini(3, lvl)], 17, UI.GOLD))
-	v.add_child(UI.label(GameData.SKILLS[id]["name"], 21))
+	v.add_child(UI.label(SKILL_LEVEL[mini(3, lvl)], 19, UI.GOLD))
+	v.add_child(UI.label(GameData.SKILLS[id]["name"], 23))
 	h.add_child(v)
 	var tip := "%s %s\n%s" % [SKILL_LEVEL[mini(3, lvl)], GameData.SKILLS[id]["name"], GameData.SKILLS[id]["desc"]]
 	HoverInfo.attach(h, func(): return tip)
 	return h
 
-## The painted figure with a socket on each body part; a second artifact for a taken slot goes below the figure.
+## Which socket each artifact sits in; the rest go into the backpack.
+static func _placed(h: Dictionary) -> Array:
+	var by_slot := {}
+	var extra := []
+	for a in h["artifacts"]:
+		var sl: String = GameData.ARTIFACTS[a]["slot"]
+		if by_slot.has(sl) and sl == "ring" and not by_slot.has("ring2"):
+			sl = "ring2"
+		if by_slot.has(sl):
+			extra.append(a)
+		else:
+			by_slot[sl] = a
+	return [by_slot, extra]
+
+static func _artifact_tip(a: String) -> String:
+	return "%s
+%s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
+
+## The painted figure with a socket on each body part.
 static func _doll(h: Dictionary) -> Control:
 	var doll := TextureRect.new()
 	doll.texture = Assets.tex("ui/paperdoll.png")
 	doll.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	doll.custom_minimum_size = DOLL
-	var by_slot := {}
-	var extra := []
-	for a in h["artifacts"]:
-		var sl: String = GameData.ARTIFACTS[a]["slot"]
-		if by_slot.has(sl):
-			extra.append(a)
-		else:
-			by_slot[sl] = a
+	var by_slot: Dictionary = _placed(h)[0]
 	for sl in SOCKETS:
 		var so := _Socket.new()
 		so.size = Vector2(68, 68)
 		so.position = SOCKETS[sl] * DOLL - so.size * 0.5
 		so.empty = not by_slot.has(sl)
 		so.glass = true
-		var tip := ""
+		var tip: String = _artifact_tip(by_slot[sl]) if by_slot.has(sl) else "%s: empty" % SOCKET_NAME[sl]
 		if by_slot.has(sl):
-			var a: String = by_slot[sl]
-			so.tex = Assets.artifact_icon(a)
-			tip = "%s\n%s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
-		else:
-			tip = "%s: empty" % sl.capitalize()
-		HoverInfo.attach(so, func(): return tip)
-		doll.add_child(so)
-	for i in extra.size():
-		var a: String = extra[i]
-		var so := _Socket.new()
-		so.size = Vector2(56, 56)
-		so.position = Vector2(14 + i * 62, DOLL.y - 70)
-		so.tex = Assets.artifact_icon(a)
-		var tip := "%s\n%s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
+			so.tex = Assets.artifact_icon(by_slot[sl])
 		HoverInfo.attach(so, func(): return tip)
 		doll.add_child(so)
 	return doll
+
+## A row of backpack sockets under the figure, for artifacts with no free body slot.
+static func _backpack(h: Dictionary) -> Control:
+	var extra: Array = _placed(h)[1]
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var l := UI.label("Backpack", 18, UI.GOLD)
+	l.custom_minimum_size.x = 92
+	row.add_child(l)
+	for i in maxi(BACKPACK, extra.size()):
+		var so := _Socket.new()
+		so.custom_minimum_size = Vector2(54, 54)
+		so.empty = i >= extra.size()
+		if not so.empty:
+			so.tex = Assets.artifact_icon(extra[i])
+			var tip := _artifact_tip(extra[i])
+			HoverInfo.attach(so, func(): return tip)
+		row.add_child(so)
+	return row
 
 ## A recessed square socket: dark well, bevelled rim, thin gold frame; holds an icon (or nothing).
 class _Socket extends Control:
@@ -204,7 +225,7 @@ class _Socket extends Control:
 		draw_line(Vector2(1, 1), Vector2(1, size.y - 1), Color(0, 0, 0, 0.8), 3)
 		draw_line(Vector2(2, size.y - 1), Vector2(size.x - 1, size.y - 1), Color(1, 0.9, 0.7, 0.18), 2)
 		draw_line(Vector2(size.x - 1, 2), Vector2(size.x - 1, size.y - 1), Color(1, 0.9, 0.7, 0.18), 2)
-		draw_rect(r.grow(1), UI.GOLD_DARK if empty else Color(0.82, 0.64, 0.3), false, 2.0)
+		draw_rect(r.grow(1), Color(0.66, 0.5, 0.25) if empty else Color(0.86, 0.68, 0.32), false, 2.0)
 
 class _Bar extends Control:
 	var frac := 0.0

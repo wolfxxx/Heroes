@@ -370,15 +370,15 @@ func _building_pic(id: String) -> Texture2D:
 ## Status of a building for this player: [label, colour]. Colours follow the classic hall screen.
 func _build_status(id: String) -> Array:
 	if TownLogic.has_building(town, id):
-		return ["Built", Color(0.85, 0.68, 0.22)]
+		return ["Built", Color(0.95, 0.78, 0.4)]
 	var reason := TownLogic.build_block_reason(town, player, id)
 	if reason == "":
-		return ["Can build", Color(0.25, 0.62, 0.22)]
+		return ["Can build", Color(0.5, 0.88, 0.42)]
 	if reason == "Not enough resources":
-		return ["Need resources", Color(0.75, 0.55, 0.15)]
+		return ["Need resources", Color(1.0, 0.7, 0.3)]
 	if reason == "Already built today":
-		return ["Built today", Color(0.4, 0.4, 0.45)]
-	return [reason, Color(0.62, 0.2, 0.16)]
+		return ["Built today", Color(0.7, 0.7, 0.75)]
+	return [reason, Color(1.0, 0.48, 0.4)]
 
 func _open_build() -> void:
 	var m := Modal.custom(self, "Build in %s" % town["name"], 1660)
@@ -408,9 +408,12 @@ func _open_build() -> void:
 		card.title = GameData.building_name(town["faction"], id)
 		card.status = st[0]
 		card.status_col = st[1]
+		if st[0] in ["Can build", "Need resources"]:  # the price on the card, short amounts in red
+			card.cost = GameData.BUILDINGS[id]["cost"]
+			card.have = player["resources"]
 		card.custom_minimum_size = Vector2(262, 226)
 		var bid: String = id
-		HoverInfo.attach(card, func(): return _building_info(bid))
+		HoverInfo.attach(card, func(): return _building_info(bid), 0.0, true)
 		card.pressed.connect(func(): m.close(bid))
 		g.add_child(card)
 	m.add_buttons([["Close", ""]])
@@ -775,6 +778,8 @@ class _BuildCard extends Button:
 	var title := ""
 	var status := ""
 	var status_col := Color.GRAY
+	var cost := {}
+	var have := {}
 	func _ready() -> void:
 		focus_mode = Control.FOCUS_NONE
 		flat = true
@@ -792,15 +797,35 @@ class _BuildCard extends Button:
 		var f := UI.font()
 		draw_rect(Rect2(Vector2(5, size.y - 61), Vector2(size.x - 10, 30)), Color(0.12, 0.09, 0.06))
 		draw_string(f, Vector2(5, size.y - 39), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, UI.GOLD)
+		# status: a dark strip with a coloured gem and coloured text (or the price), as on the classic hall plates
 		var sb := Rect2(Vector2(5, size.y - 31), Vector2(size.x - 10, 26))
-		draw_rect(sb, status_col)
-		draw_rect(sb, Color(0, 0, 0, 0.5), false, 1.0)
-		var txt := status
-		while txt.length() > 4 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x > sb.size.x - 10:
-			txt = txt.left(txt.length() - 2)
-		if txt != status:
-			txt += "..."
-		draw_string(f, Vector2(5, size.y - 12), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 17, Color(1, 0.97, 0.9))
+		draw_rect(sb, Color(0.1, 0.075, 0.05))
+		var gem := sb.position + Vector2(14, 13)
+		draw_colored_polygon(PackedVector2Array([gem + Vector2(0, -7), gem + Vector2(7, 0), gem + Vector2(0, 7), gem + Vector2(-7, 0)]), status_col)
+		draw_polyline(PackedVector2Array([gem + Vector2(0, -7), gem + Vector2(7, 0), gem + Vector2(0, 7), gem + Vector2(-7, 0), gem + Vector2(0, -7)]), Color(0, 0, 0, 0.7), 1.0)
+		var x0 := sb.position.x + 28
+		var room := sb.end.x - 6 - x0
+		if not cost.is_empty():
+			var items := []
+			var w := 0.0
+			for res in GameData.RESOURCES:
+				if cost.get(res, 0) > 0:
+					var amt := str(cost[res])
+					items.append([res, amt])
+					w += 24 + f.get_string_size(amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 10
+			var x := x0 + maxf(0.0, (room - w) * 0.5)
+			for it in items:
+				draw_texture_rect(Assets.res_icon(it[0]), Rect2(Vector2(x, sb.position.y + 3), Vector2(20, 20)), false)
+				var ok: bool = have.get(it[0], 0) >= cost[it[0]]
+				draw_string(f, Vector2(x + 23, size.y - 12), it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.9, 0.8) if ok else Color(1, 0.48, 0.4))
+				x += 24 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 10
+		else:
+			var txt := status
+			while txt.length() > 4 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x > room:
+				txt = txt.left(txt.length() - 2)
+			if txt != status:
+				txt += "..."
+			draw_string(f, Vector2(x0, size.y - 12), txt, HORIZONTAL_ALIGNMENT_CENTER, room, 17, status_col)
 		draw_rect(r, UI.GOLD if is_hovered() else UI.GOLD_DARK, false, 2.0 if is_hovered() else 1.5)
 
 ## Dwelling card: the building as backdrop, the creature standing in front, availability and cost.
