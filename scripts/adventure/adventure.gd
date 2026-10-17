@@ -141,7 +141,13 @@ func _process(delta: float) -> void:
 		_cam_target = _clamp_cam(_cam_target + move.normalized() * 900.0 * delta / cam.zoom.x)
 	cam.position = cam.position.lerp(_cam_target, minf(1.0, delta * 10.0))
 	var mpos := get_viewport().get_mouse_position()
-	if _info_tile != Vector2i(-2, -2) and (busy or _modal_open() or mpos.x > MAP_VIEW_W or mpos.y > MAP_VIEW_H):
+	if _modal_open():
+		if _info_tile != Vector2i(-3, -3):  # a window is up: the status line and tile highlight would show under it
+			_info_tile = Vector2i(-3, -3)
+			HoverInfo.hide_for(self)
+			hud.set_status("")
+			view.set_hover(Vector2i(-1, -1))
+	elif _info_tile != Vector2i(-2, -2) and (busy or mpos.x > MAP_VIEW_W or mpos.y > MAP_VIEW_H):
 		_info_tile = Vector2i(-2, -2)
 		HoverInfo.hide_for(self)
 	hud.update_minimap_view(cam.position, Vector2(MAP_VIEW_W, MAP_VIEW_H) / cam.zoom)

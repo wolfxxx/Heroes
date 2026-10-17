@@ -334,7 +334,7 @@ func _building_info(id: String, in_town := false) -> Control:
 			HoverInfo.line(v, ("Has " if ok else "Requires ") + GameData.building_name(town["faction"], req),
 				Color(0.6, 0.9, 0.55) if ok else Color(1, 0.55, 0.45), 18)
 		var cr := HBoxContainer.new()
-		cr.add_child(UI.label("Cost ", 18, UI.GOLD))
+		cr.add_child(UI.label("Building cost ", 18, UI.GOLD))
 		cr.add_child(HoverInfo.cost_row(b["cost"], player["resources"]))
 		v.add_child(cr)
 		var st := _build_status(id)

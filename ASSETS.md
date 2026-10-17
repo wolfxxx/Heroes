@@ -90,6 +90,8 @@ leaves the `_dead` sprite on the hex as a corpse.
   Necropolis is `tools/art/blender/necro_town.py` (a moor below a black crag, skull gate, its own slots and buildings).
   The blockouts are painted over in non-overlapping groups (`tools/art/town_groups.py <faction> --out ... --full ...`,
   which also writes notes.json telling the painter what each building is).
+  The Haven guardhouse (`haven_dwelling_1.png`) was cut off at the screen edge in the render; it is repainted whole
+  and moved to the front-right lawn by `tools/art/town_edge_paint.py` (imagegen/batch19), which also rewrites its rect.
 
 ## Icons & UI
 - `icons/res_<resource>.png` — 64x64 resource icons.

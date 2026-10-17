@@ -67,10 +67,11 @@ func _deploy(army: Array, side: int) -> void:
 		stacks.append(st)
 		start_counts[st["uid"]] = st["count"]
 
-## The middle slot (row 5, between the stacks on rows 4 and 6) stands one hex forward, so the three middle stacks
-## don't merge into one heap of figures.
+## The middle slot (row 5, between the stacks on rows 4 and 6) stands two hexes forward, so the three middle stacks
+## don't merge into one heap of figures; row 8 one forward, clear of the tall figure that usually stands on row 10.
 static func _stagger(slot: int, side: int) -> Vector2i:
-	return Vector2i(1 if side == 0 else -1, 0) if slot == 3 else Vector2i.ZERO
+	var k: int = {3: 2, 5: 1}.get(slot, 0)
+	return Vector2i(k if side == 0 else -k, 0)
 
 func cdata(s: Dictionary) -> Dictionary:
 	return GameData.CREATURES[s["id"]]

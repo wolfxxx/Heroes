@@ -7,7 +7,7 @@ const X0 := 264.0
 const Y0 := 272.0
 const TIER_H := [0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]
 ## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
-const FIG_H := [0, 104.0, 110.0, 118.0, 124.0, 130.0, 172.0, 190.0]
+const FIG_H := [0, 104.0, 110.0, 118.0, 124.0, 130.0, 156.0, 168.0]
 ## Widest figure in hexes, wings and capes included: 1-hex and 2-hex units (a stack mustn't swallow its neighbours).
 const VIS_MAX_W := [1.6, 2.5]
 
@@ -46,6 +46,7 @@ var _grid: _Grid
 var _sorted: Node2D
 var _corpses: Node2D
 var _fx: Node2D
+var _floats: Array = []    # live damage / status labels (they keep clear of each other)
 var ui: CanvasLayer
 var _queue_box: HBoxContainer
 var _log: Label
@@ -240,6 +241,7 @@ func _make_unit(st: Dictionary) -> void:
 	# beside the feet at the front of the footprint, facing the enemy (as the classic count plates): on the stack's
 	# own ground, not on the figure in the row below; above floating numbers so a count is never hidden
 	badge.position = Vector2((HEX_W * (0.5 if wide else 0.0) + 30) * (1 if st["side"] == 0 else -1), -2)
+	badge.set_meta("home", badge.position)
 	badge.z_index = 60
 	n.add_child(badge)
 	_sorted.add_child(n)
@@ -358,8 +360,15 @@ func _refresh_queue() -> void:
 	for c in _queue_box.get_children():
 		c.queue_free()
 	var up := L.upcoming(14)
+	var this_round := L.order.size() + L.waited.size()
 	for i in up.size():
 		var s: Dictionary = up[i]
+		if i == this_round and i > 0:  # where the next round starts
+			var m := _RoundMark.new()
+			m.num = L.round_num + 1
+			m.custom_minimum_size = Vector2(30, 84)
+			m.size_flags_vertical = Control.SIZE_SHRINK_END
+			_queue_box.add_child(m)
 		var q := _QueueIcon.new()
 		q.st = s
 		q.first = i == 0
@@ -411,7 +420,7 @@ func _next() -> void:
 			m.set_shader_parameter("width", 3.0 if k == s["uid"] else 1.2)
 	if L.check_fear(s):
 		_set_log("%s freeze in fear!" % L._name(s))
-		_float_text(_unit(s).position + Vector2(0, -_top(s) - 10), "Fear!", Color(0.8, 0.65, 1.0))
+		_float_text(Vector2(0, -_top(s) - 10), "Fear!", Color(0.8, 0.65, 1.0), 30, "", 0.0, _unit(s))
 		L.finish_turn(s)
 		await get_tree().create_timer(0.7).timeout
 		_next()
@@ -823,7 +832,7 @@ func _play(events: Array) -> void:
 				_anim_death(ev["s"])
 				await get_tree().create_timer(0.25).timeout
 			"heal":
-				_float_text(_unit(ev["s"]).position + Vector2(0, -_top(ev["s"]) - 10), "+%d" % ev["amount"], Color(0.5, 1, 0.5))
+				_float_text(Vector2(0, -_top(ev["s"]) - 10), "+%d" % ev["amount"], Color(0.5, 1, 0.5), 30, "", 0.0, _unit(ev["s"]))
 				_refresh_badge(ev["s"])
 			"text":
 				_set_log(ev["text"])
@@ -1028,11 +1037,12 @@ func _anim_spell(ev: Dictionary) -> void:
 		_spell_banner(GameData.SPELLS[sp]["name"], ev["side"])
 	var targets: Array = ev["targets"]
 	var centers := []
-	if GameData.SPELLS.has(sp) and GameData.SPELLS[sp]["target"] == "area" or sp == "death_cloud":
-		centers.append(hex_pos(ev["hex"]) + Vector2(0, -30))
-	for t in targets:
-		centers.append(_unit(t).position + Vector2(0, -70))
 	var area: bool = sp == "death_cloud" or (GameData.SPELLS.has(sp) and GameData.SPELLS[sp]["target"] == "area")
+	if area:  # one effect sized to the blast (a hex and its ring), not one more over every target
+		centers.append(hex_pos(ev["hex"]) + Vector2(0, -24))
+	else:
+		for t in targets:
+			centers.append(_unit(t).position + Vector2(0, -70))
 	var fx: String = FX_OF.get(sp, "arcane")
 	for c in centers:
 		if sp == "lightning_bolt":
@@ -1043,7 +1053,10 @@ func _anim_spell(ev: Dictionary) -> void:
 		var p: Vector2 = c
 		if fx == "holy":
 			p += Vector2(0, -20)  # a column rising from the feet: its ring sits at the bottom of the frame
-		_play_fx(fx, p, 1.3 if area else 0.95)
+		if area:
+			_play_fx(fx, p, Vector2(1.3, 0.95), 1.1)
+		else:
+			_play_fx(fx, p, Vector2.ONE * 0.95)
 	await get_tree().create_timer(0.35).timeout
 	for t in targets:
 		if ev["dmg"].has(t["uid"]):
@@ -1063,7 +1076,7 @@ const FX_OF := {"fireball": "fire", "meteor_shower": "fire", "frost_ring": "fros
 	"shield": "holy", "stone_skin": "holy", "haste": "holy", "curse": "dark", "slow": "dark", "weakness": "dark",
 	"death_ripple": "dark", "death_cloud": "dark"}
 
-func _play_fx(fx: String, p: Vector2, sc: float, dur := 0.8) -> void:
+func _play_fx(fx: String, p: Vector2, sc: Vector2, dur := 0.8, alpha := 1.0) -> void:
 	if not Assets.has("battle/fx_%s.png" % fx):
 		return
 	var s := Sprite2D.new()
@@ -1071,7 +1084,8 @@ func _play_fx(fx: String, p: Vector2, sc: float, dur := 0.8) -> void:
 	s.hframes = 4
 	s.vframes = 4
 	s.position = p
-	s.scale = Vector2.ONE * sc
+	s.scale = sc
+	s.modulate.a = alpha  # (additive: lower alpha is a fainter glow, the figures show through)
 	s.z_index = 25
 	var m := CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
@@ -1084,7 +1098,7 @@ func _play_fx(fx: String, p: Vector2, sc: float, dur := 0.8) -> void:
 ## A slain stack leaves the turn queue at once (not with the next turn).
 func _drop_from_queue(st: Dictionary) -> void:
 	for q in _queue_box.get_children():
-		if q.st["uid"] == st["uid"]:
+		if q is _QueueIcon and q.st["uid"] == st["uid"]:
 			q.queue_free()
 
 func _refresh_badge(st: Dictionary) -> void:
@@ -1099,12 +1113,44 @@ func _refresh_badge(st: Dictionary) -> void:
 		_reset_info()
 		_update_info()
 
-## Damage over a stack: one compact label, "-45  2 slain" (area spells stagger theirs so they don't pile up).
+## Damage to a stack: one compact label, "-45  2 slain", in line with its count badge on the stack's own side (over
+## its own figure, not toward the enemy where another stack may stand) and moving with it, so it can't be read as
+## another stack's.
 func _damage_text(d: Dictionary, txt: String, killed: int, lucky := false, delay := 0.0) -> void:
-	var p := _unit(d).position + Vector2(0, -_top(d) - 20)
-	_float_text(p, txt, Color(1, 0.85, 0.3) if lucky else Color(1, 0.95, 0.85), 34, ("%d slain" % killed) if killed > 0 else "", delay)
+	var n := _unit(d)
+	_float_text(Vector2.ZERO, txt, Color(1, 0.85, 0.3) if lucky else Color(1, 0.95, 0.85), 34,
+		("%d slain" % killed) if killed > 0 else "", delay, n, n.get_node("Badge").get_meta("home"), -1 if d["side"] == 0 else 1)
 
-func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay := 0.0) -> void:
+## Keeps count badges of neighbouring stacks from touching ("2" and "4" side by side read as "24"): a badge that
+## would overlap one placed before it moves down below it.
+func _settle_badges() -> void:
+	var placed: Array = []
+	var keys := units.keys()
+	keys.sort()
+	for k in keys:
+		var n: Node2D = units[k]
+		var b: Node2D = n.get_node("Badge")
+		if not b.visible or not b.st.get("alive", false):
+			continue
+		var r := Rect2(n.position + b.get_meta("home") - Vector2(24, 14), Vector2(48, 28))
+		for i in 3:
+			var moved := false
+			for o in placed:
+				if r.intersects(o):
+					r.position.y = o.end.y + 1
+					moved = true
+			if not moved:
+				break
+		placed.append(r)
+		b.position = r.position + Vector2(24, 14) - n.position
+
+func _process(_d: float) -> void:
+	_settle_badges()
+
+## A floating label at `p` (field space), or, with `follow`, beside the point `at` of that unit (toward `dir`) and
+## moving with it.
+func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay := 0.0, follow: Node2D = null,
+		at := Vector2.ZERO, dir := 0) -> void:
 	if delay > 0.0:
 		await get_tree().create_timer(delay).timeout
 	var box := PanelContainer.new()
@@ -1131,39 +1177,42 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 		l.add_theme_constant_override("outline_size", 9 if part[1] > 26 else 6)
 		row.add_child(l)
 	box.z_index = 30
-	_fx.add_child(box)
+	(follow if follow else _fx).add_child(box)
 	box.reset_size()
-	# don't land on a label that just appeared (neighbouring stacks hit at once): sit above it
+	var origin: Vector2 = follow.position if follow else Vector2.ZERO
 	var r := Rect2(p - Vector2(box.size.x * 0.5, 0), box.size)
+	if follow and dir != 0:
+		r = Rect2(origin + at + Vector2(26.0 if dir > 0 else -26.0 - box.size.x, -box.size.y * 0.5), box.size)
+	elif follow:
+		r.position += origin
 	var now := Time.get_ticks_msec()
-	# (at most two steps up, then aside: a label must stay by its stack, never drift off over empty ground)
+	_floats = _floats.filter(func(o): return is_instance_valid(o) and now - int(o.get_meta("born")) < 1500)
+	# don't land on a label that just appeared or on another stack's count badge: step aside (outward from the stack
+	# for a damage label), never up into the next row where it would read as that stack's
+	var step := dir if dir != 0 else (1 if p.x < 960 else -1)
 	for k in 4:
 		var hit = null
-		for o in _fx.get_children():
-			if o != box and o.has_meta("float_rect") and now - int(o.get_meta("born")) < 700 and r.intersects(o.get_meta("float_rect").grow(-2)):
+		for o in _floats:
+			if r.intersects(o.get_meta("float_rect").grow(-2)):
 				hit = o.get_meta("float_rect")
+		for u in units:
+			var b: Node2D = units[u].get_node("Badge")
+			if units[u] != follow and b.visible and b.st.get("alive", false):
+				var br := Rect2(units[u].position + b.position - Vector2(20, 13), Vector2(40, 26))
+				if r.intersects(br):
+					hit = br
 		if hit == null:
 			break
-		if k < 2:
-			r.position.y = hit.position.y - r.size.y - 2
-		else:
-			r.position.x = hit.end.x + 4 if r.get_center().x >= hit.get_center().x else hit.position.x - r.size.x - 4
-	# nor on a count badge: slide toward the middle of the field, beside it
-	for k in units:
-		var b: Node2D = units[k].get_node("Badge")
-		if not b.visible or not b.st.get("alive", false):
-			continue
-		var br := Rect2(units[k].position + b.position - Vector2(20, 13), Vector2(40, 26))
-		if r.intersects(br):
-			r.position.x = br.position.x - r.size.x - 4 if br.get_center().x > 960 else br.end.x + 4
+		r.position.x = hit.end.x + 4 if step > 0 else hit.position.x - r.size.x - 4
 	box.set_meta("float_rect", r)
 	box.set_meta("born", now)
-	box.position = r.position
+	_floats.append(box)
+	box.position = r.position - origin
 	var tw := box.create_tween().set_parallel(true)
 	box.pivot_offset = box.size * 0.5
 	box.scale = Vector2(0.6, 0.6)
 	tw.tween_property(box, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "position:y", r.position.y - 60, 1.3).set_ease(Tween.EASE_OUT)
+	tw.tween_property(box, "position:y", box.position.y - (6 if dir != 0 else 40), 1.3).set_ease(Tween.EASE_OUT)
 	tw.tween_property(box, "modulate:a", 0.0, 0.5).set_delay(1.0)
 	tw.chain().tween_callback(box.queue_free)
 
@@ -1182,7 +1231,7 @@ func _spell_banner(t: String, side: int) -> void:
 	l.add_theme_stylebox_override("normal", bg)
 	ui.add_child(l)
 	l.reset_size()
-	l.position = Vector2(960 - l.size.x * 0.5, 140)
+	l.position = Vector2(960 - l.size.x * 0.5, 182)
 	var tw := l.create_tween()
 	tw.tween_interval(1.0)
 	tw.tween_property(l, "modulate:a", 0.0, 0.4)
@@ -1360,24 +1409,95 @@ class _Badge extends Node2D:
 class _QueueIcon extends Control:
 	var st: Dictionary
 	var first := false
+	static var _crops := {}
+
+	## The head and shoulders of a creature's battle sprite: a square at the top of its figure, centred on the
+	## solid pixels of its upper part (a dragon's head is at the front, not over the middle of the canvas).
+	static func head_crop(id: String, tex: Texture2D) -> Rect2:
+		if _crops.has(id):
+			return _crops[id]
+		var r := Rect2(Vector2.ZERO, tex.get_size())
+		var img := tex.get_image()
+		if img:
+			if img.is_compressed():
+				img.decompress()
+			var used := _solid_rect(img)
+			var side := minf(maxf(used.size.x, used.size.y) * 0.5, maxf(used.size.x, used.size.y * 0.45))
+			# start where the figure gets wide (a head), not at the tip of a lance, spear or staff
+			var top := used.position.y
+			var need := used.size.y * 0.06
+			for y in range(used.position.y, used.end.y, 2):
+				var c := 0
+				for x in range(used.position.x, used.end.x, 2):
+					if img.get_pixel(x, y).a > 0.7:
+						c += 2
+				if c >= need:
+					top = y
+					break
+			var sx := 0.0
+			var n := 0
+			for y in range(top, top + int(side * 0.6), 3):
+				for x in range(used.position.x, used.end.x, 3):
+					if img.get_pixel(x, y).a > 0.6:
+						sx += x
+						n += 1
+			var cx: float = sx / n if n > 0 else used.get_center().x
+			r = Rect2(cx - side * 0.5, top - side * 0.06, side, side)
+		_crops[id] = r
+		return r
+
+	static func _solid_rect(img: Image) -> Rect2i:
+		var x0 := img.get_width()
+		var y0 := img.get_height()
+		var x1 := 0
+		var y1 := 0
+		for y in range(0, img.get_height(), 2):
+			for x in range(0, img.get_width(), 2):
+				if img.get_pixel(x, y).a > 0.7:
+					x0 = mini(x0, x)
+					y0 = mini(y0, y)
+					x1 = maxi(x1, x)
+					y1 = maxi(y1, y)
+		return Rect2i(x0, y0, maxi(1, x1 - x0), maxi(1, y1 - y0)) if x1 > x0 else img.get_used_rect()
+
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		var col := Color(0.85, 0.22, 0.16) if st["side"] == 0 else Color(0.27, 0.45, 1.0)
-		draw_rect(r, col.darkened(0.6))
-		# portraits are dark and sepia at this size: brighter, with the side's colour washed over the top edge
-		draw_texture_rect(Assets.creature_portrait(st["id"]), r.grow(-4), false, Color(1.4, 1.33, 1.25))
-		draw_rect(Rect2(Vector2(4, 4), Vector2(size.x - 8, 10)), Color(col, 0.35))
+		# the side's colour as a lit backdrop (bright behind the head, dark at the edges), the creature's own head
+		# cut from its battle sprite over it, facing the way it faces on the field
+		draw_rect(r, col.darkened(0.72))
+		var inner := r.grow(-4)
+		for k in 6:
+			var g := inner.grow(-k * inner.size.x * 0.07)
+			g.position.y -= k * 3
+			draw_rect(g, Color(col.darkened(0.35), 0.16))
+		var tex := Assets.creature(st["id"])
+		var src := head_crop(st["id"], tex)
+		if st["side"] == 1:
+			draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
+		draw_texture_rect_region(tex, inner, src)
+		draw_set_transform(Vector2.ZERO)
 		var txt := str(st["count"])
 		var f := UI.title_font()
 		var fs := 28 if first else 23
 		var band := 30.0 if first else 26.0
-		draw_rect(Rect2(Vector2(4, size.y - band - 3), Vector2(size.x - 8, band)), Color(col.darkened(0.45), 0.92))
+		draw_rect(Rect2(Vector2(4, size.y - band - 3), Vector2(size.x - 8, band)), Color(col.darkened(0.5), 0.9))
 		draw_rect(r, col, false, 4.0)
 		if first:  # whose turn: a bright gold frame around the side colour
 			draw_rect(r.grow(-1), UI.GOLD, false, 3.0)
 			draw_rect(r.grow(-5), Color(1, 0.9, 0.5, 0.5), false, 1.5)
 		draw_string_outline(f, Vector2(0, size.y - 9), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, 5, Color(0, 0, 0, 0.9))
 		draw_string(f, Vector2(0, size.y - 9), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 0.96, 0.85))
+
+## Divider in the turn queue before the stacks of the next round.
+class _RoundMark extends Control:
+	var num := 2
+	func _draw() -> void:
+		var cx := size.x * 0.5
+		draw_line(Vector2(cx, 2), Vector2(cx, size.y - 30), UI.GOLD, 2.0)
+		var f := UI.title_font()
+		draw_string_outline(f, Vector2(0, size.y - 8), str(num), HORIZONTAL_ALIGNMENT_CENTER, size.x, 20, 4, Color(0, 0, 0, 0.9))
+		draw_string(f, Vector2(0, size.y - 8), str(num), HORIZONTAL_ALIGNMENT_CENTER, size.x, 20, UI.GOLD)
 
 class _Projectile extends Node2D:
 	var from := Vector2.ZERO

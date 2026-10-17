@@ -102,7 +102,7 @@ static func creature(cid: String, count := -1, title := "") -> VBoxContainer:
 	if ab.size() > 0:
 		line(v, ", ".join(ab), Color(0.75, 0.85, 1.0), 18)
 	var cr := HBoxContainer.new()
-	cr.add_child(UI.label("Cost ", 18, UI.GOLD))
+	cr.add_child(UI.label("Cost per unit ", 18, UI.GOLD))
 	cr.add_child(cost_row(c["cost"]))
 	v.add_child(cr)
 	return v
