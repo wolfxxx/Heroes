@@ -16,6 +16,29 @@ const STAT_TIP := {"attack": "Attack: added to the Attack of every creature in t
 	"power": "Spell Power: how strong and how long-lasting the hero's spells are.",
 	"knowledge": "Knowledge: 10 spell points per point."}
 
+## The hero's morale out of battle: [value, explanation]. Leadership and artifacts, -1 for each extra faction in the
+## army (undead are never affected, so an all-undead army reads as neutral).
+static func _morale(h: Dictionary) -> Array:
+	var lead := int(h["skills"].get("leadership", 0))
+	var art := GameState.hero_stat(h, "morale")
+	var factions := {}
+	var living := false
+	for sl in h["army"]:
+		if sl != null and sl.get("count", 0) > 0:
+			var c: Dictionary = GameData.CREATURES[sl["id"]]
+			factions[c.get("faction", "")] = true
+			living = living or not ("undead" in c["abilities"])
+	var mixed := maxi(0, factions.size() - 1)
+	var v := clampi(lead + art - mixed, -3, 3)
+	var why := "Morale: good morale may give a stack an extra action (1 in 24 per point); bad morale may make it " \
+		+ "freeze (1 in 12 per point).\nLeadership %+d, artifacts %+d" % [lead, art]
+	if mixed > 0:
+		why += ", mixed factions in the army %+d" % -mixed
+	why += "."
+	if not living and factions.size() > 0:
+		return [0, why + "\nUndead are not affected by morale."]
+	return [v, why]
+
 static func open(owner: Node, h: Dictionary) -> Modal:
 	var m := Modal.custom(owner, "", 1240)
 	var row := HBoxContainer.new()
@@ -57,7 +80,7 @@ static func open(owner: Node, h: Dictionary) -> Modal:
 	for s in ["attack", "defense", "power", "knowledge"]:
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 0)
-		v.custom_minimum_size.x = 150
+		v.custom_minimum_size.x = 112
 		var so := _Socket.new()
 		so.custom_minimum_size = Vector2(76, 76)
 		so.tex = Assets.tex("icons/stat_%s.png" % s)
@@ -70,6 +93,31 @@ static func open(owner: Node, h: Dictionary) -> Modal:
 		vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(vl)
 		var tip: String = STAT_TIP[s]
+		HoverInfo.attach(v, func(): return tip)
+		stats.add_child(v)
+	# morale and luck, as in the classic hero screen: what they are now and why
+	var mo := _morale(h)
+	var lk := int(h["skills"].get("luck", 0)) + GameState.hero_stat(h, "luck")
+	for e in [["Morale", mo[0], "skill_leadership", mo[1]], ["Luck", lk, "skill_luck",
+			"Luck: a chance of double damage on each attack (1 in 24 per point).\nLuck skill %+d, artifacts %+d." % [
+				int(h["skills"].get("luck", 0)), GameState.hero_stat(h, "luck")]]]:
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 0)
+		v.custom_minimum_size.x = 100
+		var so := _Socket.new()
+		so.custom_minimum_size = Vector2(76, 76)
+		so.tex = Assets.tex("icons/%s.png" % e[2])
+		so.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		v.add_child(so)
+		var nl := UI.label(e[0], 18, UI.GOLD)
+		nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(nl)
+		var val: int = e[1]
+		var vl := UI.label(("%+d" % val) if val != 0 else "0", 30,
+			Color(0.6, 0.92, 0.5) if val > 0 else (Color(1, 0.55, 0.45) if val < 0 else UI.TEXT), true)
+		vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(vl)
+		var tip: String = e[3]
 		HoverInfo.attach(v, func(): return tip)
 		stats.add_child(v)
 
@@ -101,9 +149,10 @@ static func open(owner: Node, h: Dictionary) -> Modal:
 		bk.custom_minimum_size = Vector2(160, 46)
 		sb.add_child(bk)
 
-	m.body.add_child(UI.label("Army  (click to move, shift+click to split, right click for info)", 20, UI.GOLD))
+	m.body.add_child(UI.label("Army", 22, UI.GOLD, true))
 	var strip := ArmyStrip.new()
 	strip.bind(h["army"], {}, true)
+	strip.tooltip_text = "Click a stack, then another slot, to move or swap it. Shift+click to split. Right click: details."
 	m.body.add_child(strip)
 	m.add_buttons([["Close", "close"], ["Dismiss Hero", "dismiss"]])
 	m.set_meta("default", "close")

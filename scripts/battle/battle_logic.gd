@@ -47,7 +47,7 @@ func setup(s: Dictionary) -> void:
 		tries += 1
 		var h := Vector2i(rng.randi_range(3, 11), rng.randi_range(1, 9))
 		if stack_at(h) == null and not obstacles.has(h):
-			obstacles[h] = rng.randi_range(1, 4)
+			obstacles[h] = rng.randi_range(1, 8)  # (which picture: battle.gd OBSTACLES by terrain)
 	_new_round()
 
 func _deploy(army: Array, side: int) -> void:
@@ -207,6 +207,41 @@ func luck(side: int) -> int:
 	if h == null:
 		return 0
 	return int(h["skills"].get("luck", 0)) + GameState.hero_stat(h, "luck")
+
+## Morale of a stack's side (-3..3): the hero's Leadership and artifacts, -1 for each extra faction in the army.
+## Undead feel nothing: always 0 for them.
+func morale(side: int, s = null) -> int:
+	if s != null and has_ab(s, "undead"):
+		return 0
+	var v := 0
+	var h = heroes[side]
+	if h != null:
+		v += int(h["skills"].get("leadership", 0)) + GameState.hero_stat(h, "morale")
+	var factions := {}
+	for o in alive_stacks(side):
+		factions[cdata(o).get("faction", "")] = true
+	v -= maxi(0, factions.size() - 1)
+	return clampi(v, -3, 3)
+
+## Bad morale: a stack may freeze and lose its turn (1 in 12 per point below zero).
+func check_bad_morale(s: Dictionary) -> bool:
+	var m := morale(s["side"], s)
+	return m < 0 and rng.randf() < -m / 12.0
+
+## Good morale: once a round, a stack that has just acted may act again (1 in 24 per point). Puts it back at the
+## front of the order and returns true.
+func roll_good_morale(s: Dictionary) -> bool:
+	if not s["alive"] or s.get("morale_turn", false) or is_over() >= 0:
+		return false
+	var m := morale(s["side"], s)
+	if m <= 0 or rng.randf() >= m / 24.0:
+		return false
+	s["morale_turn"] = true
+	s["acted"] = false
+	s["defending"] = false
+	order.push_front(s)
+	log_lines.append("%s %s with courage and %s again!" % [_name(s), "is filled" if s["count"] == 1 else "are filled", "acts" if s["count"] == 1 else "act"])
+	return true
 
 func hero_skill(side: int, sk: String) -> int:
 	var h = heroes[side]
@@ -413,6 +448,7 @@ func _new_round() -> void:
 		s["defending"] = false
 		s["waited"] = false
 		s["acted"] = false
+		s["morale_turn"] = false
 		s["retaliations"] = 2 if has_ab(s, "two_retaliations") else 1
 		# tick effects
 		var fx: Dictionary = s["effects"]

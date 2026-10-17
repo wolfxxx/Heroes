@@ -513,12 +513,15 @@ func move_hero_step(uid: int, to_tile: Vector2i, dur: float) -> void:
 	var fac: String = spr.get_meta("faction", "")
 	var frame: int = spr.get_meta("run_frame", 0)
 	var has_run := Assets.has("heroes/map_%s_run0.png" % fac)
+	# (the timers hold the sprite's id, not the sprite: the map may rebuild its objects before they fire)
+	var sid := spr.get_instance_id()
 	for i in 2:
 		var k := (frame + i) % 4
 		if has_run:
 			get_tree().create_timer(dur * 0.5 * i).timeout.connect(func():
-				if is_instance_valid(spr):
-					_set_hero_tex(spr, "heroes/map_%s_run%d.png" % [fac, k], flip))
+				var s2 = instance_from_id(sid)
+				if s2 is Sprite2D:
+					_set_hero_tex(s2, "heroes/map_%s_run%d.png" % [fac, k], flip))
 	spr.set_meta("run_frame", (frame + 2) % 4)
 	if not has_run:
 		_set_hero_tex(spr, "heroes/map_%s.png" % fac, flip)
@@ -536,9 +539,10 @@ func move_hero_step(uid: int, to_tile: Vector2i, dur: float) -> void:
 	var token: int = spr.get_meta("step_token", 0) + 1
 	spr.set_meta("step_token", token)
 	get_tree().create_timer(dur + 0.12).timeout.connect(func():
-		if is_instance_valid(spr) and spr.get_meta("step_token", 0) == token:
-			spr.rotation = 0.0
-			_set_hero_tex(spr, "heroes/map_%s.png" % fac, flip))
+		var s2 = instance_from_id(sid)
+		if s2 is Sprite2D and s2.get_meta("step_token", 0) == token:
+			s2.rotation = 0.0
+			_set_hero_tex(s2, "heroes/map_%s.png" % fac, flip))
 
 ## Swap a hero's texture keeping the feet anchored, mirrored when facing left.
 func _set_hero_tex(spr: Sprite2D, rel: String, flip: bool) -> void:

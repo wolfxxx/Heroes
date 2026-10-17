@@ -227,13 +227,14 @@ func _pic_button(tex: Texture2D, caption: String, tip: String, cb: Callable) -> 
 	b.add_child(pic)
 	var band := Label.new()
 	band.text = caption
-	band.add_theme_font_size_override("font_size", 16)
+	band.add_theme_font_size_override("font_size", 18)
 	band.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	band.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var bs := StyleBoxFlat.new()
-	bs.bg_color = Color(0.05, 0.035, 0.02, 0.8)
+	bs.bg_color = Color(0.05, 0.035, 0.02, 0.85)
 	band.add_theme_stylebox_override("normal", bs)
-	band.position = Vector2(5, 71)
-	band.size = Vector2(146, 24)
+	band.position = Vector2(5, 67)
+	band.size = Vector2(146, 28)
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(band)
 	return b
@@ -382,7 +383,7 @@ func _set_hover(id: String) -> void:
 
 const CLICK_HINT := {"hall": "Click to build.", "fort": "Click to see all dwellings.", "tavern": "Click to hire a hero.",
 	"marketplace": "Click to trade resources.", "mage_guild": "Click to see the spells.",
-	"blacksmith": "Click to buy war machines."}
+	"blacksmith": "Click to have the smith hone your hero's weapons."}
 
 ## Hover panel for a building: what it does; until built its requirements, cost and status; in the town view
 ## (`in_town`) what clicking it does.

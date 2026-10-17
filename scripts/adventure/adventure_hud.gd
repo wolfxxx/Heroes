@@ -278,37 +278,30 @@ func _hero_card(h: Dictionary) -> Control:
 	var on := UI.selected_plate(4)
 	b.add_theme_stylebox_override("pressed", on)
 	b.add_theme_stylebox_override("hover_pressed", on)
-	var p := UI.icon(Assets.hero_portrait(h["id"]), Vector2(SLOT_H - 10, SLOT_H - 10))
+	# the face band of the portrait (the name is in the tooltip and the panel below), then the two bars, thick
+	var bw := 14.0
+	var p := TextureRect.new()
+	p.texture = Assets.hero_portrait(h["id"])
+	p.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	p.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	p.clip_contents = true
 	p.position = Vector2(5, 5)
-	p.size = p.custom_minimum_size
+	p.size = Vector2(COL_W - 10 - 2 * bw - 8, SLOT_H - 10)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(p)
-	var x := SLOT_H - 2.0
+	var x := p.position.x + p.size.x + 4
 	for bar in [[float(h["movement"]) / maxf(1.0, h["max_movement"]), Color(0.35, 0.82, 0.3)],
 			[float(h["mana"]) / maxf(1.0, GameState.max_mana(h)), Color(0.35, 0.58, 1.0)]]:
-		var c := _bar(bar[0], bar[1], 11)
+		var c := _bar(bar[0], bar[1], bw)
 		c.vertical = true
 		c.position = Vector2(x, 5)
-		c.size = Vector2(11, SLOT_H - 10)
+		c.size = Vector2(bw, SLOT_H - 10)
 		b.add_child(c)
-		x += 14
-	var l := UI.label(h["name"].replace(" ", "\n"), 15)  # first name over last name: the column is narrow
-	l.position = Vector2(x + 2, 4)
-	l.custom_minimum_size = Vector2(COL_W - x - 4, SLOT_H - 8)
-	l.size = l.custom_minimum_size
-	l.clip_text = true
-	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	l.add_theme_constant_override("line_spacing", -5)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(l)
-	var ink := func(sel: bool):
-		l.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5) if sel else UI.TEXT)
-	ink.call(b.button_pressed)
-	b.toggled.connect(ink)
+		x += bw + 4
 	if h.get("asleep", false):  # dimmed, with the moon over the portrait
 		p.modulate = Color(0.55, 0.55, 0.65)
 		var z := UI.icon(Assets.tex("ui/btn_sleep.png"), Vector2(30, 30))
-		z.position = Vector2(SLOT_H - 36, 4)
+		z.position = Vector2(8, 6)
 		z.size = z.custom_minimum_size
 		z.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(z)
@@ -342,13 +335,16 @@ func _town_card(t: Dictionary) -> Control:
 	b.add_child(pic)
 	var band := Label.new()
 	band.text = t["name"]
-	band.add_theme_font_size_override("font_size", 15)
+	band.add_theme_font_size_override("font_size", 16)
 	band.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	band.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var bs := StyleBoxFlat.new()
-	bs.bg_color = Color(0.05, 0.035, 0.02, 0.78)
+	bs.bg_color = Color(0.05, 0.035, 0.02, 0.85)
+	bs.border_color = Color(UI.GOLD_DARK, 0.9)
+	bs.border_width_top = 1
 	band.add_theme_stylebox_override("normal", bs)
-	band.position = Vector2(4, SLOT_H - 26)
-	band.size = Vector2(COL_W - 8, 22)
+	band.position = Vector2(5, SLOT_H - 30)
+	band.size = Vector2(COL_W - 10, 25)
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(band)
 	return b

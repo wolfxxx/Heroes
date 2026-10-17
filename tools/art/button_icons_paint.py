@@ -1,7 +1,8 @@
-"""Adventure panel button icons (kingdom overview, hero, sleep, move, spellbook, next hero, end turn, system),
-painted as one 4x2 sheet on magenta in the style of the stat icons.
-python tools/art/button_icons_paint.py paint   ->  imagegen/batch20/out/buttons.png
-python tools/art/button_icons_paint.py ingest  ->  assets/ui/btn_<name>.png (128 px, transparent)"""
+"""Panel button icons painted as sheets on magenta in the style of the stat icons: the adventure panel (kingdom
+overview, hero, sleep, move, spellbook, next hero, end turn, system; 4x2) and the battle bar (retreat, auto,
+defend; the battle reuses the spellbook and the hourglass).
+python tools/art/button_icons_paint.py paint [adventure|battle]   ->  imagegen/batch20/out/<sheet>.png
+python tools/art/button_icons_paint.py ingest [adventure|battle]  ->  assets/ui/btn_<name>.png (128 px, transparent)"""
 import os, sys
 import numpy as np
 from PIL import Image
@@ -13,7 +14,7 @@ BATCH = "imagegen/batch20"
 COLS, ROWS = 4, 2
 W, H = 2048, 1024
 SIZE = 128
-ICONS = [
+SHEETS = {"adventure": [
     ("kingdom", "a small castle keep with a golden crown floating above it"),
     ("hero", "a knight's steel helmet with a red plume, seen from the side"),
     ("sleep", "a pale golden crescent moon with three small stars"),
@@ -22,7 +23,16 @@ ICONS = [
     ("next_hero", "a knight's steel helmet with a golden curved arrow sweeping around it to the right"),
     ("end_turn", "an ornate brass hourglass with golden sand"),
     ("system", "a rolled parchment scroll with a red wax seal and a quill"),
-]
+], "battle": [
+    ("retreat", "a tattered white flag on a broken spear shaft"),
+    ("auto", "two crossed steel swords with a golden circular arrow around them"),
+    ("defend", "a heavy steel kite shield with a gold rim and a red cross"),
+    ("surrender", "a small leather purse of gold coins tied with a cord"),
+    ("options", "a small ornate brass astrolabe"),
+    ("ballista", "a wooden siege ballista on wheels, side view"),
+    ("catapult", "a wooden siege catapult with a stone in its bucket, side view"),
+    ("first_aid", "a small canvas field tent with a red cross on it"),
+]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "
           "each cell, in reading order (left to right, top row first):\n{items}\n"
@@ -32,7 +42,12 @@ PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a
           "inside its cell with magenta around it, and keep the background pure flat magenta everywhere else.")
 
 
-def paint():
+def _out(sheet):
+    return f"{BATCH}/out/{'buttons' if sheet == 'adventure' else sheet}.png"
+
+
+def paint(sheet):
+    ICONS = SHEETS[sheet]
     import vertex_paint as vp
     from google import genai
     os.makedirs(f"{BATCH}/in", exist_ok=True)
@@ -47,12 +62,13 @@ def paint():
     items = "\n".join(f"{i + 1}. {d}" for i, (_, d) in enumerate(ICONS))
     img = vp.paint(client, "gemini-nano-banana-2.1", f"{BATCH}/in/buttons.png", PROMPT.format(items=items), "16:9", "2K", style)
     if img:
-        img.save(f"{BATCH}/out/buttons.png")
+        img.save(_out(sheet))
         print("done", img.size)
 
 
-def ingest():
-    src = Image.open(f"{BATCH}/out/buttons.png").convert("RGB")
+def ingest(sheet):
+    ICONS = SHEETS[sheet]
+    src = Image.open(_out(sheet)).convert("RGB")
     cut = key_out(src)
     cw, ch = cut.width / COLS, cut.height / ROWS
     for k, (name, _) in enumerate(ICONS):
@@ -72,4 +88,4 @@ def ingest():
 
 
 if __name__ == "__main__":
-    {"paint": paint, "ingest": ingest}[sys.argv[1]]()
+    {"paint": paint, "ingest": ingest}[sys.argv[1]](sys.argv[2] if len(sys.argv) > 2 else "adventure")

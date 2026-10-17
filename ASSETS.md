@@ -76,7 +76,10 @@ leaves the `_dead` sprite on the hex as a corpse.
   (imagegen/batch17).
 - `creatures/sizes.json` — per sprite `[w, h, vis_w]`: solid figure size and the width with semi-transparent wings /
   capes, used by `battle.gd` to size stacks within their 1- or 2-hex footprint (`tools/art/sprite_sizes.py`).
-- `battle/obstacle_1..4.png` — rocks/stumps/skulls placed on hexes, transparent, ~160x128.
+- `battle/obstacle_<kind>.png` — obstacles on hexes, varied per terrain (`battle.gd` OBSTACLES): boulders, dead_tree, log,
+  crater, thorns, pillar, rock_spire, skull_pile, snow_boulders, ice, frozen_tree, sandstone, cactus, bones, swamp_tree,
+  rotten_log. Painted at twice their field size, centred on their feet, by `tools/art/obstacle_paint.py`
+  (imagegen/batch22). The old `obstacle_2.png` stump is still used on grass.
 
 ## Town screens
 - `town/<faction>_bg.png` — 1920x1080 painted landscape backdrop of the town site (sky + ground, no buildings, or only the
@@ -103,7 +106,8 @@ leaves the `_dead` sprite on the hex as a corpse.
 - `icons/stat_attack.png stat_defense.png stat_power.png stat_knowledge.png` 64x64.
 - `icons/building_<faction>_<building>.png` — 160x100 thumbnails for the build screen (can be auto-cropped from town sprites).
 - `ui/btn_<kingdom|hero|sleep|move|spellbook|next_hero|end_turn|system>.png` — 128 px adventure panel button icons,
-  painted as one sheet by `tools/art/button_icons_paint.py` (imagegen/batch20).
+  and `ui/btn_<retreat|auto|defend|surrender|options|ballista|catapult|first_aid>.png` for the battle bar (the last
+  five not used yet), painted as sheets by `tools/art/button_icons_paint.py` (imagegen/batch20).
 - `ui/panel.png` — 9-slice ornate stone/wood panel texture (256x256, 48px border).
 - `ui/button.png`, `ui/button_hover.png`, `ui/button_pressed.png` — 9-slice buttons (192x64, 20px border).
 - `ui/frame_portrait.png` — ornate gold frame 160x160 (transparent centre).

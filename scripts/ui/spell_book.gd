@@ -72,9 +72,9 @@ class _Book extends Control:
 			c.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			c.pressed.connect(_turn.bind(-1 if i == 0 else 1))
 			add_child(c)
-		# a wax-seal close button under the bookmarks (Esc, right click and a click beside the book also close it)
+		# a wax-seal close button above the bookmarks (Esc, right click and a click beside the book also close it)
 		var x := _Seal.new()
-		x.position = Vector2(1452, 948)  # (right of the corner ornament, under the earth tab)
+		x.position = Vector2(1458, 16)  # (top right, above the bookmarks: clear of the book's ornaments and the bar below)
 		x.size = Vector2(72, 72)
 		x.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		x.pressed.connect(func(): m.close(""))

@@ -21,6 +21,9 @@ func _ready() -> void:
 		while L.is_over() < 0 and steps < 600:
 			steps += 1
 			var s = L.current()
+			if s != null and L.check_bad_morale(s):
+				L.finish_turn(s)
+				continue
 			if s == null:
 				break
 			var act := BattleAI.decide(L, s)
@@ -29,6 +32,7 @@ func _ready() -> void:
 				"melee": L.do_melee(s, act["target"], act["from"])
 				"move": L.do_move(s, act["hex"])
 				_: L.do_defend(s)
+			L.roll_good_morale(s)
 			var err := _check(L)
 			if err != "":
 				print("FAIL seed %d step %d: %s" % [seed, steps, err])

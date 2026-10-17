@@ -7,7 +7,15 @@ const X0 := 264.0
 const Y0 := 272.0
 const TIER_H := [0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]
 ## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
-const FIG_H := [0, 104.0, 110.0, 118.0, 124.0, 130.0, 156.0, 168.0]
+const FIG_H := [0, 104.0, 110.0, 118.0, 124.0, 130.0, 146.0, 156.0]
+## Obstacle pictures by battlefield terrain (assets/battle/obstacle_<kind>.png, tools/art/obstacle_paint.py).
+const OBSTACLES := {
+	"grass": ["boulders", "dead_tree", "log", "stump", "thorns", "pillar", "rock_spire"],
+	"dirt": ["boulders", "crater", "dead_tree", "skull_pile", "rock_spire", "log", "pillar"],
+	"snow": ["snow_boulders", "ice", "frozen_tree", "snow_boulders", "ice"],
+	"sand": ["sandstone", "cactus", "bones", "crater", "skull_pile"],
+	"swamp": ["swamp_tree", "rotten_log", "thorns", "dead_tree", "skull_pile"],
+}
 ## Widest figure in hexes, wings and capes included: 1-hex and 2-hex units (a stack mustn't swallow its neighbours).
 const VIS_MAX_W := [1.6, 2.5]
 
@@ -46,7 +54,13 @@ var _grid: _Grid
 var _sorted: Node2D
 var _corpses: Node2D
 var _fx: Node2D
-var _floats: Array = []    # live damage / status labels (they keep clear of each other)
+var _floats: Array = []
+var _log_hist: Array = []   # combat log lines, oldest first
+var _log_scroll := 0        # how many lines back from the newest the bar shows
+var _log_seen := 0          # L.log_lines already copied into the log
+var _log_arrows: Array = []
+const BAR_Y := 1002.0
+const BTN := Vector2(78, 66)    # live damage / status labels (they keep clear of each other)
 var ui: CanvasLayer
 var _queue_box: HBoxContainer
 var _log: Label
@@ -74,6 +88,10 @@ func _ready() -> void:
 	_build_ui()
 	Audio.music("battle")
 	Audio.sfx("battle_start", -2)
+	var who := []
+	for side in 2:
+		who.append(L.heroes[side]["name"] if L.heroes[side] != null else "the %s" % L._name(L.alive_stacks(side)[0]) if L.alive_stacks(side).size() > 0 else "?")
+	_set_log("The battle begins: %s against %s." % who)
 	await get_tree().create_timer(0.6).timeout
 	_next()
 
@@ -156,12 +174,18 @@ func _build_scene() -> void:
 	_fx = Node2D.new()
 	_fx.z_index = 20
 	_field.add_child(_fx)
+	var kinds: Array = OBSTACLES.get(L.terrain, OBSTACLES["grass"])
 	for h in L.obstacles:
+		var kind: String = kinds[(L.obstacles[h] - 1 + h.x + h.y) % kinds.size()]
 		var s := Sprite2D.new()
-		s.texture = Assets.tex("battle/obstacle_%d.png" % L.obstacles[h], Vector2i(96, 72))
-		var sc := 120.0 / s.texture.get_width()
-		s.scale = Vector2(sc, sc)
-		s.offset = Vector2(0, -s.texture.get_height() * 0.5)
+		if kind == "stump":  # the old painted stump: drawn by its width
+			s.texture = Assets.tex("battle/obstacle_2.png", Vector2i(96, 72))
+			s.scale = Vector2.ONE * (120.0 / s.texture.get_width())
+			s.offset = Vector2(0, -s.texture.get_height() * 0.5)
+		else:  # painted at twice their size, centred on their feet at the bottom of the canvas
+			s.texture = Assets.tex("battle/obstacle_%s.png" % kind, Vector2i(96, 72))
+			s.scale = Vector2.ONE * 0.38
+			s.offset = Vector2(0, -s.texture.get_height() * 0.5 + 6)
 		s.position = hex_pos(h) + Vector2(0, 22)
 		_sorted.add_child(s)
 	for st in L.stacks:
@@ -300,48 +324,86 @@ func _build_ui() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(root)
 
+	# the classic combat bar: icon buttons at both ends, a two-line log you can scroll back through in the middle
 	var bar := Panel.new()
-	bar.position = Vector2(0, 1012)
-	bar.size = Vector2(1920, 68)
+	bar.position = Vector2(0, BAR_Y)
+	bar.size = Vector2(1920, 1080 - BAR_Y)
 	var st := StyleBoxFlat.new()
-	st.bg_color = Color(0.08, 0.06, 0.04, 0.94)
+	st.bg_color = Color(0.08, 0.06, 0.04, 0.95)
 	st.border_color = UI.GOLD_DARK
 	st.border_width_top = 2
 	bar.add_theme_stylebox_override("panel", st)
 	root.add_child(bar)
 	var left := HBoxContainer.new()
-	left.position = Vector2(10, 1018)
-	left.add_theme_constant_override("separation", 8)
+	left.position = Vector2(12, BAR_Y + 7)
+	left.add_theme_constant_override("separation", 6)
 	root.add_child(left)
 	var right := HBoxContainer.new()
-	right.position = Vector2(1460, 1018)
-	right.add_theme_constant_override("separation", 8)
+	right.position = Vector2(1920 - 12 - 3 * BTN.x - 2 * 6, BAR_Y + 7)
+	right.add_theme_constant_override("separation", 6)
 	root.add_child(right)
-	for e in [["Retreat", _on_retreat, left], ["Auto: Off", _on_auto, left], ["Spells", _on_spells, right], ["Wait", _on_wait, right], ["Defend", _on_defend, right]]:
-		var b := UI.button(e[0], e[1], 21)
-		b.custom_minimum_size = Vector2(140, 56)
+	for e in [["Retreat", "retreat", "Retreat (R): flee with your hero, losing the army", _on_retreat, left],
+			["Auto: Off", "auto", "Auto combat (A): the computer fights for you until you turn it off", _on_auto, left],
+			["Spells", "spellbook", "Cast a spell (S)", _on_spells, right],
+			["Wait", "end_turn", "Wait (W): act later this round", _on_wait, right],
+			["Defend", "defend", "Defend (D / Space): +defense until the next turn", _on_defend, right]]:
+		var b := UI.button("", e[3])
+		b.custom_minimum_size = BTN
 		b.focus_mode = Control.FOCUS_NONE
-		e[2].add_child(b)
+		b.tooltip_text = e[2]
+		var ic := UI.icon(Assets.tex("ui/btn_%s.png" % e[1]), BTN - Vector2(14, 10))
+		ic.position = Vector2(7, 5)
+		ic.size = ic.custom_minimum_size
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(ic)
+		b.draw.connect(func(): ic.modulate = Color(0.42, 0.4, 0.38) if b.disabled else Color.WHITE)
+		e[4].add_child(b)
 		_btns[e[0]] = b
-	_btns["Spells"].tooltip_text = "Cast a spell (S)"
-	_btns["Wait"].tooltip_text = "Wait (W)"
-	_btns["Defend"].tooltip_text = "Defend (D / Space)"
-	_btns["Auto: Off"].tooltip_text = "Auto combat (A)"
+	_btns["Auto: Off"].toggle_mode = true
+	UI.plate_toggle(_btns["Auto: Off"])
 
+	var lx := 12 + 2 * BTN.x + 6 + 14
+	var lw := right.position.x - 14 - lx
+	var inset := Panel.new()
+	inset.position = Vector2(lx, BAR_Y + 7)
+	inset.size = Vector2(lw, BTN.y)
+	var ist := StyleBoxFlat.new()
+	ist.bg_color = Color(0.03, 0.02, 0.015, 0.9)
+	ist.border_color = Color(UI.GOLD_DARK, 0.8)
+	ist.set_border_width_all(1)
+	ist.set_corner_radius_all(4)
+	inset.add_theme_stylebox_override("panel", ist)
+	inset.mouse_filter = Control.MOUSE_FILTER_PASS
+	inset.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed:
+			if e.button_index == MOUSE_BUTTON_WHEEL_UP:
+				_scroll_log(1)
+			elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				_scroll_log(-1))
+	root.add_child(inset)
 	_log = UI.label("", 19)
-	_log.position = Vector2(320, 1016)
-	_log.size = Vector2(1120, 60)
-	_log.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_log.position = inset.position + Vector2(16, 2)
+	_log.size = Vector2(lw - 64, BTN.y - 4)
 	_log.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_log.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_log.clip_text = true
+	_log.add_theme_constant_override("line_spacing", -2)
+	_log.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_log)
+	for k in 2:  # scroll the log: older (up) and newer (down)
+		var a := _LogArrow.new()
+		a.up = k == 0
+		a.position = inset.position + Vector2(lw - 36, 4 + k * (BTN.y * 0.5 - 2))
+		a.size = Vector2(28, BTN.y * 0.5 - 6)
+		a.tooltip_text = "Earlier messages" if k == 0 else "Later messages"
+		a.pressed.connect(_scroll_log.bind(1 if k == 0 else -1))
+		root.add_child(a)
+		_log_arrows.append(a)
 
 	_status = UI.label("", 22, UI.GOLD)
 	# what a click would do, in the bottom bar in place of the log line (not over the field)
 	_status.position = _log.position
 	_status.size = _log.size
 	_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_status)
 
@@ -376,8 +438,26 @@ func _refresh_queue() -> void:
 		q.custom_minimum_size = Vector2(110 if i == 0 else 84, 110 if i == 0 else 84)
 		_queue_box.add_child(q)
 
+## Adds a line to the combat log (the bar shows the last two; the arrows and the wheel scroll back).
 func _set_log(t: String) -> void:
-	_log.text = t
+	if t == "" or (_log_hist.size() > 0 and _log_hist[-1] == t):
+		return
+	_log_hist.append(t)
+	_log_scroll = 0
+	_show_log()
+
+func _scroll_log(d: int) -> void:
+	_log_scroll = clampi(_log_scroll + d, 0, maxi(0, _log_hist.size() - 2))
+	_show_log()
+
+func _show_log() -> void:
+	var end := _log_hist.size() - _log_scroll
+	_log.text = "\n".join(_log_hist.slice(maxi(0, end - 2), end))
+	# the older line dimmer, the newest bright (when scrolled back, both read as history)
+	_log.add_theme_color_override("font_color", UI.TEXT if _log_scroll == 0 else Color(0.8, 0.74, 0.62))
+	if _log_arrows.size() == 2:
+		_log_arrows[0].disabled = end <= 2
+		_log_arrows[1].disabled = _log_scroll == 0
 
 func _set_status(t: String) -> void:
 	_status.text = t
@@ -390,7 +470,7 @@ func _refresh_buttons(human_turn: bool) -> void:
 	_btns["Defend"].disabled = not human_turn
 	_btns["Spells"].disabled = not human_turn or not L.can_cast(side)
 	_btns["Retreat"].disabled = not human_turn or L.heroes[side] == null
-	_btns["Auto: Off"].text = "Auto: On" if _auto else "Auto: Off"
+	_btns["Auto: Off"].set_pressed_no_signal(_auto)
 
 # ---------------------------------------------------------------------------------------------
 # Turn flow
@@ -422,6 +502,13 @@ func _next() -> void:
 	if L.check_fear(s):
 		_set_log("%s freeze in fear!" % L._name(s))
 		_float_text(Vector2(0, -_top(s) - 10), "Fear!", Color(0.8, 0.65, 1.0), 30, "", 0.0, _unit(s))
+		L.finish_turn(s)
+		await get_tree().create_timer(0.7).timeout
+		_next()
+		return
+	if L.check_bad_morale(s):
+		_set_log("Low morale: %s freeze and lose the turn." % L._name(s))
+		_float_text(Vector2(0, -_top(s) - 10), "Low morale", Color(0.7, 0.75, 1.0), 28, "", 0.0, _unit(s))
 		L.finish_turn(s)
 		await get_tree().create_timer(0.7).timeout
 		_next()
@@ -466,7 +553,13 @@ func _act(ev: Array) -> void:
 	_set_status("")
 	_refresh_buttons(false)
 	_reset_info()
+	var who = L.current()
 	await _play(ev)
+	if who != null and L.roll_good_morale(who):  # good morale: the same stack acts again
+		_float_text(Vector2(0, -_top(who) - 10), "Morale!", Color(1, 0.85, 0.4), 30, "", 0.0, _unit(who))
+		_set_log(L.log_lines[-1])
+		_log_seen = L.log_lines.size()
+		await get_tree().create_timer(0.5).timeout
 	_next()
 
 # ---------------------------------------------------------------------------------------------
@@ -500,6 +593,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			KEY_D, KEY_SPACE: _on_defend()
 			KEY_S: _on_spells()
 			KEY_A: _on_auto()
+			KEY_R: _on_retreat()
 			KEY_ESCAPE:
 				if _spell != "":
 					_spell = ""
@@ -514,7 +608,7 @@ func _modal_open() -> bool:
 # ---------------------------------------------------------------------------------------------
 func _update_info() -> void:
 	var key := ""
-	if not _ended and not _modal_open():
+	if not _ended and not _modal_open() and not _auto:  # (in auto combat stacks walk under a resting cursor)
 		var st = L.stack_at(_hover) if L.in_bounds(_hover) else null
 		if st:
 			key = "s%d" % st["uid"]
@@ -781,7 +875,8 @@ func _on_defend() -> void:
 
 func _on_auto() -> void:
 	_auto = not _auto
-	_btns["Auto: Off"].text = "Auto: On" if _auto else "Auto: Off"
+	_btns["Auto: Off"].set_pressed_no_signal(_auto)
+	_update_info()
 	if _auto and not _busy:
 		_next()
 
@@ -837,8 +932,9 @@ func _play(events: Array) -> void:
 				_refresh_badge(ev["s"])
 			"text":
 				_set_log(ev["text"])
-	if L.log_lines.size() > 0:
-		_set_log(L.log_lines[L.log_lines.size() - 1])
+	for k in range(_log_seen, L.log_lines.size()):  # every line, not just the last (an attack before a spell)
+		_set_log(L.log_lines[k])
+	_log_seen = L.log_lines.size()
 	for k in units:
 		units[k].get_node("Badge").queue_redraw()
 
@@ -1349,12 +1445,13 @@ class _Grid extends Node2D:
 				var h := Vector2i(x, y)
 				var c: Vector2 = b.hex_pos(h)
 				var poly: PackedVector2Array = b.hex_poly(c, 2.0)
+				# where the active stack can go: shaded (as the classic game), with a brighter outline
 				if reach.has(h):
-					draw_colored_polygon(poly, Color(0.05, 0.03, 0.0, 0.3))
+					draw_colored_polygon(poly, Color(0.04, 0.025, 0.0, 0.42))
 				var closed := poly.duplicate()
 				closed.append(poly[0])
 				draw_polyline(closed, Color(0, 0, 0, 0.22), 3.0, true)  # dark under-line keeps the grid visible on light ground
-				draw_polyline(closed, Color(1, 0.97, 0.8, 0.34), 1.5, true)
+				draw_polyline(closed, Color(1, 0.95, 0.72, 0.6 if reach.has(h) else 0.34), 1.5, true)
 		if not active.is_empty() and active.get("alive", false):
 			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 180.0)
 			_fill(_body(active["hex"]), Color(1, 0.85, 0.3, 0.22 + 0.18 * pulse), Color(1, 0.9, 0.4, 0.75 + 0.25 * pulse), 4.0)
@@ -1504,6 +1601,25 @@ class _RoundMark extends Control:
 		var t := str(num)
 		draw_string_outline(f, Vector2(0, c.y + 9), t, HORIZONTAL_ALIGNMENT_CENTER, size.x, 26, 4, Color(0, 0, 0, 0.9))
 		draw_string(f, Vector2(0, c.y + 9), t, HORIZONTAL_ALIGNMENT_CENTER, size.x, 26, Color(1, 0.88, 0.5))
+
+## A small gold triangle button scrolling the combat log.
+class _LogArrow extends BaseButton:
+	var up := true
+	func _ready() -> void:
+		focus_mode = Control.FOCUS_NONE
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
+	func _draw() -> void:
+		var c := size * 0.5
+		var w := minf(size.x, size.y * 1.6) * 0.42
+		var h := w * 0.8
+		var pts := PackedVector2Array([c + Vector2(-w, h * 0.5), c + Vector2(w, h * 0.5), c + Vector2(0, -h * 0.5)]) if up \
+			else PackedVector2Array([c + Vector2(-w, -h * 0.5), c + Vector2(w, -h * 0.5), c + Vector2(0, h * 0.5)])
+		var col := UI.GOLD if not disabled else Color(0.35, 0.3, 0.24)
+		if is_hovered() and not disabled:
+			col = Color(1, 0.92, 0.6)
+		draw_colored_polygon(pts, col)
 
 class _Projectile extends Node2D:
 	var from := Vector2.ZERO
