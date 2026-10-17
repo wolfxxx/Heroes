@@ -16,7 +16,7 @@ const CORNERS := [Rect2(100, 780, 160, 130), Rect2(1270, 790, 140, 120)]  # curl
 const PER_PAGE := 6
 const INK := Color(0.27, 0.15, 0.06)
 const INK_RED := Color(0.5, 0.1, 0.04)
-const SCHOOL := {"all": "All schools", "air": "Air magic", "fire": "Fire magic", "water": "Water magic", "earth": "Earth magic"}
+const SCHOOL := {"all": "All Schools", "air": "Air Magic", "fire": "Fire Magic", "water": "Water Magic", "earth": "Earth Magic"}
 
 static func open(owner: Node, hero: Dictionary, can_cast := Callable(), detail := Callable()) -> Modal:
 	var m := Modal.custom(owner, "", SIZE.x)
@@ -74,7 +74,7 @@ class _Book extends Control:
 			add_child(c)
 		# a wax-seal close button under the bookmarks (Esc, right click and a click beside the book also close it)
 		var x := _Seal.new()
-		x.position = Vector2(1424, 928)
+		x.position = Vector2(1452, 948)  # (right of the corner ornament, under the earth tab)
 		x.size = Vector2(72, 72)
 		x.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		x.pressed.connect(func(): m.close(""))
@@ -160,7 +160,11 @@ class _Book extends Control:
 		_rule(p1)
 		_text("Spell points:  %d / %d" % [hero["mana"], GameState.max_mana(hero)], Rect2(p0.position.x, p0.end.y - 36, p0.size.x, 32), 21)
 		var n := _spreads()
-		_text("Page %d of %d" % [spread + 1, n] if n > 1 else "", Rect2(p1.position.x, p1.end.y - 36, p1.size.x, 32), 19)
+		# the curled corners turn the pages: say so beside the page number
+		var pg := ""
+		if n > 1:
+			pg = ("«  " if spread > 0 else "") + "Page %d of %d" % [spread + 1, n] + ("  »" if spread < n - 1 else "")
+		_text(pg, Rect2(p1.position.x, p1.end.y - 36, p1.size.x, 32), 19)
 		if list.is_empty():
 			_text("No %s spells known." % ("" if school == "all" else school), Rect2(p0.position.x, 380, p0.size.x, 40), 22)
 		for i in range(spread * 2 * SpellBook.PER_PAGE, mini(list.size(), (spread + 1) * 2 * SpellBook.PER_PAGE)):

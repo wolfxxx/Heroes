@@ -15,8 +15,8 @@ run --shot=$D/hero_screen.png --scene=res://scenes/adventure.tscn --delay=3 --se
 run --shot=$D/town_haven_early.png --scene=res://scenes/town.tscn --delay=3 --setup=demo
 run --shot=$D/town_haven_full.png --scene=res://scenes/town.tscn --delay=3 --setup=rich
 run --shot=$D/town_necro_full.png --scene=res://scenes/town.tscn --delay=3 --setup=necro_rich
-run --shot=$D/town_build.png --scene=res://scenes/town.tscn --delay=3 --setup=demo --click=1418,853
-run --shot=$D/town_recruit.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --click=1604,853
+run --shot=$D/town_build.png --scene=res://scenes/town.tscn --delay=3 --setup=demo --keys=B
+run --shot=$D/town_recruit.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --keys=R
 run --shot=$D/battle.png --scene=res://scenes/battle.tscn --delay=2 --setup=demo --shots=3 --interval=5 --keys=A
 # hover twice: the first hover panel of a run can be mispositioned; keep the second
 run --shot=$D/hv.png --scene=res://scenes/battle.tscn --delay=3 --setup=demo --hover="264,410;270,412" --shots=2 --interval=0.5

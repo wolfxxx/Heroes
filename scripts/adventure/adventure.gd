@@ -226,6 +226,18 @@ func _unhandled_input(e: InputEvent) -> void:
 				end_turn()
 			KEY_H, KEY_TAB:
 				next_hero()
+			KEY_K:
+				hud.open_kingdom()
+			KEY_I:
+				if not selected_hero().is_empty():
+					hud.open_hero_screen(selected_hero())
+			KEY_Z:
+				toggle_sleep()
+			KEY_M:
+				continue_move()
+			KEY_C:
+				if not selected_hero().is_empty():
+					SpellBook.open(self, selected_hero())
 			KEY_T:
 				var p := human_player()
 				if p["towns"].size() > 0:
@@ -486,7 +498,7 @@ func select_hero(uid: int) -> void:
 func _first_hero_with_mp() -> int:
 	var p := human_player()
 	for hid in p["heroes"]:
-		if world["heroes"][hid]["movement"] > 0:
+		if world["heroes"][hid]["movement"] > 0 and not world["heroes"][hid].get("asleep", false):
 			return hid
 	return p["heroes"][0] if p["heroes"].size() > 0 else -1
 
@@ -497,9 +509,31 @@ func next_hero() -> void:
 	var i: int = p["heroes"].find(world["selected_hero"])
 	for k in p["heroes"].size():
 		var hid: int = p["heroes"][(i + 1 + k) % p["heroes"].size()]
-		if world["heroes"][hid]["movement"] > 0 or k == p["heroes"].size() - 1:
+		var h: Dictionary = world["heroes"][hid]
+		if (h["movement"] > 0 and not h.get("asleep", false)) or k == p["heroes"].size() - 1:
 			_select_hero(hid)
 			return
+
+## Sleep / wake the selected hero: Next Hero passes over sleeping heroes (they wake when moved).
+func toggle_sleep() -> void:
+	var h := selected_hero()
+	if h.is_empty():
+		return
+	h["asleep"] = not h.get("asleep", false)
+	hud.toast("%s %s" % [h["name"], "sleeps" if h["asleep"] else "wakes"])
+	hud.refresh()
+
+## Walks the selected hero on along the route already shown (or toward the destination it was heading for).
+func continue_move() -> void:
+	var h := selected_hero()
+	if busy or h.is_empty():
+		return
+	if _plan.is_empty() and h.has("dest") and h["dest"] != h["pos"]:
+		_make_plan(h["dest"])
+	if _plan.is_empty():
+		hud.toast("No route planned: click a destination first")
+		return
+	_execute_move()
 
 # ---------------------------------------------------------------------------------------------
 # Movement
@@ -513,6 +547,7 @@ func _execute_move() -> void:
 		hud.toast("Not enough movement points left today")
 		return
 	busy = true
+	hero["asleep"] = false
 	view.clear_path()
 	await move_hero(hero, _plan, true)
 	busy = false

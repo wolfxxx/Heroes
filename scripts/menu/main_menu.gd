@@ -346,7 +346,7 @@ func _select_faction(f: String) -> void:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(300, 132)
-		_card(b, Assets.hero_portrait(hid), 96, h["name"], h["class"], 20)
+		_card(b, Assets.hero_portrait(hid), 84, h["name"], h["class"], 19)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)

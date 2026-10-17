@@ -5,6 +5,10 @@ class_name AdventureHUD
 const PANEL_X := 1544.0
 const MINI := 316.0
 const PAD := 30.0
+const COL_W := 155.0       # hero and town list columns, side by side
+const COL_GAP := 6
+const SLOT_H := 66.0
+const BTN := Vector2(76, 62)
 const TERRAIN_COLORS := [Color(0.30, 0.50, 0.17), Color(0.47, 0.37, 0.22), Color(0.85, 0.75, 0.48), Color(0.9, 0.92, 0.96),
 	Color(0.27, 0.33, 0.22), Color(0.12, 0.30, 0.52), Color(0.62, 0.52, 0.38)]
 
@@ -13,6 +17,7 @@ var world: Dictionary
 var root: Control
 var _mini_img: Image
 var _mini_tex: ImageTexture
+var _mini_k := 1          # minimap pixels per tile (terrain is blended between tiles, markers stay crisp)
 var _mini_rect: TextureRect
 var _mini_view: Control
 var _hero_list: VBoxContainer
@@ -25,6 +30,7 @@ var _toast: Label
 var _turn_label: Label
 var _turn_panel: PanelContainer
 var _end_turn_btn: Button
+var _sleep_btn: Button
 
 func setup(a) -> void:
 	adv = a
@@ -39,7 +45,8 @@ func setup(a) -> void:
 	_build_bar()
 	var size: Vector2i = world["size"]
 	_mini_img = Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
-	_mini_tex = ImageTexture.create_from_image(_mini_img)
+	_mini_k = clampi(int(ceil(MINI / float(maxi(size.x, size.y)))), 1, 8)
+	_mini_tex = ImageTexture.create_from_image(Image.create(size.x * _mini_k, size.y * _mini_k, false, Image.FORMAT_RGBA8))
 	_mini_rect.texture = _mini_tex
 	refresh_minimap()
 	refresh()
@@ -64,7 +71,7 @@ func _build_panel() -> void:
 	_mini_rect.position = Vector2(PANEL_X + PAD, PAD)
 	_mini_rect.size = Vector2(MINI, MINI)
 	_mini_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_mini_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_mini_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	_mini_rect.mouse_filter = Control.MOUSE_FILTER_STOP
 	_mini_rect.gui_input.connect(_on_minimap_input)
 	root.add_child(_mini_rect)
@@ -74,41 +81,55 @@ func _build_panel() -> void:
 	_mini_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_mini_view)
 
+	# heroes and towns side by side (as the classic adventure panel), the selected hero below, then the buttons
+	var cols := HBoxContainer.new()
+	cols.position = Vector2(PANEL_X + PAD, MINI + PAD + 10)
+	cols.size = Vector2(MINI, 0)
+	cols.add_theme_constant_override("separation", COL_GAP)
+	root.add_child(cols)
+	for k in 2:
+		var cv := VBoxContainer.new()
+		cv.custom_minimum_size = Vector2(COL_W, 0)
+		cv.add_theme_constant_override("separation", 4)
+		cv.add_child(UI.label("Heroes" if k == 0 else "Towns", 21, UI.GOLD, true))
+		var lst := VBoxContainer.new()
+		lst.add_theme_constant_override("separation", 4)
+		cv.add_child(lst)
+		cols.add_child(cv)
+		if k == 0:
+			_hero_list = lst
+		else:
+			_town_list = lst
 	var v := VBoxContainer.new()
-	v.position = Vector2(PANEL_X + PAD, MINI + PAD + 14)
-	v.size = Vector2(MINI, 1036 - MINI - 130)
+	v.position = Vector2(PANEL_X + PAD, MINI + PAD + 10 + 30 + 3 * (SLOT_H + 4) + 8)
+	v.size = Vector2(MINI, 0)
 	v.add_theme_constant_override("separation", 6)
 	root.add_child(v)
-	v.add_child(UI.label("Heroes", 22, UI.GOLD, true))
-	_hero_list = VBoxContainer.new()
-	_hero_list.add_theme_constant_override("separation", 4)
-	v.add_child(_hero_list)
-	v.add_child(UI.label("Towns", 22, UI.GOLD, true))
-	_town_list = VBoxContainer.new()
-	_town_list.add_theme_constant_override("separation", 4)
-	v.add_child(_town_list)
-	var sep := HSeparator.new()
-	v.add_child(sep)
+	v.add_child(HSeparator.new())
 	_detail = VBoxContainer.new()
 	_detail.add_theme_constant_override("separation", 6)
 	v.add_child(_detail)
 
-	var brow := HBoxContainer.new()
-	brow.position = Vector2(PANEL_X + PAD - 2, 1036 - 88)
-	brow.size = Vector2(MINI + 4, 60)
-	brow.add_theme_constant_override("separation", 8)
-	root.add_child(brow)
-	var nb := UI.button("Next Hero", func(): adv.next_hero(), 19)
-	nb.custom_minimum_size = Vector2(110, 56)
-	nb.tooltip_text = "Select the next hero (H)"
-	brow.add_child(nb)
-	_end_turn_btn = UI.button("End Turn", func(): adv.end_turn(), 19)
-	_end_turn_btn.custom_minimum_size = Vector2(110, 56)
-	_end_turn_btn.tooltip_text = "End your turn (E)"
-	brow.add_child(_end_turn_btn)
-	var sb := UI.button("Menu", open_system_menu, 19)
-	sb.custom_minimum_size = Vector2(88, 56)
-	brow.add_child(sb)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.position = Vector2(PANEL_X + PAD, 1036 - PAD - 2 * BTN.y - 6)
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 6)
+	root.add_child(grid)
+	for e in [["kingdom", "Kingdom overview (K)", func(): open_kingdom()],
+			["hero", "Hero screen (I)", func(): _with_hero(open_hero_screen)],
+			["sleep", "Put the hero to sleep, or wake it (Z): sleeping heroes are skipped by Next Hero", func(): adv.toggle_sleep()],
+			["move", "Continue moving along the planned route (M)", func(): adv.continue_move()],
+			["spellbook", "Spellbook (C)", func(): _with_hero(func(h): SpellBook.open(adv, h))],
+			["next_hero", "Next hero (H)", func(): adv.next_hero()],
+			["system", "Game menu: save, load, quit (Esc)", open_system_menu],
+			["end_turn", "End turn (E)", func(): adv.end_turn()]]:
+		var b := _icon_button(e[0], e[1], e[2])
+		grid.add_child(b)
+		if e[0] == "end_turn":
+			_end_turn_btn = b
+		elif e[0] == "sleep":
+			_sleep_btn = b
 
 	_turn_panel = PanelContainer.new()
 	_turn_panel.position = Vector2(520, 20)
@@ -188,14 +209,14 @@ func refresh() -> void:
 		if i < me["heroes"].size():
 			_hero_list.add_child(_hero_card(world["heroes"][me["heroes"][i]]))
 		else:
-			_hero_list.add_child(_empty_slot(56))
+			_hero_list.add_child(_empty_slot(SLOT_H))
 	for c in _town_list.get_children():
 		c.queue_free()
-	for i in 2:
+	for i in 3:
 		if i < me["towns"].size():
 			_town_list.add_child(_town_card(world["towns"][me["towns"][i]]))
 		else:
-			_town_list.add_child(_empty_slot(40))
+			_town_list.add_child(_empty_slot(SLOT_H))
 	for c in _detail.get_children():
 		c.queue_free()
 	var hero: Dictionary = adv.selected_hero()
@@ -228,62 +249,69 @@ func refresh() -> void:
 		army.bind(hero["army"], {})
 		army.add_theme_constant_override("separation", 3)
 		_detail.add_child(army)
+	if _sleep_btn:
+		_sleep_btn.disabled = hero.is_empty()
 	_mini_view.queue_redraw()
 
+## An empty list slot: a shallow recess in the panel, not a black box.
 func _empty_slot(h: float) -> Control:
 	var p := Panel.new()
-	p.custom_minimum_size = Vector2(MINI, h)
+	p.custom_minimum_size = Vector2(COL_W, h)
 	var st := StyleBoxFlat.new()
-	st.bg_color = Color(0.05, 0.04, 0.03, 0.75)
-	st.border_color = UI.GOLD_DARK
+	st.bg_color = Color(0.1, 0.075, 0.05, 0.35)
+	st.border_color = Color(UI.GOLD_DARK, 0.45)
 	st.set_border_width_all(1)
 	st.set_corner_radius_all(4)
 	p.add_theme_stylebox_override("panel", st)
 	return p
 
+## A hero in the list: portrait with its movement (green) and spell points (blue) as bars beside it, and the name.
 func _hero_card(h: Dictionary) -> Control:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(MINI, 56)
+	b.custom_minimum_size = Vector2(COL_W, SLOT_H)
 	b.toggle_mode = true
 	b.button_pressed = h["uid"] == world.get("selected_hero", -1)
 	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = "%s, level %d %s\nMovement %d / %d, spell points %d / %d" % [h["name"], h["level"], h["class"],
+		h["movement"], h["max_movement"], h["mana"], GameState.max_mana(h)]
 	b.pressed.connect(func(): adv.select_hero(h["uid"]))
-	var hb := HBoxContainer.new()
-	hb.position = Vector2(6, 4)
-	hb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(hb)
-	var p := UI.icon(Assets.hero_portrait(h["id"]), Vector2(48, 48))
-	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hb.add_child(p)
-	# movement / mana as vertical bars beside the portrait (as in the classic games), name to the right
-	var mv := _bar(float(h["movement"]) / maxf(1.0, h["max_movement"]), Color(0.35, 0.8, 0.3), 7)
-	mv.vertical = true
-	mv.custom_minimum_size = Vector2(7, 48)
-	mv.tooltip_text = "Movement"
-	hb.add_child(mv)
-	var mn := _bar(float(h["mana"]) / maxf(1.0, GameState.max_mana(h)), Color(0.35, 0.55, 1.0), 7)
-	mn.vertical = true
-	mn.custom_minimum_size = Vector2(7, 48)
-	hb.add_child(mn)
-	var v := VBoxContainer.new()
-	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_theme_constant_override("separation", -4)
-	hb.add_child(v)
-	var l := UI.label(h["name"], 19)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(l)
-	var lv := UI.label("Level %d" % h["level"], 16)
-	lv.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	v.add_child(lv)
-	# the selected card: a dark plate in a gold frame, gold name (follows the toggle, which can change later)
-	var on := UI.selected_plate(6)
+	var on := UI.selected_plate(4)
 	b.add_theme_stylebox_override("pressed", on)
 	b.add_theme_stylebox_override("hover_pressed", on)
+	var p := UI.icon(Assets.hero_portrait(h["id"]), Vector2(SLOT_H - 10, SLOT_H - 10))
+	p.position = Vector2(5, 5)
+	p.size = p.custom_minimum_size
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(p)
+	var x := SLOT_H - 2.0
+	for bar in [[float(h["movement"]) / maxf(1.0, h["max_movement"]), Color(0.35, 0.82, 0.3)],
+			[float(h["mana"]) / maxf(1.0, GameState.max_mana(h)), Color(0.35, 0.58, 1.0)]]:
+		var c := _bar(bar[0], bar[1], 11)
+		c.vertical = true
+		c.position = Vector2(x, 5)
+		c.size = Vector2(11, SLOT_H - 10)
+		b.add_child(c)
+		x += 14
+	var l := UI.label(h["name"].replace(" ", "\n"), 15)  # first name over last name: the column is narrow
+	l.position = Vector2(x + 2, 4)
+	l.custom_minimum_size = Vector2(COL_W - x - 4, SLOT_H - 8)
+	l.size = l.custom_minimum_size
+	l.clip_text = true
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.add_theme_constant_override("line_spacing", -5)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(l)
 	var ink := func(sel: bool):
 		l.add_theme_color_override("font_color", Color(1.0, 0.86, 0.5) if sel else UI.TEXT)
-		lv.add_theme_color_override("font_color", Color(0.9, 0.84, 0.7) if sel else Color(0.8, 0.75, 0.62))
 	ink.call(b.button_pressed)
 	b.toggled.connect(ink)
+	if h.get("asleep", false):  # dimmed, with the moon over the portrait
+		p.modulate = Color(0.55, 0.55, 0.65)
+		var z := UI.icon(Assets.tex("ui/btn_sleep.png"), Vector2(30, 30))
+		z.position = Vector2(SLOT_H - 36, 4)
+		z.size = z.custom_minimum_size
+		z.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(z)
 	return b
 
 func _bar(frac: float, col: Color, width: float) -> Control:
@@ -294,17 +322,73 @@ func _bar(frac: float, col: Color, width: float) -> Control:
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return c
 
+## A town in the list: its picture from the map with the name on a band across the bottom.
 func _town_card(t: Dictionary) -> Control:
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(MINI, 40)
+	b.custom_minimum_size = Vector2(COL_W, SLOT_H)
 	b.focus_mode = Control.FOCUS_NONE
-	b.text = "  %s  (%s)" % [t["name"], GameData.FACTIONS[t["faction"]]["name"]]
-	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.add_theme_font_size_override("font_size", 19)
+	b.tooltip_text = "%s (%s): %d gold a day" % [t["name"], GameData.FACTIONS[t["faction"]]["name"], TownLogic.daily_income(t)]
 	b.pressed.connect(func():
 		Audio.sfx("click", -6)
 		adv.open_town(t["uid"]))
+	var pic := TextureRect.new()
+	pic.texture = _trimmed("map/town_%s.png" % t["faction"])
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	pic.position = Vector2(4, 4)
+	pic.size = Vector2(COL_W - 8, SLOT_H - 8)
+	pic.clip_contents = true
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(pic)
+	var band := Label.new()
+	band.text = t["name"]
+	band.add_theme_font_size_override("font_size", 15)
+	band.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var bs := StyleBoxFlat.new()
+	bs.bg_color = Color(0.05, 0.035, 0.02, 0.78)
+	band.add_theme_stylebox_override("normal", bs)
+	band.position = Vector2(4, SLOT_H - 26)
+	band.size = Vector2(COL_W - 8, 22)
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(band)
 	return b
+
+## A square panel button with a painted icon (and a tooltip naming it and its key).
+func _icon_button(id: String, tip: String, cb: Callable) -> Button:
+	var b := UI.button("", cb)
+	b.custom_minimum_size = BTN
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = tip
+	var ic := UI.icon(Assets.tex("ui/btn_%s.png" % id), BTN - Vector2(14, 10))
+	ic.position = Vector2(7, 5)
+	ic.size = ic.custom_minimum_size
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(ic)
+	b.draw.connect(func(): ic.modulate = Color(0.45, 0.42, 0.4) if b.disabled else Color.WHITE)
+	return b
+
+## A sprite cut to its visible pixels (map sprites have room around them for shadows), cached.
+var _trims := {}
+func _trimmed(path: String) -> Texture2D:
+	if _trims.has(path):
+		return _trims[path]
+	var tex := Assets.tex(path)
+	var out: Texture2D = tex
+	var img := tex.get_image()
+	if img:
+		if img.is_compressed():
+			img.decompress()
+		var at := AtlasTexture.new()
+		at.atlas = tex
+		at.region = Rect2(img.get_used_rect())
+		out = at
+	_trims[path] = out
+	return out
+
+func _with_hero(f: Callable) -> void:
+	var h: Dictionary = adv.selected_hero()
+	if not h.is_empty():
+		f.call(h)
 
 func set_status(t: String) -> void:
 	_status.text = t
@@ -372,28 +456,27 @@ func refresh_minimap() -> void:
 			if blk[i]:
 				c = c.darkened(0.35)
 			_mini_img.set_pixel(x, y, c)
+	var big := _mini_img.duplicate()
+	big.resize(size.x * _mini_k, size.y * _mini_k, Image.INTERPOLATE_CUBIC)
 	for o in world["objects"].values():
 		if o["type"] == "mine" and ex[o["pos"].y * size.x + o["pos"].x]:
 			var c: Color = Color(0.6, 0.6, 0.6) if o["owner"] < 0 else GameData.PLAYER_COLORS[o["owner"]]
-			_mini_px(o["pos"], c, 1)
+			_mini_mark(big, Vector2(o["pos"]) + Vector2(0.5, 0.5), Vector2(1.6, 1.6), c)
 	for t in world["towns"].values():
 		if ex[t["pos"].y * size.x + t["pos"].x]:
 			var c: Color = Color(0.75, 0.75, 0.75) if t["owner"] < 0 else GameData.PLAYER_COLORS[t["owner"]]
-			for dy in range(-1, 1):
-				for dx in range(-1, 2):
-					_mini_px(t["pos"] + Vector2i(dx, dy), c, 0)
+			_mini_mark(big, Vector2(t["pos"]) + Vector2(0.5, 0.0), Vector2(3.0, 2.0), c)
 	for hh in world["heroes"].values():
 		if ex[hh["pos"].y * size.x + hh["pos"].x]:
-			_mini_px(hh["pos"], GameData.PLAYER_COLORS[hh["owner"]].lightened(0.3), 0)
-	_mini_tex.update(_mini_img)
+			_mini_mark(big, Vector2(hh["pos"]) + Vector2(0.5, 0.5), Vector2(1.3, 1.3), GameData.PLAYER_COLORS[hh["owner"]].lightened(0.35))
+	_mini_tex.update(big)
 
-func _mini_px(p: Vector2i, c: Color, r: int) -> void:
-	var size: Vector2i = world["size"]
-	for dy in range(-r, r + 1):
-		for dx in range(-r, r + 1):
-			var q := p + Vector2i(dx, dy)
-			if q.x >= 0 and q.y >= 0 and q.x < size.x and q.y < size.y:
-				_mini_img.set_pixel(q.x, q.y, c)
+## A marker on the minimap: a filled box in tile units with a dark rim, centred on `c` (tiles).
+func _mini_mark(img: Image, c: Vector2, sz: Vector2, col: Color) -> void:
+	var k := float(_mini_k)
+	var r := Rect2i(Vector2i((c - sz * 0.5) * k), Vector2i((sz * k).round())).intersection(Rect2i(Vector2i.ZERO, img.get_size()))
+	img.fill_rect(r, Color(0.05, 0.03, 0.02))
+	img.fill_rect(r.grow(-1) if r.size.x > 3 else r, col)
 
 func update_minimap_view(cam_pos: Vector2, view_size: Vector2) -> void:
 	var s: Vector2 = Vector2(world["size"]) * WorldGen.TILE
@@ -430,6 +513,81 @@ func open_system_menu() -> void:
 			GameState.change_scene(GameState.SCENE_MENU)
 		"quit":
 			adv.get_tree().quit()
+
+## Kingdom overview: towns with their income, heroes with their armies, the mines held and the day's income.
+func open_kingdom() -> void:
+	var me: Dictionary = adv.human_player()
+	var idx: int = adv._human()
+	var m := Modal.custom(adv, "Kingdom Overview", 1040)
+	var income := {}
+	for r in GameData.RESOURCES:
+		income[r] = 0
+	m.body.add_child(UI.label("Towns", 24, UI.GOLD, true))
+	for tid in me["towns"]:
+		var t: Dictionary = world["towns"][tid]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		var pic := UI.icon(Assets.tex("map/town_%s.png" % t["faction"]), Vector2(96, 64))
+		row.add_child(pic)
+		var g := TownLogic.daily_income(t)
+		income["gold"] += g
+		var tv := VBoxContainer.new()
+		tv.add_theme_constant_override("separation", -2)
+		tv.add_child(UI.label("%s  (%s)" % [t["name"], GameData.FACTIONS[t["faction"]]["name"]], 21))
+		tv.add_child(UI.label("%d gold a day" % g, 18, Color(0.95, 0.82, 0.45)))
+		row.add_child(tv)
+		m.body.add_child(row)
+	if me["towns"].is_empty():
+		m.body.add_child(UI.label("No towns.", 19, Color(0.8, 0.75, 0.62)))
+	m.body.add_child(UI.label("Heroes", 24, UI.GOLD, true))
+	for hid in me["heroes"]:
+		var h: Dictionary = world["heroes"][hid]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 14)
+		row.add_child(UI.icon(Assets.hero_portrait(h["id"]), Vector2(64, 64)))
+		var hv := VBoxContainer.new()
+		hv.custom_minimum_size = Vector2(300, 0)
+		hv.add_theme_constant_override("separation", -2)
+		hv.add_child(UI.label(h["name"] + ("  (asleep)" if h.get("asleep", false) else ""), 21))
+		hv.add_child(UI.label("Level %d %s" % [h["level"], h["class"]], 18, Color(0.85, 0.8, 0.68)))
+		row.add_child(hv)
+		var army := ArmyStrip.new()
+		army.slot_size = Vector2(56, 56)
+		army.editable = false
+		army.bind(h["army"], {})
+		row.add_child(army)
+		m.body.add_child(row)
+	m.body.add_child(UI.label("Mines", 24, UI.GOLD, true))
+	var held := {}
+	for o in world["objects"].values():
+		if o["type"] == "mine" and o["owner"] == idx:
+			var md: Dictionary = GameData.MINES[o["mine"]]
+			held[md["resource"]] = held.get(md["resource"], 0) + 1
+			income[md["resource"]] += md["amount"]
+	var mg := HBoxContainer.new()
+	mg.add_theme_constant_override("separation", 22)
+	for r in GameData.RESOURCES:
+		var box := HBoxContainer.new()
+		box.add_theme_constant_override("separation", 6)
+		box.add_child(UI.icon(Assets.res_icon(r), Vector2(34, 34)))
+		box.add_child(UI.label("x %d" % held.get(r, 0), 19))
+		box.tooltip_text = GameData.RESOURCE_NAMES[r]
+		mg.add_child(box)
+	m.body.add_child(mg)
+	m.body.add_child(HSeparator.new())
+	var inc := HBoxContainer.new()
+	inc.add_theme_constant_override("separation", 22)
+	inc.add_child(UI.label("Income each day:", 21, UI.GOLD))
+	for r in GameData.RESOURCES:
+		if income[r] > 0:
+			var box := HBoxContainer.new()
+			box.add_theme_constant_override("separation", 6)
+			box.add_child(UI.icon(Assets.res_icon(r), Vector2(30, 30)))
+			box.add_child(UI.label("+%d" % income[r], 19, Color(0.6, 0.9, 0.55)))
+			inc.add_child(box)
+	m.body.add_child(inc)
+	m.add_buttons([["Close", "close"]])
+	m.set_meta("cancel", "close")
 
 func open_hero_screen(h: Dictionary) -> void:
 	var m := HeroScreen.open(adv, h)

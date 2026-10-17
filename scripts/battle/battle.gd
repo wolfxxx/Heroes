@@ -366,7 +366,8 @@ func _refresh_queue() -> void:
 		if i == this_round and i > 0:  # where the next round starts
 			var m := _RoundMark.new()
 			m.num = L.round_num + 1
-			m.custom_minimum_size = Vector2(30, 84)
+			m.tooltip_text = "Round %d starts here" % m.num
+			m.custom_minimum_size = Vector2(44, 84)
 			m.size_flags_vertical = Control.SIZE_SHRINK_END
 			_queue_box.add_child(m)
 		var q := _QueueIcon.new()
@@ -1182,7 +1183,7 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	var origin: Vector2 = follow.position if follow else Vector2.ZERO
 	var r := Rect2(p - Vector2(box.size.x * 0.5, 0), box.size)
 	if follow and dir != 0:
-		r = Rect2(origin + at + Vector2(26.0 if dir > 0 else -26.0 - box.size.x, -box.size.y * 0.5), box.size)
+		r = Rect2(origin + at + Vector2(34.0 if dir > 0 else -34.0 - box.size.x, -box.size.y * 0.5), box.size)
 	elif follow:
 		r.position += origin
 	var now := Time.get_ticks_msec()
@@ -1493,11 +1494,16 @@ class _QueueIcon extends Control:
 class _RoundMark extends Control:
 	var num := 2
 	func _draw() -> void:
-		var cx := size.x * 0.5
-		draw_line(Vector2(cx, 2), Vector2(cx, size.y - 30), UI.GOLD, 2.0)
+		# a gold rule through a medallion with the round number
+		var c := size * 0.5
+		draw_rect(Rect2(c.x - 2, 0, 4, size.y), UI.GOLD)
+		draw_rect(Rect2(c.x - 1, 0, 1, size.y), Color(1, 0.95, 0.75))
+		draw_circle(c, 19, Color(0.12, 0.08, 0.04))
+		draw_arc(c, 19, 0, TAU, 32, UI.GOLD, 3.0, true)
 		var f := UI.title_font()
-		draw_string_outline(f, Vector2(0, size.y - 8), str(num), HORIZONTAL_ALIGNMENT_CENTER, size.x, 20, 4, Color(0, 0, 0, 0.9))
-		draw_string(f, Vector2(0, size.y - 8), str(num), HORIZONTAL_ALIGNMENT_CENTER, size.x, 20, UI.GOLD)
+		var t := str(num)
+		draw_string_outline(f, Vector2(0, c.y + 9), t, HORIZONTAL_ALIGNMENT_CENTER, size.x, 26, 4, Color(0, 0, 0, 0.9))
+		draw_string(f, Vector2(0, c.y + 9), t, HORIZONTAL_ALIGNMENT_CENTER, size.x, 26, Color(1, 0.88, 0.5))
 
 class _Projectile extends Node2D:
 	var from := Vector2.ZERO

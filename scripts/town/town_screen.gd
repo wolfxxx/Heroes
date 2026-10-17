@@ -109,6 +109,7 @@ func _build() -> void:
 	add_child(_armies)
 	_buttons = VBoxContainer.new()
 	_buttons.position = Vector2(1330, TownLayout.VIEW_H + 14)
+	_buttons.add_theme_constant_override("separation", 8)
 	add_child(_buttons)
 
 	var bar := HBoxContainer.new()
@@ -127,12 +128,22 @@ func refresh() -> void:
 	_rebuild_buildings()
 	for c in _info.get_children():
 		c.queue_free()
-	_info.add_child(UI.label("%s town" % GameData.FACTIONS[town["faction"]]["name"], 24, UI.GOLD))
-	_info.add_child(UI.label("Income: %d gold / day" % TownLogic.daily_income(town), 21))
-	var gl := TownLogic.mage_guild_level(town)
-	_info.add_child(UI.label("Mage Guild: %s" % ("level %d" % gl if gl > 0 else "none"), 21))
-	_info.add_child(UI.label("Fortifications: %s" % ("Citadel" if TownLogic.has_building(town, "citadel") else ("Fort" if TownLogic.has_building(town, "fort") else "none")), 21))
-	_info.add_child(UI.label("Already built today" if town["built_today"] else "You may build today", 20, Color(0.8, 0.6, 0.5) if town["built_today"] else Color(0.6, 0.9, 0.55)))
+	# the hall (build) and the fort (all dwellings) as pictures, as on the classic town screen
+	var pics := HBoxContainer.new()
+	pics.add_theme_constant_override("separation", 12)
+	var hall := "village_hall"
+	for h in ["city_hall", "town_hall"]:
+		if TownLogic.has_building(town, h):
+			hall = h
+			break
+	pics.add_child(_pic_button(_building_pic(hall), GameData.building_name(town["faction"], hall),
+		"Build in %s (B)" % town["name"], _open_build))
+	var fort := "citadel" if TownLogic.has_building(town, "citadel") else "fort"
+	pics.add_child(_pic_button(_building_pic(fort), GameData.building_name(town["faction"], fort) if TownLogic.has_building(town, fort) else "Dwellings",
+		"All creature dwellings: recruit (R)", _open_recruit_all))
+	_info.add_child(pics)
+	_info.add_child(UI.label("Income: %d gold a day" % TownLogic.daily_income(town), 20))
+	_info.add_child(UI.label("Already built today" if town["built_today"] else "You may build today", 19, Color(0.8, 0.6, 0.5) if town["built_today"] else Color(0.6, 0.9, 0.55)))
 
 	for c in _armies.get_children():
 		c.queue_free()
@@ -178,23 +189,88 @@ func refresh() -> void:
 
 	for c in _buttons.get_children():
 		c.queue_free()
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	_buttons.add_child(grid)
-	var entries := [["Build", _open_build, true], ["Recruit", _open_recruit_all, true],
-		["Tavern", _open_tavern, TownLogic.has_building(town, "tavern")],
+	# creatures available this week, one per dwelling (click to recruit), then the town's other places and Exit
+	var crow := HBoxContainer.new()
+	crow.add_theme_constant_override("separation", 5)
+	_buttons.add_child(crow)
+	for tier in range(1, 8):
+		crow.add_child(_creature_cell(tier))
+	var brow := HBoxContainer.new()
+	brow.add_theme_constant_override("separation", 6)
+	_buttons.add_child(brow)
+	var entries := [["Tavern", _open_tavern, TownLogic.has_building(town, "tavern")],
 		["Market", _open_market, TownLogic.has_building(town, "marketplace")],
 		["Mage Guild", _open_guild, TownLogic.mage_guild_level(town) > 0],
 		["Exit", _exit, true]]
 	for e in entries:
-		var b := UI.button(e[0], e[1], 21)
-		b.custom_minimum_size = Vector2(178, 58)
+		var b := UI.button(e[0], e[1], 20)
+		b.custom_minimum_size = Vector2(136, 52)
 		b.disabled = not e[2]
-		grid.add_child(b)
+		brow.add_child(b)
 	for r in GameData.RESOURCES:
 		_res_labels[r].text = str(player["resources"].get(r, 0))
+
+## A picture button for the bottom bar: the building's picture with its name on a band.
+func _pic_button(tex: Texture2D, caption: String, tip: String, cb: Callable) -> Button:
+	var b := UI.button("", cb)
+	b.custom_minimum_size = Vector2(156, 100)
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = tip
+	var pic := TextureRect.new()
+	pic.texture = tex
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	pic.clip_contents = true
+	pic.position = Vector2(5, 5)
+	pic.size = Vector2(146, 90)
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(pic)
+	var band := Label.new()
+	band.text = caption
+	band.add_theme_font_size_override("font_size", 16)
+	band.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var bs := StyleBoxFlat.new()
+	bs.bg_color = Color(0.05, 0.035, 0.02, 0.8)
+	band.add_theme_stylebox_override("normal", bs)
+	band.position = Vector2(5, 71)
+	band.size = Vector2(146, 24)
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(band)
+	return b
+
+## One dwelling in the bar: the creature's portrait and how many can be recruited (dimmed if not built).
+func _creature_cell(tier: int) -> Button:
+	var cid := GameData.faction_creature(town["faction"], tier)
+	var built := TownLogic.has_building(town, "dwelling_%d" % tier)
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(76, 100)
+	b.focus_mode = Control.FOCUS_NONE
+	var pic := UI.icon(Assets.creature_portrait(cid), Vector2(68, 68))
+	pic.position = Vector2(4, 4)
+	pic.size = pic.custom_minimum_size
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not built:
+		pic.modulate = Color(0.35, 0.33, 0.32)
+	b.add_child(pic)
+	var n := UI.label(str(town["available"][tier - 1]) if built else "-", 20, UI.GOLD if built else Color(0.55, 0.5, 0.45))
+	n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	n.position = Vector2(0, 72)
+	n.size = Vector2(76, 26)
+	n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(n)
+	var name := GameData.dwelling_name(town["faction"], tier)
+	HoverInfo.attach(b, func():
+		var v := HoverInfo.creature(cid, -1, name)
+		HoverInfo.line(v, ("%d available. Click to recruit." % town["available"][tier - 1]) if built else "Dwelling not built yet.", UI.GOLD, 18)
+		return v)
+	if built:
+		b.pressed.connect(func():
+			Audio.sfx("click", -6)
+			_recruit_tier(tier))
+	else:
+		b.disabled = true
+		b.mouse_filter = Control.MOUSE_FILTER_PASS  # (still shows its info on hover)
+	return b
 
 func _on_army_changed() -> void:
 	pass
@@ -746,10 +822,18 @@ func _exit() -> void:
 	GameState.change_scene(GameState.SCENE_ADVENTURE)
 
 func _unhandled_input(e: InputEvent) -> void:
-	if e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_ESCAPE:
-		var l := get_tree().root.get_node_or_null("ModalLayer")
-		if l == null or l.get_child_count() == 0:
+	if not (e is InputEventKey and e.pressed and not e.echo):
+		return
+	var l := get_tree().root.get_node_or_null("ModalLayer")
+	if l != null and l.get_child_count() > 0:
+		return
+	match e.keycode:
+		KEY_ESCAPE:
 			_exit()
+		KEY_B:
+			_open_build()
+		KEY_R:
+			_open_recruit_all()
 
 class _Banner extends Control:
 	var color := Color.RED

@@ -92,6 +92,8 @@ leaves the `_dead` sprite on the hex as a corpse.
   which also writes notes.json telling the painter what each building is).
   The Haven guardhouse (`haven_dwelling_1.png`) was cut off at the screen edge in the render; it is repainted whole
   and moved to the front-right lawn by `tools/art/town_edge_paint.py` (imagegen/batch19), which also rewrites its rect.
+  The archers' tower (`haven_dwelling_2.png`) had its roof cut at the left edge: `tools/art/tower_edge_paint.py`
+  (imagegen/batch21) repaints the roof and platform whole, aligned to the old sprite, and moves it right.
 
 ## Icons & UI
 - `icons/res_<resource>.png` — 64x64 resource icons.
@@ -100,6 +102,8 @@ leaves the `_dead` sprite on the hex as a corpse.
 - `icons/skill_<skill_id>.png` — 64x64 secondary skills.
 - `icons/stat_attack.png stat_defense.png stat_power.png stat_knowledge.png` 64x64.
 - `icons/building_<faction>_<building>.png` — 160x100 thumbnails for the build screen (can be auto-cropped from town sprites).
+- `ui/btn_<kingdom|hero|sleep|move|spellbook|next_hero|end_turn|system>.png` — 128 px adventure panel button icons,
+  painted as one sheet by `tools/art/button_icons_paint.py` (imagegen/batch20).
 - `ui/panel.png` — 9-slice ornate stone/wood panel texture (256x256, 48px border).
 - `ui/button.png`, `ui/button_hover.png`, `ui/button_pressed.png` — 9-slice buttons (192x64, 20px border).
 - `ui/frame_portrait.png` — ornate gold frame 160x160 (transparent centre).
