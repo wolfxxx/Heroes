@@ -7,7 +7,7 @@ const X0 := 264.0
 const Y0 := 272.0
 const TIER_H := [0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]
 ## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
-const FIG_H := [0, 104.0, 110.0, 118.0, 124.0, 130.0, 146.0, 156.0]
+const FIG_H := [0, 104.0, 110.0, 118.0, 124.0, 130.0, 136.0, 144.0]
 ## Obstacle pictures by battlefield terrain (assets/battle/obstacle_<kind>.png, tools/art/obstacle_paint.py).
 const OBSTACLES := {
 	"grass": ["boulders", "dead_tree", "log", "stump", "thorns", "pillar", "rock_spire"],
@@ -242,8 +242,6 @@ func _make_unit(st: Dictionary) -> void:
 		var sc := 0.5
 		if fig.y > 0:
 			sc = FIG_H[c["tier"]] / fig.y
-			if wide:  # the body of a large unit spans most of its two hexes
-				sc = clampf(1.9 * HEX_W / fig.x, sc, 1.1 * sc)
 			sc = minf(sc, HEX_W * VIS_MAX_W[1 if wide else 0] / fig_vis_w(st["id"]))
 		s.scale = Vector2.ONE * sc
 		s.offset = (Vector2(0.5, 0.5) - anc) * tsz
@@ -297,6 +295,22 @@ func _pose(st: Dictionary, pose: String, hold := 0.0) -> bool:
 		return false
 	var s: Sprite2D = n.get_node("Sprite")
 	var anc := Assets.anchor(rel)
+	var base: Vector2 = n.get_meta("base_scale", s.scale)
+	var k := 1.0
+	if pose != "" and not pose.begins_with("move") and pose != "dead":
+		var cap := HEX_W * (2.15 if L.is_wide(st) else 1.25)
+		var vw := fig_vis_w("%s_%s" % [st["id"], pose]) * base.x
+		if vw > cap:
+			k = maxf(0.78, cap / vw)
+	# (the idle breathing animates the scale: it pauses while a narrowed pose shows)
+	var br = n.get_meta("breath", null)
+	if br is Tween and br.is_valid():
+		if k < 1.0:
+			br.pause()
+			s.scale = base * k
+		elif pose == "" and not br.is_running():
+			s.scale = base
+			br.play()
 	s.texture = Assets.tex(rel)
 	var tsz := Vector2(s.texture.get_size())
 	s.offset = (Vector2(0.5, 0.5) - anc) * tsz
@@ -1153,7 +1167,7 @@ func _anim_spell(ev: Dictionary) -> void:
 		if area:
 			_play_fx(fx, p, Vector2(1.3, 0.95), 1.1)
 		else:
-			_play_fx(fx, p, Vector2.ONE * 0.95)
+			_play_fx(fx, p, Vector2.ONE * 0.95, 0.8, 0.7 if fx == "spark" else 1.0)
 	await get_tree().create_timer(0.35).timeout
 	for t in targets:
 		if ev["dmg"].has(t["uid"]):
@@ -1234,7 +1248,8 @@ func _settle_badges() -> void:
 			var moved := false
 			for o in placed:
 				if r.intersects(o):
-					r.position.y = o.end.y + 1
+					# down below the other one, or up above it at the bottom of the field (never under the bar)
+					r.position.y = o.end.y + 1 if o.end.y + 1 + r.size.y < BAR_Y - 2 else o.position.y - r.size.y - 1
 					moved = true
 			if not moved:
 				break

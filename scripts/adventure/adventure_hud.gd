@@ -31,6 +31,7 @@ var _turn_label: Label
 var _turn_panel: PanelContainer
 var _end_turn_btn: Button
 var _sleep_btn: Button
+var _info_box: VBoxContainer
 
 func setup(a) -> void:
 	adv = a
@@ -45,7 +46,7 @@ func setup(a) -> void:
 	_build_bar()
 	var size: Vector2i = world["size"]
 	_mini_img = Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
-	_mini_k = clampi(int(ceil(MINI / float(maxi(size.x, size.y)))), 1, 8)
+	_mini_k = clampi(int(ceil(MINI / float(maxi(size.x, size.y)))) + 1, 2, 9)
 	_mini_tex = ImageTexture.create_from_image(Image.create(size.x * _mini_k, size.y * _mini_k, false, Image.FORMAT_RGBA8))
 	_mini_rect.texture = _mini_tex
 	refresh_minimap()
@@ -82,11 +83,15 @@ func _build_panel() -> void:
 	root.add_child(_mini_view)
 
 	# heroes and towns side by side (as the classic adventure panel), the selected hero below, then the buttons
+	# (one column of lists, then the selected hero, flowing down: only filled slots are shown)
+	var v := VBoxContainer.new()
+	v.position = Vector2(PANEL_X + PAD, MINI + PAD + 10)
+	v.size = Vector2(MINI, 0)
+	v.add_theme_constant_override("separation", 6)
+	root.add_child(v)
 	var cols := HBoxContainer.new()
-	cols.position = Vector2(PANEL_X + PAD, MINI + PAD + 10)
-	cols.size = Vector2(MINI, 0)
 	cols.add_theme_constant_override("separation", COL_GAP)
-	root.add_child(cols)
+	v.add_child(cols)
 	for k in 2:
 		var cv := VBoxContainer.new()
 		cv.custom_minimum_size = Vector2(COL_W, 0)
@@ -100,15 +105,29 @@ func _build_panel() -> void:
 			_hero_list = lst
 		else:
 			_town_list = lst
-	var v := VBoxContainer.new()
-	v.position = Vector2(PANEL_X + PAD, MINI + PAD + 10 + 30 + 3 * (SLOT_H + 4) + 8)
-	v.size = Vector2(MINI, 0)
-	v.add_theme_constant_override("separation", 6)
-	root.add_child(v)
 	v.add_child(HSeparator.new())
 	_detail = VBoxContainer.new()
 	_detail.add_theme_constant_override("separation", 6)
 	v.add_child(_detail)
+
+	# the status window over the buttons (as the classic panel): the date, and the kingdom at a glance
+	var sp := PanelContainer.new()
+	var sst := StyleBoxFlat.new()
+	sst.bg_color = Color(0.03, 0.02, 0.015, 0.85)
+	sst.border_color = Color(UI.GOLD_DARK, 0.85)
+	sst.set_border_width_all(1)
+	sst.set_corner_radius_all(4)
+	sst.content_margin_left = 10
+	sst.content_margin_right = 10
+	sst.content_margin_top = 4
+	sst.content_margin_bottom = 4
+	sp.add_theme_stylebox_override("panel", sst)
+	sp.position = Vector2(PANEL_X + PAD, 1036 - PAD - 2 * BTN.y - 6 - 10 - 64)
+	sp.size = Vector2(MINI, 64)
+	root.add_child(sp)
+	_info_box = VBoxContainer.new()
+	_info_box.add_theme_constant_override("separation", -2)
+	sp.add_child(_info_box)
 
 	var grid := GridContainer.new()
 	grid.columns = 4
@@ -205,18 +224,27 @@ func refresh() -> void:
 	_date_label.text = adv.rules.date_string()
 	for c in _hero_list.get_children():
 		c.queue_free()
-	for i in 3:
-		if i < me["heroes"].size():
-			_hero_list.add_child(_hero_card(world["heroes"][me["heroes"][i]]))
-		else:
-			_hero_list.add_child(_empty_slot(SLOT_H))
+	for i in mini(3, me["heroes"].size()):
+		_hero_list.add_child(_hero_card(world["heroes"][me["heroes"][i]]))
 	for c in _town_list.get_children():
 		c.queue_free()
-	for i in 3:
-		if i < me["towns"].size():
-			_town_list.add_child(_town_card(world["towns"][me["towns"][i]]))
-		else:
-			_town_list.add_child(_empty_slot(SLOT_H))
+	for i in mini(3, me["towns"].size()):
+		_town_list.add_child(_town_card(world["towns"][me["towns"][i]]))
+	if me["towns"].is_empty():
+		_town_list.add_child(_empty_slot(SLOT_H))
+	# status window: the day, and income / heroes / towns
+	for c in _info_box.get_children():
+		c.queue_free()
+	var d: int = world["day"]
+	_info_box.add_child(UI.label("Month %d · Week %d · Day %d" % [(d - 1) / 28 + 1, ((d - 1) / 7) % 4 + 1, (d - 1) % 7 + 1], 18, UI.GOLD))
+	var inc := 0
+	for tid in me["towns"]:
+		inc += TownLogic.daily_income(world["towns"][tid])
+	for o in world["objects"].values():
+		if o["type"] == "mine" and o["owner"] == adv._human() and GameData.MINES[o["mine"]]["resource"] == "gold":
+			inc += GameData.MINES[o["mine"]]["amount"]
+	_info_box.add_child(UI.label("+%d gold a day   ·   %d hero%s, %d town%s" % [inc, me["heroes"].size(),
+		"" if me["heroes"].size() == 1 else "es", me["towns"].size(), "" if me["towns"].size() == 1 else "s"], 16, Color(0.85, 0.8, 0.68)))
 	for c in _detail.get_children():
 		c.queue_free()
 	var hero: Dictionary = adv.selected_hero()
@@ -249,6 +277,20 @@ func refresh() -> void:
 		army.bind(hero["army"], {})
 		army.add_theme_constant_override("separation", 3)
 		_detail.add_child(army)
+		# its secondary skills as small framed icons (hover for name and level)
+		var sk := HBoxContainer.new()
+		sk.add_theme_constant_override("separation", 3)
+		var lv := ["", "Basic", "Advanced", "Expert"]
+		for id in hero["skills"]:
+			var n := int(hero["skills"][id])
+			if n <= 0 or not GameData.SKILLS.has(id):
+				continue
+			var ic := UI.icon(Assets.tex("icons/skill_%s.png" % id), Vector2(41, 41))
+			ic.tooltip_text = "%s %s" % [lv[clampi(n, 0, 3)], GameData.SKILLS[id]["name"]]
+			ic.mouse_filter = Control.MOUSE_FILTER_PASS
+			sk.add_child(ic)
+		if sk.get_child_count() > 0:
+			_detail.add_child(sk)
 	if _sleep_btn:
 		_sleep_btn.disabled = hero.is_empty()
 	_mini_view.queue_redraw()
@@ -452,27 +494,46 @@ func refresh_minimap() -> void:
 			if blk[i]:
 				c = c.darkened(0.35)
 			_mini_img.set_pixel(x, y, c)
+	# terrain blended between tiles in two steps (soft shores and forest edges), with a faint painted grain
 	var big := _mini_img.duplicate()
+	big.resize(size.x * 2, size.y * 2, Image.INTERPOLATE_BILINEAR)
 	big.resize(size.x * _mini_k, size.y * _mini_k, Image.INTERPOLATE_CUBIC)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for y in big.get_height():
+		for x in big.get_width():
+			var c: Color = big.get_pixel(x, y)
+			if c.v > 0.1:
+				big.set_pixel(x, y, c.darkened(rng.randf() * 0.07))
+	# mines, towns and heroes as round dots in their owner's colour (neutral: a small dark dot), heroes brightest
 	for o in world["objects"].values():
 		if o["type"] == "mine" and ex[o["pos"].y * size.x + o["pos"].x]:
-			var c: Color = Color(0.6, 0.6, 0.6) if o["owner"] < 0 else GameData.PLAYER_COLORS[o["owner"]]
-			_mini_mark(big, Vector2(o["pos"]) + Vector2(0.5, 0.5), Vector2(1.6, 1.6), c)
+			var own: bool = o["owner"] >= 0
+			_mini_dot(big, Vector2(o["pos"]) + Vector2(0.5, 0.5), 0.95 if own else 0.7,
+				GameData.PLAYER_COLORS[o["owner"]] if own else Color(0.32, 0.3, 0.27))
 	for t in world["towns"].values():
 		if ex[t["pos"].y * size.x + t["pos"].x]:
-			var c: Color = Color(0.75, 0.75, 0.75) if t["owner"] < 0 else GameData.PLAYER_COLORS[t["owner"]]
-			_mini_mark(big, Vector2(t["pos"]) + Vector2(0.5, 0.0), Vector2(3.0, 2.0), c)
+			var c: Color = Color(0.78, 0.76, 0.7) if t["owner"] < 0 else GameData.PLAYER_COLORS[t["owner"]]
+			_mini_dot(big, Vector2(t["pos"]) + Vector2(0.5, 0.0), 1.7, c)
 	for hh in world["heroes"].values():
 		if ex[hh["pos"].y * size.x + hh["pos"].x]:
-			_mini_mark(big, Vector2(hh["pos"]) + Vector2(0.5, 0.5), Vector2(1.3, 1.3), GameData.PLAYER_COLORS[hh["owner"]].lightened(0.35))
+			_mini_dot(big, Vector2(hh["pos"]) + Vector2(0.5, 0.5), 1.0, GameData.PLAYER_COLORS[hh["owner"]].lightened(0.45))
 	_mini_tex.update(big)
 
-## A marker on the minimap: a filled box in tile units with a dark rim, centred on `c` (tiles).
-func _mini_mark(img: Image, c: Vector2, sz: Vector2, col: Color) -> void:
+## A round marker on the minimap with a dark rim: centre `c` and radius `r` in tiles.
+func _mini_dot(img: Image, c: Vector2, r: float, col: Color) -> void:
 	var k := float(_mini_k)
-	var r := Rect2i(Vector2i((c - sz * 0.5) * k), Vector2i((sz * k).round())).intersection(Rect2i(Vector2i.ZERO, img.get_size()))
-	img.fill_rect(r, Color(0.05, 0.03, 0.02))
-	img.fill_rect(r.grow(-1) if r.size.x > 3 else r, col)
+	var cp := c * k
+	var rp := maxf(2.0, r * k)
+	for y in range(int(cp.y - rp - 1), int(cp.y + rp + 2)):
+		for x in range(int(cp.x - rp - 1), int(cp.x + rp + 2)):
+			if x < 0 or y < 0 or x >= img.get_width() or y >= img.get_height():
+				continue
+			var d := Vector2(x + 0.5, y + 0.5).distance_to(cp)
+			if d <= rp - 1.2:
+				img.set_pixel(x, y, col.lightened(0.25) if d < rp * 0.4 else col)
+			elif d <= rp:
+				img.set_pixel(x, y, Color(0.05, 0.03, 0.02))
 
 func update_minimap_view(cam_pos: Vector2, view_size: Vector2) -> void:
 	var s: Vector2 = Vector2(world["size"]) * WorldGen.TILE

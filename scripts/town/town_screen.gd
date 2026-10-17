@@ -198,22 +198,28 @@ func refresh() -> void:
 	var brow := HBoxContainer.new()
 	brow.add_theme_constant_override("separation", 6)
 	_buttons.add_child(brow)
-	var entries := [["Tavern", _open_tavern, TownLogic.has_building(town, "tavern")],
-		["Market", _open_market, TownLogic.has_building(town, "marketplace")],
-		["Mage Guild", _open_guild, TownLogic.mage_guild_level(town) > 0],
-		["Exit", _exit, true]]
+	# the tavern, market and guild as pictures of their buildings (dimmed until built), then Exit
+	var gl := TownLogic.mage_guild_level(town)
+	var entries := [["Tavern", "tavern", _open_tavern, TownLogic.has_building(town, "tavern"), "Hire heroes"],
+		["Market", "marketplace", _open_market, TownLogic.has_building(town, "marketplace"), "Trade resources"],
+		["Mage Guild", "mage_guild_%d" % maxi(1, gl), _open_guild, gl > 0, "Spells of the guild"]]
 	for e in entries:
-		var b := UI.button(e[0], e[1], 20)
-		b.custom_minimum_size = Vector2(136, 52)
-		b.disabled = not e[2]
+		var b := _pic_button(_building_pic(e[1]), e[0], e[4] if e[3] else "%s: not built yet" % e[0], e[2], Vector2(132, 76))
+		b.disabled = not e[3]
+		if not e[3]:
+			b.get_child(0).modulate = Color(0.4, 0.38, 0.36)
 		brow.add_child(b)
+	var ex := UI.button("Exit", _exit, 20)
+	ex.custom_minimum_size = Vector2(132, 76)
+	ex.tooltip_text = "Leave the town (Esc)"
+	brow.add_child(ex)
 	for r in GameData.RESOURCES:
 		_res_labels[r].text = str(player["resources"].get(r, 0))
 
 ## A picture button for the bottom bar: the building's picture with its name on a band.
-func _pic_button(tex: Texture2D, caption: String, tip: String, cb: Callable) -> Button:
+func _pic_button(tex: Texture2D, caption: String, tip: String, cb: Callable, sz := Vector2(156, 100)) -> Button:
 	var b := UI.button("", cb)
-	b.custom_minimum_size = Vector2(156, 100)
+	b.custom_minimum_size = sz
 	b.focus_mode = Control.FOCUS_NONE
 	b.tooltip_text = tip
 	var pic := TextureRect.new()
@@ -222,7 +228,7 @@ func _pic_button(tex: Texture2D, caption: String, tip: String, cb: Callable) -> 
 	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	pic.clip_contents = true
 	pic.position = Vector2(5, 5)
-	pic.size = Vector2(146, 90)
+	pic.size = sz - Vector2(10, 10)
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(pic)
 	var band := Label.new()
@@ -233,8 +239,8 @@ func _pic_button(tex: Texture2D, caption: String, tip: String, cb: Callable) -> 
 	var bs := StyleBoxFlat.new()
 	bs.bg_color = Color(0.05, 0.035, 0.02, 0.85)
 	band.add_theme_stylebox_override("normal", bs)
-	band.position = Vector2(5, 67)
-	band.size = Vector2(146, 28)
+	band.position = Vector2(5, sz.y - 33)
+	band.size = Vector2(sz.x - 10, 28)
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(band)
 	return b

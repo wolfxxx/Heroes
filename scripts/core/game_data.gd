@@ -139,10 +139,10 @@ const SPELLS := {
 	"weakness": {"name": "Weakness", "level": 2, "school": "water", "mana": 8, "target": "enemy", "desc": "-3 attack."},
 	"lightning_bolt": {"name": "Lightning Bolt", "level": 2, "school": "air", "mana": 10, "target": "enemy", "damage": [10, 25], "desc": "Deals 10 + 25×Power damage."},
 	"ice_bolt": {"name": "Ice Bolt", "level": 2, "school": "water", "mana": 8, "target": "enemy", "damage": [10, 20], "desc": "Deals 10 + 20×Power damage."},
-	"stone_skin": {"name": "Stone Skin", "level": 2, "school": "earth", "mana": 5, "target": "ally", "desc": "+3 defense."},
+	"stone_skin": {"name": "Stone Skin", "level": 1, "school": "earth", "mana": 5, "target": "ally", "desc": "+3 defense."},
 	"fireball": {"name": "Fireball", "level": 3, "school": "fire", "mana": 15, "target": "area", "damage": [15, 10], "desc": "Deals 15 + 10×Power damage in an area."},
 	"frost_ring": {"name": "Frost Ring", "level": 3, "school": "water", "mana": 12, "target": "area", "damage": [15, 10], "desc": "Deals 15 + 10×Power damage in an area."},
-	"death_ripple": {"name": "Death Ripple", "level": 3, "school": "earth", "mana": 10, "target": "all_living", "damage": [10, 5], "desc": "Deals 10 + 5×Power damage to every living creature."},
+	"death_ripple": {"name": "Death Ripple", "level": 2, "school": "earth", "mana": 10, "target": "all_living", "damage": [10, 5], "desc": "Deals 10 + 5×Power damage to every living creature."},
 	"resurrection": {"name": "Resurrection", "level": 4, "school": "earth", "mana": 20, "target": "ally", "desc": "Revives 40 + 20×Power HP of fallen creatures."},
 	"meteor_shower": {"name": "Meteor Shower", "level": 4, "school": "earth", "mana": 16, "target": "area", "damage": [25, 25], "desc": "Deals 25 + 25×Power damage in an area."},
 }

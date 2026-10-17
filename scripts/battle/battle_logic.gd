@@ -685,7 +685,20 @@ func cast(side: int, spell: String, hex: Vector2i) -> Array:
 				"resurrection":
 					var g := heal(s, 40 + 20 * spell_power(side), true)
 					out.append({"t": "heal", "s": s, "amount": g})
-	log_lines.append("%s casts %s." % [h["name"], sp["name"]])
+	# the log names the target and the damage, so every number on the field has its line
+	var line := "%s casts %s" % [h["name"], sp["name"]]
+	if targets.size() == 1:
+		line += " on %s" % _name(targets[0])
+	elif targets.size() > 1:
+		line += " (%d stacks)" % targets.size()
+	if ev["dmg"].size() > 0:
+		var total := 0
+		var slain := 0
+		for k in ev["dmg"]:
+			total += ev["dmg"][k]
+			slain += ev["killed"].get(k, 0)
+		line += ", %d damage" % total + (", %d perish" % slain if slain > 0 else "")
+	log_lines.append(line + ".")
 	return out
 
 # ---------------------------------------------------------------------------------------------
