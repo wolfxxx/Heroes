@@ -14,5 +14,53 @@
 "obstacle_4.png": [
 0.5,
 0.5424
+],
+"siege_haven_gate.png": [
+0.5127,
+0.9966
+],
+"siege_haven_gate_broken.png": [
+0.5217,
+0.9962
+],
+"siege_haven_tower.png": [
+0.5,
+0.9976
+],
+"siege_haven_tower_broken.png": [
+0.4937,
+0.995
+],
+"siege_haven_wall.png": [
+0.5,
+0.996
+],
+"siege_haven_wall_broken.png": [
+0.4437,
+0.9917
+],
+"siege_necropolis_gate.png": [
+0.4981,
+0.9966
+],
+"siege_necropolis_gate_broken.png": [
+0.5191,
+0.9962
+],
+"siege_necropolis_tower.png": [
+0.5,
+0.9976
+],
+"siege_necropolis_tower_broken.png": [
+0.4734,
+0.9612
+],
+"siege_necropolis_wall.png": [
+0.504,
+0.996
+],
+"siege_necropolis_wall_broken.png": [
+0.4392,
+0.9917
 ]
 }

@@ -105,6 +105,8 @@ func make_hero(hero_id: String, owner: int) -> Dictionary:
 		"knowledge": d["knowledge"], "level": 1, "xp": 0, "mana": 0, "movement": 1500, "max_movement": 1500,
 		"army": army, "spells": d.get("spells", []).duplicate(), "skills": d.get("skills", {}).duplicate(),
 		"artifacts": [], "pos": Vector2i.ZERO,
+		# might heroes march with a ballista, magic heroes with a first aid tent (more at a Blacksmith)
+		"machines": ["ballista"] if d["class"] in ["Knight", "Death Knight"] else ["first_aid_tent"],
 	}
 	h["max_movement"] = hero_max_movement(h)
 	h["movement"] = h["max_movement"]

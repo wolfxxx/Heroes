@@ -82,6 +82,22 @@ const CREATURES := {
 	"bone_dragon": {"name": "Bone Dragon", "plural": "Bone Dragons", "faction": "necropolis", "tier": 7,
 		"attack": 17, "defense": 15, "dmg": [25, 50], "hp": 150, "speed": 9, "growth": 1, "shots": 0,
 		"cost": {"gold": 1800}, "abilities": ["undead", "flying", "fear", "two_hex"], "ai_value": 3388},
+	# ---------------- WAR MACHINES (tier 0: never recruited or met on the map; "machine" stacks don't move) ----------------
+	"ballista": {"name": "Ballista", "plural": "Ballistas", "faction": "neutral", "tier": 0, "machine": true,
+		"attack": 10, "defense": 10, "dmg": [10, 20], "hp": 250, "speed": 0, "growth": 0, "shots": 99,
+		"cost": {"gold": 2500}, "abilities": ["ranged"], "ai_value": 600},
+	"first_aid_tent": {"name": "First Aid Tent", "plural": "First Aid Tents", "faction": "neutral", "tier": 0, "machine": true,
+		"attack": 0, "defense": 0, "dmg": [0, 0], "hp": 75, "speed": 0, "growth": 0, "shots": 0,
+		"cost": {"gold": 750}, "abilities": ["heals"], "ai_value": 300},
+	"ammo_cart": {"name": "Ammo Cart", "plural": "Ammo Carts", "faction": "neutral", "tier": 0, "machine": true,
+		"attack": 0, "defense": 5, "dmg": [0, 0], "hp": 100, "speed": 0, "growth": 0, "shots": 0,
+		"cost": {"gold": 1000}, "abilities": ["ammo"], "ai_value": 200},
+	"catapult": {"name": "Catapult", "plural": "Catapults", "faction": "neutral", "tier": 0, "machine": true,
+		"attack": 10, "defense": 10, "dmg": [0, 0], "hp": 1000, "speed": 30, "growth": 0, "shots": 0,
+		"cost": {}, "abilities": ["siege"], "ai_value": 100},  # (speed: it fires first each round; it never moves)
+	"arrow_tower": {"name": "Arrow Tower", "plural": "Arrow Towers", "faction": "neutral", "tier": 0, "machine": true,
+		"attack": 10, "defense": 10, "dmg": [10, 15], "hp": 999, "speed": 0, "growth": 0, "shots": 99,
+		"cost": {}, "abilities": ["ranged"], "ai_value": 0},
 	# ---------------- UPGRADES (from an upgraded dwelling; "upgrade_of" names the base creature) ----------------
 	"halberdier": {"name": "Halberdier", "plural": "Halberdiers", "faction": "haven", "tier": 1, "upgrade_of": "pikeman",
 		"attack": 6, "defense": 5, "dmg": [2, 3], "hp": 10, "speed": 5, "growth": 14, "shots": 0,
@@ -125,6 +141,15 @@ const CREATURES := {
 	"ghost_dragon": {"name": "Ghost Dragon", "plural": "Ghost Dragons", "faction": "necropolis", "tier": 7, "upgrade_of": "bone_dragon",
 		"attack": 19, "defense": 17, "dmg": [25, 50], "hp": 200, "speed": 14, "growth": 1, "shots": 0,
 		"cost": {"gold": 3000, "mercury": 1}, "abilities": ["undead", "flying", "fear", "two_hex"], "ai_value": 4696},
+}
+
+## War machines a hero can own (bought at a Blacksmith); the catapult comes with every hero laying siege.
+const WAR_MACHINES := ["ballista", "first_aid_tent", "ammo_cart"]
+const MACHINE_TEXT := {
+	"ballista": "Shoots an enemy stack every round, guided by the hero's Attack.",
+	"first_aid_tent": "Heals the top creature of a wounded friendly stack every round.",
+	"ammo_cart": "Friendly shooters never run out of arrows.",
+	"catapult": "Batters the walls and towers of a besieged town.",
 }
 
 const ABILITY_TEXT := {

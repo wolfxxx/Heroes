@@ -520,6 +520,8 @@ func battle_vs_town(att: Dictionary, town: Dictionary) -> Dictionary:
 		"terrain": _battle_terrain(town["pos"]), "attacker_player": att["owner"], "defender_player": town["owner"],
 		"attacker_ai": player_of(att)["is_ai"], "defender_ai": def_ai,
 		"context": {"type": "town", "hero": att["uid"], "town": town["uid"], "defender": def_hero.get("uid", -1)},
+		"siege": 2 if TownLogic.has_building(town, "citadel") else (1 if TownLogic.has_building(town, "fort") else 0),
+		"siege_faction": town["faction"],
 	}
 
 ## Hero defending a town: one of the owner's heroes standing in the gate (never the attacker itself,
@@ -709,6 +711,6 @@ func new_day() -> Dictionary:
 					o["available"] = o["available"] + GameData.CREATURES[o["creature"]]["growth"]
 				"monster":
 					o["count"] = int(ceil(o["count"] * 1.1))
-		var ids := GameData.CREATURES.keys()
+		var ids := GameData.CREATURES.keys().filter(func(c): return GameData.CREATURES[c]["tier"] > 0)
 		info["week_creature"] = ids[randi() % ids.size()]
 	return info

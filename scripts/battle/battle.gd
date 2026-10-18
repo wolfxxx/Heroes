@@ -5,9 +5,9 @@ const HEX_W := 96.0
 const ROW_STEP := 68.0
 const X0 := 264.0
 const Y0 := 272.0
-const TIER_H := [0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]
+const TIER_H := [120.0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]  # (tier 0: war machines)
 ## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
-const FIG_H := [0, 104.0, 110.0, 118.0, 124.0, 130.0, 136.0, 144.0]
+const FIG_H := [112.0, 104.0, 110.0, 118.0, 124.0, 130.0, 136.0, 144.0]
 ## Obstacle pictures by battlefield terrain (assets/battle/obstacle_<kind>.png, tools/art/obstacle_paint.py).
 const OBSTACLES := {
 	"grass": ["boulders", "dead_tree", "log", "stump", "thorns", "pillar", "rock_spire"],
@@ -107,9 +107,14 @@ func _demo_setup() -> Dictionary:
 		h["power"] = 3
 		h["knowledge"] = 4
 		h["mana"] = 40
-	return {"attacker_army": a["army"], "defender_army": d["army"], "attacker_hero": a, "defender_hero": d,
+	var out := {"attacker_army": a["army"], "defender_army": d["army"], "attacker_hero": a, "defender_hero": d,
 		"terrain": "grass", "attacker_player": 0, "defender_player": 1, "attacker_ai": false, "defender_ai": true,
-		"context": {"type": "demo"}, "seed": 7}
+		"context": {"type": "demo"}, "seed": int(Shot.args.get("seed", "7"))}
+	if Shot.setup.begins_with("siege"):  # Sir Aldric with all his machines before a Necropolis citadel
+		a["machines"] = GameData.WAR_MACHINES.duplicate()
+		out["siege"] = 2
+		out["siege_faction"] = "haven" if Shot.setup == "siege_haven" else "necropolis"
+	return out
 
 # ---------------------------------------------------------------------------------------------
 # Geometry
@@ -151,6 +156,8 @@ func pos_to_hex(p: Vector2) -> Vector2i:
 # ---------------------------------------------------------------------------------------------
 func _build_scene() -> void:
 	var bgp := "battle/bg_%s.png" % L.terrain
+	if L.siege > 0 and Assets.has("battle/bg_siege_%s.png" % L.siege_faction):
+		bgp = "battle/bg_siege_%s.png" % L.siege_faction
 	if Assets.has(bgp):
 		var bg := Sprite2D.new()
 		bg.texture = Assets.tex(bgp)
@@ -166,6 +173,10 @@ func _build_scene() -> void:
 	_grid = _Grid.new()
 	_grid.b = self
 	_field.add_child(_grid)
+	if L.siege > 0:
+		var moat := _Moat.new()
+		moat.b = self
+		_field.add_child(moat)
 	_corpses = Node2D.new()  # dead stacks: above the ground and grid, below everything standing
 	_corpses.y_sort_enabled = true
 	_field.add_child(_corpses)
@@ -191,6 +202,8 @@ func _build_scene() -> void:
 		_sorted.add_child(s)
 		var rr := s.get_rect()
 		_obstacle_rects.append(Rect2(s.position + rr.position * s.scale, rr.size * s.scale).grow(-8))
+	if L.siege > 0:
+		_build_walls()
 	for st in L.stacks:
 		_make_unit(st)
 	for side in 2:
@@ -271,6 +284,13 @@ func _make_unit(st: Dictionary) -> void:
 	n.add_child(badge)
 	_sorted.add_child(n)
 	units[st["uid"]] = n
+	if st.get("machine", false):
+		badge.visible = false  # (a machine is one piece, no count; its ring shows whose it is)
+		if st.get("tower", false):  # an arrow tower is the tower sprite of the wall: only a point to shoot from
+			s.visible = false
+			shadow.visible = false
+			n.set_meta("top", 230.0)
+		return
 	# idle breathing
 	var tw := s.create_tween().set_loops()
 	var base := s.scale
@@ -438,7 +458,7 @@ func _build_ui() -> void:
 func _refresh_queue() -> void:
 	for c in _queue_box.get_children():
 		c.queue_free()
-	var up := L.upcoming(14)
+	var up := L.upcoming(16).filter(func(s): return not s.get("tower", false)).slice(0, 14)
 	var this_round := L.order.size() + L.waited.size()
 	for i in up.size():
 		var s: Dictionary = up[i]
@@ -516,6 +536,16 @@ func _next() -> void:
 		if m:  # the active unit gets a thick gold outline instead of the ink one
 			m.set_shader_parameter("ink", Color(1, 0.82, 0.25, 1) if k == s["uid"] else Color(0.09, 0.06, 0.03, 0.95))
 			m.set_shader_parameter("width", 3.0 if k == s["uid"] else 1.2)
+	if s.get("machine", false):  # war machines and towers act on their own, for either side
+		_busy = true
+		_reach = {}
+		_grid.reach = {}
+		_grid.queue_redraw()
+		_refresh_buttons(false)
+		await get_tree().create_timer(0.3).timeout
+		await _play(L.machine_act(s))
+		_next()
+		return
 	if L.check_fear(s):
 		_set_log("%s freeze in fear!" % L._name(s))
 		_float_text(Vector2(0, -_top(s) - 10), "Fear!", Color(0.8, 0.65, 1.0), 30, "", 0.0, _unit(s))
@@ -953,6 +983,8 @@ func _play(events: Array) -> void:
 				await _anim_attack(ev)
 			"spell":
 				await _anim_spell(ev)
+			"catapult":
+				await _anim_catapult(ev)
 			"death":
 				if not _unit(ev["s"]).has_meta("fallen"):  # (most fall with their blow)
 					_anim_death(ev["s"])
@@ -1245,6 +1277,88 @@ func _play_fx(fx: String, p: Vector2, sc: Vector2, dur := 0.8, alpha := 1.0, par
 	tw.tween_property(s, "frame", 15, dur)
 	tw.tween_callback(s.queue_free)
 
+# ---------------------------------------------------------------------------------------------
+# Siege
+# ---------------------------------------------------------------------------------------------
+const WALL_SCALE := 0.44  # (a wall block about one hex wide)
+var _wall_nodes: Array = []  # per wall segment: its sprites (one per hex)
+
+func _wall_tex(kind: String, broken: bool) -> String:
+	return "battle/siege_%s_%s%s.png" % [L.siege_faction, kind, "_broken" if broken else ""]
+
+func _build_walls() -> void:
+	for i in L.walls.size():
+		var seg: Dictionary = L.walls[i]
+		var nodes := []
+		for r in seg["rows"]:
+			var s := Sprite2D.new()
+			s.position = hex_pos(Vector2i(BattleLogic.WALL_X, r)) + Vector2(0, 30)
+			_sorted.add_child(s)
+			nodes.append(s)
+		_wall_nodes.append(nodes)
+		_set_wall(i, false)
+		for s in nodes:
+			if s.texture:
+				var rr: Rect2 = s.get_rect()
+				_obstacle_rects.append(Rect2(s.position + rr.position * s.scale, rr.size * s.scale).grow(-10))
+
+## Shows a wall segment intact or as rubble.
+func _set_wall(i: int, broken: bool) -> void:
+	var kind: String = L.walls[i]["kind"]
+	var p := _wall_tex(kind, broken)
+	for s in _wall_nodes[i]:
+		s.modulate = Color.WHITE
+		if not Assets.has(p):
+			s.texture = null
+			continue
+		s.texture = Assets.tex(p)
+		s.centered = false
+		s.scale = Vector2.ONE * WALL_SCALE
+		var anc := Assets.anchor(p)
+		if anc.x < 0.0:
+			anc = Vector2(0.5, 0.95)
+		s.offset = -anc * Vector2(s.texture.get_size())
+
+## The catapult's boulder: a high arc onto a wall segment; a hit throws up dust, a breach turns it to rubble.
+func _anim_catapult(ev: Dictionary) -> void:
+	var n := _unit(ev["s"])
+	var seg: Dictionary = L.walls[ev["seg"]]
+	var row: int = seg["rows"][seg["rows"].size() / 2]
+	var to := hex_pos(Vector2i(BattleLogic.WALL_X, row)) + Vector2(0, -40)
+	if not ev["hit"]:
+		to += Vector2(-HEX_W * 0.9, 50)  # short: into the moat
+	var spr: Sprite2D = n.get_node("Sprite")
+	var tw := spr.create_tween()
+	tw.tween_property(spr, "rotation", 0.12, 0.12)
+	tw.tween_property(spr, "rotation", 0.0, 0.3).set_trans(Tween.TRANS_BACK)
+	Audio.sfx("arrow_shot", -2)
+	var rock := _Boulder.new()
+	rock.from = n.position + Vector2(20, -90)
+	rock.to = to
+	_fx.add_child(rock)
+	await rock.fly(0.75)
+	_flush_log(ev)
+	Audio.sfx("blunt_hit", 0)
+	var dust := _Dust.new()
+	dust.position = to + Vector2(0, 40)
+	dust.big = true
+	_fx.add_child(dust)
+	if ev["hit"]:
+		_shake(8.0 if ev["destroyed"] else 4.0)
+		if ev["destroyed"]:
+			_set_wall(ev["seg"], true)
+			for k in 2:
+				var d2 := _Dust.new()
+				d2.position = to + Vector2(randf_range(-40, 40), 50 + k * 20)
+				d2.big = true
+				_fx.add_child(d2)
+		else:  # cracked: it stays darker
+			for s in _wall_nodes[ev["seg"]]:
+				var t2: Tween = s.create_tween()
+				t2.tween_property(s, "modulate", Color(1.5, 1.3, 1.1), 0.06)
+				t2.tween_property(s, "modulate", Color(0.72, 0.66, 0.62), 0.3)
+	await get_tree().create_timer(0.35).timeout
+
 ## A slain stack leaves the turn queue at once (not with the next turn).
 func _drop_from_queue(st: Dictionary) -> void:
 	for q in _queue_box.get_children():
@@ -1290,8 +1404,19 @@ func _settle_badges() -> void:
 		var home: Vector2 = b.get_meta("home")
 		var r := Rect2(n.position + home - Vector2(24, 14), Vector2(48, 28))
 		var mirror := Rect2(n.position + Vector2(-home.x, home.y) - Vector2(24, 14), Vector2(48, 28))
-		if placed.any(func(o): return r.grow(4).intersects(o)) and not placed.any(func(o): return mirror.grow(4).intersects(o)):
-			r = mirror  # (an enemy badge facing it read as one number: "2 6")
+		# (an enemy badge facing it read as one number, "2 6"; one on another stack's figure read as that stack's)
+		var bodies := _figure_rects(n)
+		var hit := func(q: Rect2) -> float:
+			var c := 0.0
+			for o in placed:
+				if q.grow(4).intersects(o):
+					c += 1000.0
+			for o in bodies:
+				if q.intersects(o):
+					c += q.intersection(o).get_area()
+			return c
+		if hit.call(r) > 0.0 and hit.call(mirror) < hit.call(r):
+			r = mirror
 		for i in 3:
 			var moved := false
 			for o in placed:
@@ -1306,6 +1431,19 @@ func _settle_badges() -> void:
 				break
 		placed.append(r)
 		b.position = r.position + Vector2(24, 14) - n.position
+
+## The solid middle of every other living stack's figure (field space), for keeping badges off them.
+func _figure_rects(except: Node2D) -> Array:
+	var out := []
+	for k in units:
+		var o: Node2D = units[k]
+		var st: Dictionary = o.get_node("Badge").st
+		if o == except or not st.get("alive", false):
+			continue
+		var half := HEX_W * (0.7 if L.is_wide(st) else 0.3)
+		var t: float = o.get_meta("top", 120.0)
+		out.append(Rect2(o.position.x - half, o.position.y - t, half * 2, t - 6))
+	return out
 
 func _process(_d: float) -> void:
 	_settle_badges()
@@ -1422,7 +1560,7 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	box.scale = Vector2(0.6, 0.6)
 	tw.tween_property(box, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(box, "position:y", box.position.y - (6 if dir != 0 else 40), 1.3).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "modulate:a", 0.0, 0.5).set_delay(1.0)
+	tw.tween_property(box, "modulate:a", 0.0, 0.35).set_delay(0.85)
 	tw.chain().tween_callback(box.queue_free)
 
 ## Where a damage label for the stack of `n` goes: centred over its head, or higher up the same column when another
@@ -1568,6 +1706,9 @@ func _end_battle(winner: int) -> void:
 	m.set_meta("default", true)
 	await m.closed
 
+	for side in 2:
+		if L.heroes[side] != null:
+			L.heroes[side]["machines"] = L.machines_left(side)
 	var result := {
 		"winner": "attacker" if winner == 0 else "defender",
 		"attacker_army": L.army_out(0) if _retreated != 0 else [null, null, null, null, null, null, null],
@@ -1675,12 +1816,15 @@ class _QueueIcon extends Control:
 	var st: Dictionary
 	var first := false
 	static var _crops := {}
+	const HEAD := {"vampire_lord": Rect2(192, 44, 136, 136)}  # (sprite pixels: the wings rise above the head)
 
 	## The head and shoulders of a creature's battle sprite: a square at the top of its figure, centred on the
 	## solid pixels of its upper part (a dragon's head is at the front, not over the middle of the canvas).
 	static func head_crop(id: String, tex: Texture2D) -> Rect2:
 		if _crops.has(id):
 			return _crops[id]
+		if HEAD.has(id):
+			return HEAD[id]
 		var r := Rect2(Vector2.ZERO, tex.get_size())
 		var img := tex.get_image()
 		if img:
@@ -1810,6 +1954,40 @@ class _Projectile extends Node2D:
 		else:
 			for i in 5:
 				draw_circle(p - (to - from).normalized() * i * 9, 12 - i * 2, Color(0.75, 0.6, 1.0, 0.8 - i * 0.15))
+
+class _Boulder extends Node2D:
+	var from := Vector2.ZERO
+	var to := Vector2.ZERO
+	var t := 0.0
+	func fly(dur: float) -> void:
+		var tw := create_tween()
+		tw.tween_property(self, "t", 1.0, dur).set_trans(Tween.TRANS_LINEAR)
+		await tw.finished
+		queue_free()
+	func _process(_d: float) -> void:
+		queue_redraw()
+	func _draw() -> void:
+		var p := from.lerp(to, t) + Vector2(0, -320.0 * 4.0 * t * (1.0 - t))
+		draw_circle(p + Vector2(4, 5), 15, Color(0, 0, 0, 0.3))
+		draw_circle(p, 15, Color(0.36, 0.32, 0.28))
+		draw_circle(p + Vector2(-4, -4), 8, Color(0.55, 0.5, 0.44))
+
+## Water in the moat before a besieged town's wall (none before the gate: the bridge).
+class _Moat extends Node2D:
+	var b
+	func _draw() -> void:
+		for y in BattleLogic.ROWS:
+			var h := Vector2i(BattleLogic.MOAT_X, y)
+			if not b.L.is_moat(h):
+				continue
+			var c: Vector2 = b.hex_pos(h)
+			draw_colored_polygon(b.hex_poly(c, -6.0), Color(0.24, 0.19, 0.11, 0.8))  # muddy bank
+			draw_colored_polygon(b.hex_poly(c, 3.0), Color(0.12, 0.22, 0.2, 0.95))  # dark water, lighter towards the middle
+			draw_colored_polygon(b.hex_poly(c, 14.0), Color(0.16, 0.3, 0.28, 0.9))
+			draw_colored_polygon(b.hex_poly(c, 26.0), Color(0.2, 0.36, 0.33, 0.8))
+			for k in 2:  # a glint of the sky
+				var o := Vector2(-14 + k * 22, -8 + k * 12)
+				draw_line(c + o, c + o + Vector2(14, 0), Color(0.75, 0.85, 0.8, 0.35), 2.0, true)
 
 class _Burst extends Node2D:
 	var color := Color.WHITE

@@ -116,22 +116,60 @@ func _info(i: int) -> void:
 	if up == "":
 		show_creature_info(self, st["id"], st["count"])
 		return
-	var cost := TownLogic.upgrade_cost(st["id"], up, st["count"])
-	var ok := TownLogic.can_afford(upgrade_player, cost)
-	var m := show_creature_info(self, st["id"], st["count"], [["Upgrade", "upgrade"], ["OK", true]])
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	row.add_child(UI.label("Upgrade to %s:" % GameData.CREATURES[up]["plural"], 20, UI.GOLD))
-	row.add_child(HoverInfo.cost_row(cost, upgrade_player["resources"]))
-	m.body.add_child(row)
-	m.body.move_child(row, m.body.get_child_count() - 2)
-	m.get_meta("buttons").get_child(0).disabled = not ok
-	if await m.closed == "upgrade" and TownLogic.upgrade_stack(upgrade_town, upgrade_player, st):
+	if await upgrade_dialog(self, st, up, upgrade_player) and TownLogic.upgrade_stack(upgrade_town, upgrade_player, st):
 		Audio.sfx("build", -4)
 		refresh_group()
 		for s in group.get("strips", []):
 			if is_instance_valid(s):
 				s.changed.emit()
+
+## Before and after: the stack now and as upgraded, side by side with their stats (better ones in green), and the
+## price for the whole stack. True when the player chose to upgrade.
+static func upgrade_dialog(owner_node: Node, st: Dictionary, up: String, player: Dictionary) -> bool:
+	var a: Dictionary = GameData.CREATURES[st["id"]]
+	var b: Dictionary = GameData.CREATURES[up]
+	var n: int = st["count"]
+	var m := Modal.custom(owner_node, "Upgrade %d %s" % [n, a["plural"] if n != 1 else a["name"]], 980)
+	var h := HBoxContainer.new()
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_theme_constant_override("separation", 26)
+	m.body.add_child(h)
+	var rows := [["Attack", "attack"], ["Defense", "defense"], ["Damage", "dmg"], ["Health", "hp"], ["Speed", "speed"],
+		["Shots", "shots"]]
+	for k in 2:
+		var c: Dictionary = a if k == 0 else b
+		var col := VBoxContainer.new()
+		col.add_theme_constant_override("separation", 6)
+		var title := UI.label(c["plural"] if n != 1 else c["name"], 24, UI.GOLD, true)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(title)
+		col.add_child(UI.icon(Assets.creature_portrait(GameData.base_of(st["id"]) if k == 0 else up), Vector2(230, 230)))
+		var g := GridContainer.new()
+		g.columns = 2
+		g.add_theme_constant_override("h_separation", 22)
+		for r in rows:
+			g.add_child(UI.label(r[0], 20, UI.GOLD))
+			var v = c[r[1]]
+			var txt := ("%d - %d" % v) if r[1] == "dmg" else (str(v) if v != 0 else "-")
+			var better: bool = k == 1 and (str(v) != str(a[r[1]]))
+			g.add_child(UI.label(txt, 20, Color(0.6, 0.95, 0.5) if better else UI.TEXT))
+		col.add_child(g)
+		h.add_child(col)
+		if k == 0:
+			var arrow := UI.label("»", 64, UI.GOLD, true)
+			arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			h.add_child(arrow)
+	var cost := TownLogic.upgrade_cost(st["id"], up, n)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	row.add_child(UI.label("Cost for the whole stack:", 21, UI.GOLD))
+	row.add_child(HoverInfo.cost_row(cost, player["resources"]))
+	m.body.add_child(row)
+	var btns := m.add_buttons([["Upgrade", "upgrade"], ["Cancel", ""]])
+	btns.get_child(0).disabled = not TownLogic.can_afford(player, cost)
+	m.set_meta("cancel", "")
+	return await m.closed == "upgrade"
 
 static func show_creature_info(owner_node: Node, cid: String, count: int, buttons := [["OK", true]]) -> Modal:
 	var c: Dictionary = GameData.CREATURES[cid]
@@ -192,10 +230,11 @@ class _Slot extends Control:
 				draw_texture_rect(tex, r.grow(-3), false, Color(1.3, 1.25, 1.2) if small else Color.WHITE)
 			var txt := str(st["count"])
 			var f := UI.font()
-			var fs := 15 if small else 20
+			var fs := 13 if small else 20
 			var tw := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-			var p := Vector2(size.x - tw - 6, size.y - 6)
-			draw_rect(Rect2(p - Vector2(3, fs - 2), Vector2(tw + 6, fs + 2)), Color(0.04, 0.03, 0.02, 0.85 if small else 0.6))
+			var p := Vector2(size.x - tw - (4 if small else 6), size.y - (4 if small else 6))
+			var pad := 2.0 if small else 3.0
+			draw_rect(Rect2(p - Vector2(pad, fs - 3), Vector2(tw + pad * 2, fs)), Color(0.04, 0.03, 0.02, 0.85 if small else 0.6))
 			draw_string(f, p + Vector2(1, 1), txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.BLACK)
 			draw_string(f, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UI.TEXT)
 		var sel = strip.group.get("sel")

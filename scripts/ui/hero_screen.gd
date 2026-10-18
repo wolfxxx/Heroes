@@ -149,11 +149,18 @@ static func open(owner: Node, h: Dictionary) -> Modal:
 		bk.custom_minimum_size = Vector2(160, 46)
 		sb.add_child(bk)
 
-	m.body.add_child(UI.label("Army", 22, UI.GOLD, true))
+	# the army, and beside it the war machine sockets (as the classic hero screen)
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 40)
+	m.body.add_child(bottom)
+	var av := VBoxContainer.new()
+	bottom.add_child(av)
+	av.add_child(UI.label("Army", 22, UI.GOLD, true))
 	var strip := ArmyStrip.new()
 	strip.bind(h["army"], {}, true)
 	strip.tooltip_text = "Click a stack, then another slot, to move or swap it. Shift+click to split. Right click: details."
-	m.body.add_child(strip)
+	av.add_child(strip)
+	bottom.add_child(_machines(h))
 	m.add_buttons([["Close", "close"], ["Dismiss Hero", "dismiss"]])
 	m.set_meta("default", "close")
 	m.set_meta("cancel", "close")
@@ -237,6 +244,27 @@ static func _doll(h: Dictionary) -> Control:
 		doll.add_child(so)
 	return doll
 
+## The four war machine sockets: the hero's ballista, ammo cart and first aid tent (bought at a Blacksmith), and the
+## catapult every hero brings to a siege.
+static func _machines(h: Dictionary) -> Control:
+	var v := VBoxContainer.new()
+	v.add_child(UI.label("War Machines", 22, UI.GOLD, true))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	v.add_child(row)
+	var have: Array = h.get("machines", [])
+	for id in ["ballista", "ammo_cart", "first_aid_tent", "catapult"]:
+		var so := _Socket.new()
+		so.custom_minimum_size = Vector2(92, 92)
+		so.empty = not (id in have or id == "catapult")
+		so.tex = Assets.creature_portrait(id)
+		var c: Dictionary = GameData.CREATURES[id]
+		var tip: String = "%s%s\n%s" % [c["name"], "" if not so.empty else " (not owned: buy one at a Blacksmith)",
+			GameData.MACHINE_TEXT[id]]
+		HoverInfo.attach(so, func(): return tip)
+		row.add_child(so)
+	return v
+
 ## A row of backpack sockets under the figure, for artifacts with no free body slot.
 static func _backpack(h: Dictionary) -> Control:
 	var extra: Array = _placed(h)[1]
@@ -269,6 +297,8 @@ class _Socket extends Control:
 		draw_rect(r, Color(0.02, 0.02, 0.025, (0.22 if glass else 0.4) if empty else 0.92))
 		if tex and not empty:
 			draw_texture_rect(tex, r.grow(-5), false)
+		elif tex:  # a machine not owned: its picture greyed out in the empty socket
+			draw_texture_rect(tex, r.grow(-5), false, Color(0.3, 0.29, 0.28, 0.75))
 		# bevel: shadowed top-left, lit bottom-right
 		draw_line(Vector2(1, 1), Vector2(size.x - 1, 1), Color(0, 0, 0, 0.8), 3)
 		draw_line(Vector2(1, 1), Vector2(1, size.y - 1), Color(0, 0, 0, 0.8), 3)

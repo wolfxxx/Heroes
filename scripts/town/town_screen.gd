@@ -836,22 +836,59 @@ func _open_guild() -> void:
 	m.set_meta("cancel", true)
 	await m.closed
 
+## The Blacksmith sells war machines to a visiting hero (one of each), and hones its weapons once (+1 Attack).
 func _open_smith() -> void:
 	if hero.is_empty():
-		await Modal.message(self, "Blacksmith", "The smith can hone the weapons of a visiting hero (+1 Attack for 1500 gold).").closed
+		await Modal.message(self, "Blacksmith", "The smith sells war machines and hones weapons, for a hero visiting the town.").closed
 		return
-	if hero.get("smith", false):
-		await Modal.message(self, "Blacksmith", "%s's weapons are already as sharp as they can be." % hero["name"]).closed
-		return
-	if await Modal.confirm(self, "Blacksmith", "Hone %s's weapons for 1500 gold? (+1 Attack)" % hero["name"], "Hone", "No").closed:
-		if player["resources"]["gold"] >= 1500:
+	while true:
+		var m := Modal.custom(self, "Blacksmith", 1180)
+		var row := HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 22)
+		m.body.add_child(row)
+		var have: Array = hero.get("machines", [])
+		for id in GameData.WAR_MACHINES:
+			var c: Dictionary = GameData.CREATURES[id]
+			var v := VBoxContainer.new()
+			v.add_theme_constant_override("separation", 8)
+			var t := UI.label(c["name"], 24, UI.GOLD, true)
+			t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			v.add_child(t)
+			v.add_child(UI.icon(Assets.creature_portrait(id), Vector2(240, 240)))
+			var d := UI.label(GameData.MACHINE_TEXT[id], 18)
+			d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			d.custom_minimum_size = Vector2(240, 70)
+			d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			v.add_child(d)
+			var cr := HoverInfo.cost_row(c["cost"], player["resources"])
+			cr.alignment = BoxContainer.ALIGNMENT_CENTER
+			v.add_child(cr)
+			var owned: bool = id in have
+			var b := UI.button("Owned" if owned else "Buy", func(): m.close(id), 22)
+			b.disabled = owned or not TownLogic.can_afford(player, c["cost"])
+			v.add_child(b)
+			row.add_child(v)
+		var hone_ok: bool = not hero.get("smith", false) and player["resources"]["gold"] >= 1500
+		var btns := m.add_buttons([["Hone weapons (+1 Attack, 1500 gold)", "hone"], ["Close", ""]])
+		btns.get_child(0).disabled = not hone_ok
+		btns.get_child(0).custom_minimum_size.x = 420
+		m.set_meta("cancel", "")
+		var r = await m.closed
+		if r == "hone":
 			player["resources"]["gold"] -= 1500
 			hero["attack"] += 1
 			hero["smith"] = true
 			Audio.sfx("sword_hit")
-			refresh()
+		elif r is String and r in GameData.WAR_MACHINES:
+			TownLogic.pay(player, GameData.CREATURES[r]["cost"])
+			if not hero.has("machines"):
+				hero["machines"] = []
+			hero["machines"].append(r)
+			Audio.sfx("build", -4)
 		else:
-			Audio.sfx("error")
+			break
+		refresh()
 
 func _exit() -> void:
 	GameState.change_scene(GameState.SCENE_ADVENTURE)

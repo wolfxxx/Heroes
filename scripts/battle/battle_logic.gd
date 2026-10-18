@@ -8,6 +8,10 @@ class_name BattleLogic
 ##   {"t": "attack", "a": stack, "d": stack, "ranged": bool, "retaliation": bool, "dmg": int, "killed": int, "lucky": bool}
 ##   {"t": "spell", "spell": id, "side": int, "targets": [stack...], "hex": Vector2i, "dmg": {stack_uid: int}, "killed": {uid: int}}
 ##   {"t": "death", "s": stack}   {"t": "text", "text": String}   {"t": "heal", "s": stack, "amount": int}
+##   {"t": "catapult", "s": stack, "seg": int, "hit": bool, "destroyed": bool}
+## War machines are stacks with "machine": true (they never move and don't count for victory); in a siege the
+## defenders stand behind a wall (column WALL_X, segments with hit points) with a gate only they can pass, a moat in
+## front of it, and (with a citadel) arrow towers: machine stacks with "tower": true that nothing can target.
 
 const COLS := 15
 const ROWS := 11
@@ -27,6 +31,14 @@ var rng := RandomNumberGenerator.new()
 var start_counts := {}        # uid -> count at battle start
 var terrain := "grass"
 var _uid := 0
+var siege := 0                # 0: open field, 1: town with a fort (walls, gate, moat), 2: citadel (plus arrow towers)
+var siege_faction := "haven"
+var walls: Array = []         # segments: {"rows": [int], "kind": "wall"|"tower"|"gate", "hp": int}
+const WALL_X := 11
+const MOAT_X := 10
+const SEGMENTS := [[[0], "tower"], [[1, 2], "wall"], [[3, 4], "wall"], [[5], "gate"], [[6, 7], "wall"], [[8, 9], "wall"],
+	[[10], "tower"]]
+const MACHINE_ROWS := {"ballista": 1, "first_aid_tent": 9, "ammo_cart": 7, "catapult": 3}
 
 # ---------------------------------------------------------------------------------------------
 func setup(s: Dictionary) -> void:
@@ -38,14 +50,32 @@ func setup(s: Dictionary) -> void:
 	players = [s.get("attacker_player", -1), s.get("defender_player", -1)]
 	ai_side = [s.get("attacker_ai", false), s.get("defender_ai", true)]
 	terrain = s.get("terrain", "grass")
+	siege = int(s.get("siege", 0))
+	siege_faction = s.get("siege_faction", "haven")
+	if siege > 0:
+		for sg in SEGMENTS:
+			walls.append({"rows": sg[0], "kind": sg[1], "hp": 2})
 	_deploy(s.get("attacker_army", []), 0)
 	_deploy(s.get("defender_army", []), 1)
-	# obstacles
+	for side in 2:
+		var h = heroes[side]
+		if h != null:
+			for m in h.get("machines", []):
+				if m in GameData.WAR_MACHINES:
+					_deploy_machine(m, side, Vector2i(0 if side == 0 else COLS - 1, MACHINE_ROWS[m]))
+	if siege > 0 and heroes[0] != null:
+		_deploy_machine("catapult", 0, Vector2i(0, MACHINE_ROWS["catapult"]))
+	if siege >= 2:
+		for i in [0, walls.size() - 1]:
+			var t := _deploy_machine("arrow_tower", 1, Vector2i(WALL_X, walls[i]["rows"][0]))
+			t["tower"] = true
+			t["seg"] = i
+	# obstacles (in a siege only in front of the moat)
 	var n := rng.randi_range(2, 5)
 	var tries := 0
 	while obstacles.size() < n and tries < 100:
 		tries += 1
-		var h := Vector2i(rng.randi_range(3, 11), rng.randi_range(1, 9))
+		var h := Vector2i(rng.randi_range(3, MOAT_X - 2 if siege > 0 else 11), rng.randi_range(1, 9))
 		if stack_at(h) == null and not obstacles.has(h):
 			obstacles[h] = rng.randi_range(1, 8)  # (which picture: battle.gd OBSTACLES by terrain)
 	_new_round()
@@ -67,6 +97,16 @@ func _deploy(army: Array, side: int) -> void:
 		stacks.append(st)
 		start_counts[st["uid"]] = st["count"]
 
+func _deploy_machine(id: String, side: int, hex: Vector2i) -> Dictionary:
+	var c: Dictionary = GameData.CREATURES[id]
+	_uid += 1
+	var st := {"uid": _uid, "id": id, "side": side, "slot": -1, "count": 1, "hp_top": c["hp"], "hex": hex,
+		"shots": c["shots"], "retaliations": 0, "effects": {}, "alive": true, "defending": false, "waited": false,
+		"acted": false, "machine": true}
+	stacks.append(st)
+	start_counts[st["uid"]] = 1
+	return st
+
 ## The middle slot (row 5, between the stacks on rows 4 and 6) stands two hexes forward, so the three middle stacks
 ## don't merge into one heap of figures; row 8 one forward, clear of the tall figure that usually stands on row 10.
 static func _stagger(slot: int, side: int) -> Vector2i:
@@ -79,11 +119,118 @@ func cdata(s: Dictionary) -> Dictionary:
 func has_ab(s: Dictionary, ab: String) -> bool:
 	return ab in cdata(s)["abilities"]
 
-func alive_stacks(side := -1) -> Array:
+## Living stacks (of one side). Arrow towers are left out (nothing targets them) unless `towers`.
+func alive_stacks(side := -1, towers := false) -> Array:
 	var out := []
 	for s in stacks:
-		if s["alive"] and (side < 0 or s["side"] == side):
+		if s["alive"] and (side < 0 or s["side"] == side) and (towers or not s.get("tower", false)):
 			out.append(s)
+	return out
+
+## Living creature stacks of a side (war machines and towers don't win a battle).
+func fighters(side: int) -> int:
+	var n := 0
+	for s in stacks:
+		if s["alive"] and s["side"] == side and not s.get("machine", false):
+			n += 1
+	return n
+
+# ---------------------------------------------------------------------------------------------
+# Siege
+# ---------------------------------------------------------------------------------------------
+## Index of the wall segment standing on a hex (-1: none, or no siege).
+func wall_seg(h: Vector2i) -> int:
+	if siege == 0 or h.x != WALL_X:
+		return -1
+	for i in walls.size():
+		if h.y in walls[i]["rows"]:
+			return i
+	return -1
+
+## Does an intact wall keep a stack of `side` off this hex? (Defenders pass their own gate.)
+func wall_blocks(h: Vector2i, side: int) -> bool:
+	var i := wall_seg(h)
+	if i < 0 or walls[i]["hp"] <= 0:
+		return false
+	return not (walls[i]["kind"] == "gate" and side == 1)
+
+## The moat in front of the wall (not before the gate: the bridge): walking into it ends the move.
+func is_moat(h: Vector2i) -> bool:
+	return siege > 0 and h.x == MOAT_X and h.y != 5
+
+## Shots from outside at a stack behind an unbroken stretch of wall do half damage.
+func behind_wall(a: Dictionary, d: Dictionary) -> bool:
+	if siege == 0 or a["side"] != 0:
+		return false
+	var i := wall_seg(Vector2i(WALL_X, d["hex"].y))
+	return i >= 0 and walls[i]["hp"] > 0 and a["hex"].x < WALL_X and d["hex"].x > WALL_X
+
+## A war machine's turn: the ballista and the towers shoot, the tent heals, the catapult batters the wall.
+func machine_act(s: Dictionary) -> Array:
+	var ev := []
+	match s["id"]:
+		"ballista", "arrow_tower":
+			var best = null
+			var bv := -1.0
+			for e in alive_stacks(1 - s["side"]):
+				var v := BattleAI._value_of_damage(self, e, (damage_range(s, e, true)[0] + damage_range(s, e, true)[1]) * 0.5)
+				if v > bv:
+					bv = v
+					best = e
+			if best != null:
+				ev = _strike(s, best, true, 0, false)
+		"first_aid_tent":
+			var best = null
+			var gap := 0
+			for a in alive_stacks(s["side"]):
+				var g: int = cdata(a)["hp"] - a["hp_top"]
+				if not a.get("machine", false) and g > gap:
+					gap = g
+					best = a
+			if best != null:
+				var got := heal(best, rng.randi_range(1, 25), false)
+				log_lines.append("The First Aid Tent heals %s for %d." % [_name(best), got])
+				ev = [{"t": "heal", "s": best, "amount": got, "log": log_lines.size()}]
+		"catapult":
+			for shot in 2:  # two boulders a turn
+				ev += _catapult_shot(s)
+	finish_turn(s)
+	return ev
+
+## One boulder at a random standing stretch of wall (cracked ones more likely); a fallen tower falls silent.
+func _catapult_shot(s: Dictionary) -> Array:
+	var ev := []
+	var cands := []
+	for i in walls.size():
+		if walls[i]["hp"] > 0:  # (the crew keeps at a cracked stretch until it falls)
+			for k in (2 if walls[i]["kind"] in ["gate", "tower"] else 1) * (4 if walls[i]["hp"] < 2 else 1):
+				cands.append(i)
+	if not cands.is_empty():
+		var i: int = cands[rng.randi() % cands.size()]
+		var hit := rng.randf() < 0.7
+		var destroyed := false
+		if hit:
+			walls[i]["hp"] -= 1
+			destroyed = walls[i]["hp"] <= 0
+		var what: String = {"wall": "the wall", "tower": "a tower", "gate": "the gate"}[walls[i]["kind"]]
+		log_lines.append(("The catapult %s %s." % ["destroys" if destroyed else "hits", what]) if hit else "The catapult misses.")
+		ev = [{"t": "catapult", "s": s, "seg": i, "hit": hit, "destroyed": destroyed, "log": log_lines.size()}]
+		if destroyed and walls[i]["kind"] == "tower":
+			for t in stacks:
+				if t.get("tower", false) and t.get("seg", -1) == i and t["alive"]:
+					t["alive"] = false
+					t["count"] = 0
+					order.erase(t)
+					waited.erase(t)
+					ev.append({"t": "death", "s": t})
+	return ev
+
+## The war machines (not the catapult) of a side still standing: what its hero keeps after the battle.
+func machines_left(side: int) -> Array:
+	var out := []
+	for s in stacks:
+		if s["side"] == side and s["alive"] and s.get("machine", false) and s["id"] in GameData.WAR_MACHINES:
+			out.append(s["id"])
 	return out
 
 # ---------------------------------------------------------------------------------------------
@@ -117,12 +264,12 @@ static func distance(a: Vector2i, b: Vector2i) -> int:
 
 func stack_at(h: Vector2i) -> Variant:
 	for s in stacks:
-		if s["alive"] and (s["hex"] == h or (is_wide(s) and tail(s) == h)):
+		if s["alive"] and not s.get("tower", false) and (s["hex"] == h or (is_wide(s) and tail(s) == h)):
 			return s
 	return null
 
 func is_free(h: Vector2i) -> bool:
-	return in_bounds(h) and not obstacles.has(h) and stack_at(h) == null
+	return in_bounds(h) and not obstacles.has(h) and stack_at(h) == null and wall_seg(h) < 0
 
 func is_wide(s: Dictionary) -> bool:
 	return has_ab(s, "two_hex")
@@ -142,7 +289,7 @@ func cells(s: Dictionary, head = null) -> Array:
 ## Can the stack stand with its head on `head` (in bounds, no obstacle, no other stack)?
 func fits(s: Dictionary, head: Vector2i) -> bool:
 	for c in cells(s, head):
-		if not in_bounds(c) or obstacles.has(c):
+		if not in_bounds(c) or obstacles.has(c) or wall_blocks(c, s["side"]):
 			return false
 		var o = stack_at(c)
 		if o != null and o != s:
@@ -257,6 +404,8 @@ func is_flyer(s: Dictionary) -> bool:
 func reachable(s: Dictionary) -> Dictionary:
 	var spd := speed(s)
 	var out := {}
+	if s.get("machine", false):
+		return out
 	if is_flyer(s):
 		for y in ROWS:
 			for x in COLS:
@@ -274,7 +423,7 @@ func reachable(s: Dictionary) -> Dictionary:
 				if dist.has(n) or not fits(s, n):
 					continue
 				dist[n] = dist[h] + 1
-				if dist[n] < spd:
+				if dist[n] < spd and not is_moat(n):  # (the moat: in, but no further this turn)
 					nxt.append(n)
 				out[n] = dist[n]
 		frontier = nxt
@@ -290,6 +439,8 @@ func path_to(s: Dictionary, target: Vector2i) -> Array:
 		for h in frontier:
 			for n in neighbors(h):
 				if prev.has(n) or not fits(s, n):
+					continue
+				if is_moat(n) and n != target:
 					continue
 				prev[n] = h
 				if n == target:
@@ -371,6 +522,8 @@ func _mult(a: Dictionary, d: Dictionary, ranged: bool, moved: int) -> float:
 		bonus += 0.15 * hero_skill(a["side"], "archery")
 		if stack_distance(a, d) > 10:
 			bonus *= 0.5
+		if behind_wall(a, d):
+			bonus *= 0.5
 	else:
 		bonus += 0.10 * hero_skill(a["side"], "offense")
 		if cdata(a)["shots"] > 0:
@@ -434,7 +587,7 @@ func heal(d: Dictionary, amount: int, resurrect: bool) -> int:
 func _new_round() -> void:
 	round_num += 1
 	hero_cast = [false, false]
-	order = alive_stacks()
+	order = alive_stacks(-1, true)
 	order.sort_custom(func(a, b):
 		var sa := speed(a)
 		var sb := speed(b)
@@ -529,7 +682,7 @@ func do_melee(s: Dictionary, target: Dictionary, from_hex: Vector2i) -> Array:
 		s["hex"] = from_hex
 		ev.append({"t": "move", "s": s, "path": path})
 	ev += _strike(s, target, false, moved, false)
-	if target["alive"] and s["alive"] and target["retaliations"] > 0 and not has_ab(s, "no_retaliation") and _can_act(target):
+	if target["alive"] and s["alive"] and not target.get("machine", false) and target["retaliations"] > 0 and not has_ab(s, "no_retaliation") and _can_act(target):
 		target["retaliations"] -= 1
 		ev += _strike(target, s, false, 0, true)
 	if s["alive"] and has_ab(s, "double_strike") and target["alive"]:
@@ -539,7 +692,12 @@ func do_melee(s: Dictionary, target: Dictionary, from_hex: Vector2i) -> Array:
 
 func do_shoot(s: Dictionary, target: Dictionary) -> Array:
 	var ev := _strike(s, target, true, 0, false)
-	s["shots"] -= 1
+	var cart := false
+	for o in alive_stacks(s["side"]):
+		if o["id"] == "ammo_cart":
+			cart = true
+	if not cart:  # (an ammo cart keeps the quivers full)
+		s["shots"] -= 1
 	if has_ab(s, "death_cloud"):
 		var hit := {}
 		var killed := {}
@@ -708,8 +866,8 @@ func cast(side: int, spell: String, hex: Vector2i) -> Array:
 # ---------------------------------------------------------------------------------------------
 func is_over() -> int:
 	## Returns winning side (0/1) or -1 if the battle continues.
-	var a := alive_stacks(0).size()
-	var d := alive_stacks(1).size()
+	var a := fighters(0)
+	var d := fighters(1)
 	if a == 0:
 		return 1
 	if d == 0:
@@ -719,7 +877,7 @@ func is_over() -> int:
 func army_out(side: int) -> Array:
 	var out: Array = [null, null, null, null, null, null, null]
 	for s in stacks:
-		if s["side"] == side and s["alive"] and s["count"] > 0:
+		if s["side"] == side and s["alive"] and s["count"] > 0 and s["slot"] >= 0:
 			if out[s["slot"]] == null:
 				out[s["slot"]] = {"id": s["id"], "count": s["count"]}
 			else:
@@ -730,7 +888,7 @@ func casualties(side: int) -> Dictionary:
 	## id -> count lost
 	var out := {}
 	for s in stacks:
-		if s["side"] == side:
+		if s["side"] == side and not s.get("machine", false):
 			var lost: int = start_counts[s["uid"]] - s["count"]
 			if lost > 0:
 				out[s["id"]] = out.get(s["id"], 0) + lost

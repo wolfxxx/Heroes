@@ -21,9 +21,14 @@ run --shot=$D/town_build.png --scene=res://scenes/town.tscn --delay=3 --setup=de
 run --shot=$D/town_build_rich.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --keys=B
 # right click the hero's pikemen: the upgraded guardhouse offers to upgrade them
 run --shot=$D/town_upgrade.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --click=r528,966
+# click the smithy: war machines for the visiting hero
+run --shot=$D/town_blacksmith.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --click=1320,540
 run --shot=$D/town_recruit.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --keys=R
 run --shot=$D/battle.png --scene=res://scenes/battle.tscn --delay=2 --setup=demo --shots=3 --interval=5 --keys=A
 run --shot=$D/battle_upgraded.png --scene=res://scenes/battle.tscn --delay=3 --setup=upgraded
+# a siege: walls, gate, moat and towers; auto combat, the catapult at work a few turns in
+run --shot=$D/bs.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege --seed=5 --shots=2 --interval=12 --keys=A
+mv -f $D/bs_0.png $D/battle_siege.png; mv -f $D/bs_1.png $D/battle_siege_later.png
 # hover twice: the first hover panel of a run can be mispositioned; keep the second
 run --shot=$D/hv.png --scene=res://scenes/battle.tscn --delay=3 --setup=demo --hover="264,410;270,412" --shots=2 --interval=0.5
 mv -f $D/hv_1.png $D/battle_hover.png; rm -f $D/hv_0.png

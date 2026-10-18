@@ -1,4 +1,8 @@
 {
+"ammo_cart.png": [
+0.4323,
+0.9094
+],
 "angel.png": [
 0.5,
 0.8906
@@ -127,6 +131,10 @@
 0.234,
 0.9552
 ],
+"ballista.png": [
+0.3678,
+0.9129
+],
 "bone_dragon.png": [
 0.5,
 0.8985
@@ -158,6 +166,10 @@
 "bone_dragon_move3.png": [
 0.5499,
 0.8239
+],
+"catapult.png": [
+0.4573,
+0.9311
 ],
 "cavalier.png": [
 0.5,
@@ -318,6 +330,10 @@
 "dread_knight_move3.png": [
 0.4032,
 0.9718
+],
+"first_aid_tent.png": [
+0.4419,
+0.9218
 ],
 "ghost.png": [
 0.5,
