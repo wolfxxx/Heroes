@@ -963,18 +963,26 @@ class _BuildCard extends Button:
 		var room := sb.end.x - 6 - x0
 		if not cost.is_empty():
 			var items := []
-			var w := 0.0
 			for res in GameData.RESOURCES:
 				if cost.get(res, 0) > 0:
-					var amt := str(cost[res])
-					items.append([res, amt])
-					w += 24 + f.get_string_size(amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 10
+					items.append([res, str(cost[res])])
+			# icon size, font size, gap: tighter until the whole price fits the strip (six resources on a Mage Guild)
+			var fit: Array = [20, 16, 10]
+			var w := 0.0
+			for opt in [[20, 16, 10], [18, 15, 5], [16, 14, 2]]:
+				fit = opt
+				w = 0.0
+				for it in items:
+					w += opt[0] + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, opt[1]).x + opt[2]
+				if w - opt[2] <= room:
+					break
 			var x := x0 + maxf(0.0, (room - w) * 0.5)
 			for it in items:
-				draw_texture_rect(Assets.res_icon(it[0]), Rect2(Vector2(x, sb.position.y + 3), Vector2(20, 20)), false)
+				var ic: float = fit[0]
+				draw_texture_rect(Assets.res_icon(it[0]), Rect2(Vector2(x, sb.position.y + 13 - ic * 0.5), Vector2(ic, ic)), false)
 				var ok: bool = have.get(it[0], 0) >= cost[it[0]]
-				draw_string(f, Vector2(x + 23, size.y - 12), it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.95, 0.9, 0.8) if ok else Color(1, 0.48, 0.4))
-				x += 24 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x + 10
+				draw_string(f, Vector2(x + ic + 3, size.y - 12), it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fit[1], Color(0.95, 0.9, 0.8) if ok else Color(1, 0.48, 0.4))
+				x += ic + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fit[1]).x + fit[2]
 		else:
 			var txt := status
 			while txt.length() > 4 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x > room:

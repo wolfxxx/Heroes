@@ -1,7 +1,9 @@
 """War machines and siege pieces, painted by an image model in the style of the existing battle art.
 python tools/art/siege_paint.py paint [names...]   ->  imagegen/batch24/out/<name>.png
 python tools/art/siege_paint.py ingest             ->  assets/creatures/<machine>.png (+ anchors), portraits,
-                                                       assets/battle/siege_<faction>_<piece>.png (+ anchors), bg_siege_<faction>.png
+                                                       assets/battle/siege_<faction>_archer.png (+ anchors)
+(The wall pieces and open siege backdrops painted here were the first sieges; the wall is now painted into the
+backdrop by siege_wall_paint.py, which starts from bg__siege_<faction>.)
 
 Machines and wall pieces are painted on flat magenta next to a reference sprite (a battle unit, a piece of the town's
 castle) that sets the style and scale; ingest keys the magenta out. The siege backdrops repaint the grass battlefield
@@ -72,6 +74,14 @@ BG_PROMPT = ("Repaint this battlefield background of a fantasy strategy game as 
              "town inside the walls rising in the distance: {town}. Do NOT paint the castle wall itself, any units, "
              "a grid or text; the ground in front stays open grass.")
 
+ARCHERS = {
+    "haven": "a castle crossbowman in a steel kettle helmet and a blue-and-gold tabard over mail, aiming a crossbow to "
+             "the right from the shoulder, seen from the side at a high three-quarter angle, the whole figure standing",
+    "necropolis": "a skeleton archer in a rusted black iron helmet and tattered violet rags, drawing a black bone bow "
+                  "aimed to the right, faint green ghost-light in its eye sockets, seen from the side at a high three-quarter "
+                  "angle, the whole figure standing",
+}
+
 TOWN = {
     "haven": "the white towers, blue slate roofs and golden domes of a noble city, banners flying",
     "necropolis": "the black spires, crypts and violet roofs of a necromancer citadel under a darker sky with green "
@@ -113,6 +123,8 @@ def jobs():
             ar = "3:4" if p.startswith("tower") else "1:1"
             out[f"piece__{fac}__{p}"] = (f"ref_fort_{fac}", PIECE_PROMPT.format(piece=pd, fac=fd), ar)
         out[f"bg__siege_{fac}"] = ("ref_bg", BG_PROMPT.format(town=TOWN[fac]), "16:9")
+        out[f"archer__{fac}"] = ("ref_unit", MACHINE_PROMPT.format(desc=ARCHERS[fac]).replace(" Nobody operating it.", ""),
+                                 "3:4")
     return out
 
 
@@ -176,20 +188,14 @@ def ingest():
         if os.path.exists(ps):
             Image.open(ps).convert("RGB").resize((256, 256), Image.LANCZOS).save(f"assets/creatures/portraits/{m}.png")
     for fac in FACTION:
-        for p in PIECES:
-            src = f"{BATCH}/out/piece__{fac}__{p}.png"
-            if not os.path.exists(src):
-                continue
-            h = {"tower": 420, "tower_broken": 200, "wall": 250, "wall_broken": 120, "gate": 290, "gate_broken": 260}[p]
-            fig = _cut(src, h)
-            fig.save(f"assets/battle/siege_{fac}_{p}.png")
+        ar = f"{BATCH}/out/archer__{fac}.png"
+        if os.path.exists(ar):  # (the arrow tower's crew, standing on the painted towers)
+            fig = _cut(ar, 200)
+            fig.save(f"assets/battle/siege_{fac}_archer.png")
             a = np.asarray(fig)[..., 3]
-            px, py = feet(a, lying=True)
-            banch[f"siege_{fac}_{p}.png"] = [round(px / fig.width, 4), round(py / fig.height, 4)]
-            print("  piece", fac, p, fig.size)
-        bs = f"{BATCH}/out/bg__siege_{fac}.png"
-        if os.path.exists(bs):
-            Image.open(bs).convert("RGB").resize((1920, 1080), Image.LANCZOS).save(f"assets/battle/bg_siege_{fac}.png")
+            px, py = feet(a)
+            banch[f"siege_{fac}_archer.png"] = [round(px / fig.width, 4), round(py / fig.height, 4)]
+            print("  archer", fac, fig.size)
     json.dump(anchors, open("assets/creatures/anchors.json", "w"), indent=0, sort_keys=True)
     json.dump(banch, open(banch_p, "w"), indent=0, sort_keys=True)
 

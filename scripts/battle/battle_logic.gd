@@ -9,9 +9,12 @@ class_name BattleLogic
 ##   {"t": "spell", "spell": id, "side": int, "targets": [stack...], "hex": Vector2i, "dmg": {stack_uid: int}, "killed": {uid: int}}
 ##   {"t": "death", "s": stack}   {"t": "text", "text": String}   {"t": "heal", "s": stack, "amount": int}
 ##   {"t": "catapult", "s": stack, "seg": int, "hit": bool, "destroyed": bool}
-## War machines are stacks with "machine": true (they never move and don't count for victory); in a siege the
-## defenders stand behind a wall (column WALL_X, segments with hit points) with a gate only they can pass, a moat in
-## front of it, and (with a citadel) arrow towers: machine stacks with "tower": true that nothing can target.
+## War machines are stacks with "machine": true (they never move and don't count for victory). They stand on a back
+## rank just outside the grid (column -1 for the attacker, COLS for the defender), where nothing else may stand but
+## where they can be shot or struck from the first column. In a siege the defenders stand behind a wall (column
+## WALL_X, segments with hit points) with a gate only they can pass, a moat in front of it, and (with a citadel)
+## arrow towers in two wall towers and the keep: machine stacks with "tower": true that nothing can target; the
+## defending hero's own machines stay in the town.
 
 const COLS := 15
 const ROWS := 11
@@ -38,7 +41,9 @@ const WALL_X := 11
 const MOAT_X := 10
 const SEGMENTS := [[[0], "tower"], [[1, 2], "wall"], [[3, 4], "wall"], [[5], "gate"], [[6, 7], "wall"], [[8, 9], "wall"],
 	[[10], "tower"]]
-const MACHINE_ROWS := {"ballista": 1, "first_aid_tent": 9, "ammo_cart": 7, "catapult": 3}
+const MACHINE_ROWS := {"ballista": 2, "catapult": 4, "ammo_cart": 6, "first_aid_tent": 8}
+const SEG_NAMES := ["the upper tower", "the upper wall", "the wall above the gate", "the gate",
+	"the wall below the gate", "the lower wall", "the lower tower"]
 
 # ---------------------------------------------------------------------------------------------
 func setup(s: Dictionary) -> void:
@@ -59,15 +64,15 @@ func setup(s: Dictionary) -> void:
 	_deploy(s.get("defender_army", []), 1)
 	for side in 2:
 		var h = heroes[side]
-		if h != null:
+		if h != null and not (siege > 0 and side == 1):
 			for m in h.get("machines", []):
 				if m in GameData.WAR_MACHINES:
-					_deploy_machine(m, side, Vector2i(0 if side == 0 else COLS - 1, MACHINE_ROWS[m]))
+					_deploy_machine(m, side, Vector2i(-1 if side == 0 else COLS, MACHINE_ROWS[m]))
 	if siege > 0 and heroes[0] != null:
-		_deploy_machine("catapult", 0, Vector2i(0, MACHINE_ROWS["catapult"]))
-	if siege >= 2:
-		for i in [0, walls.size() - 1]:
-			var t := _deploy_machine("arrow_tower", 1, Vector2i(WALL_X, walls[i]["rows"][0]))
+		_deploy_machine("catapult", 0, Vector2i(-1, MACHINE_ROWS["catapult"]))
+	if siege >= 2:  # the two wall towers and the keep (which no catapult can bring down)
+		for i in [0, walls.size() - 1, -1]:
+			var t := _deploy_machine("arrow_tower", 1, Vector2i(WALL_X, walls[i]["rows"][0]) if i >= 0 else Vector2i(COLS, 5))
 			t["tower"] = true
 			t["seg"] = i
 	# obstacles (in a siege only in front of the moat)
@@ -212,8 +217,9 @@ func _catapult_shot(s: Dictionary) -> Array:
 		if hit:
 			walls[i]["hp"] -= 1
 			destroyed = walls[i]["hp"] <= 0
-		var what: String = {"wall": "the wall", "tower": "a tower", "gate": "the gate"}[walls[i]["kind"]]
-		log_lines.append(("The catapult %s %s." % ["destroys" if destroyed else "hits", what]) if hit else "The catapult misses.")
+		var what: String = SEG_NAMES[i] if i < SEG_NAMES.size() else "the wall"
+		log_lines.append(("The catapult %s %s." % ["breaches" if destroyed else "hits", what]) if hit
+			else "The catapult misses %s." % what)
 		ev = [{"t": "catapult", "s": s, "seg": i, "hit": hit, "destroyed": destroyed, "log": log_lines.size()}]
 		if destroyed and walls[i]["kind"] == "tower":
 			for t in stacks:
@@ -239,6 +245,10 @@ func machines_left(side: int) -> Array:
 static func in_bounds(h: Vector2i) -> bool:
 	return h.x >= 0 and h.y >= 0 and h.x < COLS and h.y < ROWS
 
+## The grid plus the war machines' back rank on either side (only machines stand there).
+static func on_field(h: Vector2i) -> bool:
+	return h.x >= -1 and h.y >= 0 and h.x <= COLS and h.y < ROWS
+
 static func neighbors(h: Vector2i) -> Array:
 	var d: Array
 	if h.y % 2 == 0:
@@ -248,7 +258,7 @@ static func neighbors(h: Vector2i) -> Array:
 	var out := []
 	for o in d:
 		var n: Vector2i = h + o
-		if in_bounds(n):
+		if on_field(n):  # (a machine on the back rank has neighbours on the grid; moves still check in_bounds)
 			out.append(n)
 	return out
 
@@ -520,7 +530,7 @@ func _mult(a: Dictionary, d: Dictionary, ranged: bool, moved: int) -> float:
 	var bonus := 1.0
 	if ranged:
 		bonus += 0.15 * hero_skill(a["side"], "archery")
-		if stack_distance(a, d) > 10:
+		if stack_distance(a, d) > 10 and not a.get("machine", false):  # (towers and the ballista: no range penalty)
 			bonus *= 0.5
 		if behind_wall(a, d):
 			bonus *= 0.5

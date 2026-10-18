@@ -29,6 +29,8 @@ run --shot=$D/battle_upgraded.png --scene=res://scenes/battle.tscn --delay=3 --s
 # a siege: walls, gate, moat and towers; auto combat, the catapult at work a few turns in
 run --shot=$D/bs.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege --seed=5 --shots=2 --interval=12 --keys=A
 mv -f $D/bs_0.png $D/battle_siege.png; mv -f $D/bs_1.png $D/battle_siege_later.png
+run --shot=$D/sh.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege_haven --seed=5 --shots=2 --interval=14 --keys=A
+mv -f $D/sh_1.png $D/battle_siege_haven.png; rm -f $D/sh_0.png
 # hover twice: the first hover panel of a run can be mispositioned; keep the second
 run --shot=$D/hv.png --scene=res://scenes/battle.tscn --delay=3 --setup=demo --hover="264,410;270,412" --shots=2 --interval=0.5
 mv -f $D/hv_1.png $D/battle_hover.png; rm -f $D/hv_0.png

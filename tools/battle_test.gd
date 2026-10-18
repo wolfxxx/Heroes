@@ -59,8 +59,8 @@ func _check(L: BattleLogic) -> String:
 	var seen := {}
 	for s in L.alive_stacks():
 		for c in L.cells(s):
-			if not BattleLogic.in_bounds(c):
-				return "%s off the field at %s" % [s["id"], c]
+			if not (BattleLogic.on_field(c) if s.get("machine", false) else BattleLogic.in_bounds(c)):
+				return "%s off the field at %s" % [s["id"], c]  # (machines stand on the back rank)
 			if L.obstacles.has(c):
 				return "%s on an obstacle at %s" % [s["id"], c]
 			if L.wall_blocks(c, s["side"]) and not s.get("tower", false):

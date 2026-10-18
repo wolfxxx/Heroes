@@ -262,7 +262,15 @@ static func _machines(h: Dictionary) -> Control:
 		var tip: String = "%s%s\n%s" % [c["name"], "" if not so.empty else " (not owned: buy one at a Blacksmith)",
 			GameData.MACHINE_TEXT[id]]
 		HoverInfo.attach(so, func(): return tip)
-		row.add_child(so)
+		var cell := VBoxContainer.new()  # (with its name under it: gold when the hero has it)
+		cell.add_theme_constant_override("separation", 2)
+		cell.add_child(so)
+		var nm := UI.label(c["name"].replace("First Aid ", "Aid ") if not so.empty else "(none)", 15,
+			UI.GOLD if not so.empty else Color(0.55, 0.5, 0.45))
+		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		nm.custom_minimum_size.x = 92
+		cell.add_child(nm)
+		row.add_child(cell)
 	return v
 
 ## A row of backpack sockets under the figure, for artifacts with no free body slot.

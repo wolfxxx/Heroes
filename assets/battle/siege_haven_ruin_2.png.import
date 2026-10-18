@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://daeokljdsklrx"
-path="res://.godot/imported/siege_haven_gate.png-6962e00aa3f76cebaf8f394f088f9351.ctex"
+uid="uid://dgfyhywhhefxt"
+path="res://.godot/imported/siege_haven_ruin_2.png-c760b312957377f1f0215700e8128cce.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/battle/siege_haven_gate.png"
-dest_files=["res://.godot/imported/siege_haven_gate.png-6962e00aa3f76cebaf8f394f088f9351.ctex"]
+source_file="res://assets/battle/siege_haven_ruin_2.png"
+dest_files=["res://.godot/imported/siege_haven_ruin_2.png-c760b312957377f1f0215700e8128cce.ctex"]
 
 [params]
 

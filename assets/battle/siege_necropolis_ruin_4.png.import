@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dwubotlp1sngs"
-path="res://.godot/imported/siege_haven_wall.png-1dbefbf5403774fa24b3368e925c1b3b.ctex"
+uid="uid://cbabsuhdyonuu"
+path="res://.godot/imported/siege_necropolis_ruin_4.png-e86af16668d996cad4352296e36ff2d3.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/battle/siege_haven_wall.png"
-dest_files=["res://.godot/imported/siege_haven_wall.png-1dbefbf5403774fa24b3368e925c1b3b.ctex"]
+source_file="res://assets/battle/siege_necropolis_ruin_4.png"
+dest_files=["res://.godot/imported/siege_necropolis_ruin_4.png-e86af16668d996cad4352296e36ff2d3.ctex"]
 
 [params]
 

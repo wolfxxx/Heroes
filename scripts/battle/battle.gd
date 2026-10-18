@@ -143,7 +143,9 @@ func pos_to_hex(p: Vector2) -> Vector2i:
 	var best := Vector2i(-1, -1)
 	var bd := 1e9
 	for y in BattleLogic.ROWS:
-		for x in BattleLogic.COLS:
+		for x in range(-1, BattleLogic.COLS + 1):  # (with the machines' back rank)
+			if (x < 0 or x >= BattleLogic.COLS) and L.stack_at(Vector2i(x, y)) == null:
+				continue
 			var c := hex_pos(Vector2i(x, y))
 			var d := Vector2(p.x - c.x, (p.y - c.y) * 1.25).length()
 			if d < bd:
@@ -168,6 +170,9 @@ func _build_scene() -> void:
 		var bg := _Fallback.new()
 		bg.terrain = L.terrain
 		add_child(bg)
+	if L.siege > 0:
+		_wall_layer = Node2D.new()  # breaches and cracks over the painted wall, under the grid and the stacks
+		add_child(_wall_layer)
 	_field = Node2D.new()
 	add_child(_field)
 	_grid = _Grid.new()
@@ -286,10 +291,27 @@ func _make_unit(st: Dictionary) -> void:
 	units[st["uid"]] = n
 	if st.get("machine", false):
 		badge.visible = false  # (a machine is one piece, no count; its ring shows whose it is)
-		if st.get("tower", false):  # an arrow tower is the tower sprite of the wall: only a point to shoot from
-			s.visible = false
+		if st.get("tower", false):  # an arrow tower: the crew behind the parapet of a painted tower
 			shadow.visible = false
-			n.set_meta("top", 230.0)
+			var spots: Dictionary = ARCHER_SPOTS.get(L.siege_faction, ARCHER_SPOTS["haven"])
+			n.position = spots.get(st.get("seg", -1), Vector2(1760, 600))
+			var ap := "battle/siege_%s_archer.png" % L.siege_faction
+			if Assets.has(ap):
+				s.texture = Assets.tex(ap)
+				var tsz := Vector2(s.texture.get_size())
+				s.region_enabled = true
+				s.region_rect = Rect2(0, 0, tsz.x, tsz.y * 0.56)  # (from the waist up)
+				s.centered = true
+				s.scale = Vector2.ONE * 0.5
+				s.offset = Vector2(0, -tsz.y * 0.28)
+				s.remove_meta("anchor_x")
+				s.flip_h = true
+				s.material = null
+				MapView.outline(s, 1.0)
+				s.set_meta("home", s.position)
+			else:
+				s.visible = false
+			n.set_meta("top", 60.0)
 		return
 	# idle breathing
 	var tw := s.create_tween().set_loops()
@@ -450,15 +472,17 @@ func _build_ui() -> void:
 	qc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(qc)
 	var qp := PanelContainer.new()
+	qp.custom_minimum_size.x = 1330  # (room for 14 icons and the round mark: the frame doesn't jump between turns)
 	qc.add_child(qp)
 	_queue_box = HBoxContainer.new()
 	_queue_box.add_theme_constant_override("separation", 4)
+	_queue_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	qp.add_child(_queue_box)
 
 func _refresh_queue() -> void:
 	for c in _queue_box.get_children():
 		c.queue_free()
-	var up := L.upcoming(16).filter(func(s): return not s.get("tower", false)).slice(0, 14)
+	var up := L.upcoming(14)
 	var this_round := L.order.size() + L.waited.size()
 	for i in up.size():
 		var s: Dictionary = up[i]
@@ -472,6 +496,8 @@ func _refresh_queue() -> void:
 		var q := _QueueIcon.new()
 		q.st = s
 		q.first = i == 0
+		if s.get("tower", false):
+			q.tex = Assets.tex("battle/siege_%s_archer.png" % L.siege_faction)
 		q.custom_minimum_size = Vector2(110 if i == 0 else 84, 110 if i == 0 else 84)
 		_queue_box.add_child(q)
 
@@ -632,8 +658,10 @@ func _unhandled_input(e: InputEvent) -> void:
 				_update_hover()
 			else:
 				var s = L.stack_at(pos_to_hex(get_viewport().get_canvas_transform().affine_inverse() * e.position))
-				if s:
+				if s and not s.get("machine", false):
 					ArmyStrip.show_creature_info(self, s["id"], s["count"])
+	elif e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_A:
+		_on_auto()  # (also while something is acting: it takes over from the next turn)
 	elif e is InputEventKey and e.pressed and not e.echo and not _busy:
 		match e.keycode:
 			KEY_W: _on_wait()
@@ -656,7 +684,7 @@ func _modal_open() -> bool:
 func _update_info() -> void:
 	var key := ""
 	if not _ended and not _modal_open() and not _auto:  # (in auto combat stacks walk under a resting cursor)
-		var st = L.stack_at(_hover) if L.in_bounds(_hover) else null
+		var st = L.stack_at(_hover) if L.on_field(_hover) else null
 		if st:
 			key = "s%d" % st["uid"]
 		else:
@@ -833,7 +861,7 @@ func _update_hover() -> void:
 				txt += " on %s (%d damage)" % [L._name(t), L.spell_damage(cur["side"], _spell)]
 		else:
 			txt = "Select a target for %s (right click to cancel)" % sp["name"]
-	elif L.in_bounds(_hover):
+	elif L.on_field(_hover):
 		var t = L.stack_at(_hover)
 		if t and t["side"] != cur["side"]:
 			if L.can_shoot(cur):
@@ -1221,7 +1249,7 @@ func _anim_spell(ev: Dictionary) -> void:
 		if sp == "lightning_bolt":
 			var burst := _Burst.new()  # the bolt from the sky; the painted sparks are the impact, at the feet
 			burst.bolt = true
-			burst.slant = 1.0 if c.x > 960 else -1.0
+			burst.slant = 1.0 if (c.x > 960 and c.x < 1400) or c.x < 560 else -1.0  # (clear of the name plates)
 			burst.position = c + Vector2(0, 62)
 			_fx.add_child(burst)
 			p = c + Vector2(0, 40)
@@ -1280,51 +1308,57 @@ func _play_fx(fx: String, p: Vector2, sc: Vector2, dur := 0.8, alpha := 1.0, par
 # ---------------------------------------------------------------------------------------------
 # Siege
 # ---------------------------------------------------------------------------------------------
-const WALL_SCALE := 0.44  # (a wall block about one hex wide)
-var _wall_nodes: Array = []  # per wall segment: its sprites (one per hex)
-
-func _wall_tex(kind: String, broken: bool) -> String:
-	return "battle/siege_%s_%s%s.png" % [L.siege_faction, kind, "_broken" if broken else ""]
+# The wall, moat, towers and keep are painted into the siege backdrop (tools/art/siege_wall_paint.py); a breached
+# segment shows its band of the ruined painting, a cracked one painted cracks.
+var _wall_layer: Node2D
+var _ruins: Array = []     # per wall segment: the overlay of its ruin (hidden while it stands)
+var _cracks: _Cracks
+## The band of the screen (y) each wall segment owns in the painting (as tools/art/siege_wall_paint.py BANDS).
+const WALL_BANDS := [[0, 270], [270, 400], [400, 470], [470, 645], [645, 750], [750, 885], [885, 1080]]
+## Where each arrow tower's crew stands on the painted towers (by wall segment; -1: the keep).
+const ARCHER_SPOTS := {
+	"haven": {0: Vector2(1292, 412), 6: Vector2(1338, 770), -1: Vector2(1738, 598)},
+	"necropolis": {0: Vector2(1300, 418), 6: Vector2(1338, 800), -1: Vector2(1742, 660)},
+}
 
 func _build_walls() -> void:
+	var mp := Assets.path("battle/siege.json")  # (where each segment's ruin overlay sits, from the paint script)
+	var meta = JSON.parse_string(FileAccess.get_file_as_string(mp)) if FileAccess.file_exists(mp) else null
+	var spots: Array = meta.get(L.siege_faction, []) if meta is Dictionary else []
 	for i in L.walls.size():
-		var seg: Dictionary = L.walls[i]
-		var nodes := []
-		for r in seg["rows"]:
-			var s := Sprite2D.new()
-			s.position = hex_pos(Vector2i(BattleLogic.WALL_X, r)) + Vector2(0, 30)
-			_sorted.add_child(s)
-			nodes.append(s)
-		_wall_nodes.append(nodes)
-		_set_wall(i, false)
-		for s in nodes:
-			if s.texture:
-				var rr: Rect2 = s.get_rect()
-				_obstacle_rects.append(Rect2(s.position + rr.position * s.scale, rr.size * s.scale).grow(-10))
+		var s := Sprite2D.new()
+		var p := "battle/siege_%s_ruin_%d.png" % [L.siege_faction, i]
+		if Assets.has(p) and i < spots.size():
+			s.texture = Assets.tex(p)
+			s.centered = false
+			s.position = Vector2(spots[i][0], spots[i][1])
+		s.visible = false
+		_wall_layer.add_child(s)
+		_ruins.append(s)
+	_cracks = _Cracks.new()
+	_cracks.b = self
+	_wall_layer.add_child(_cracks)
+	for i in L.walls.size():  # (labels keep off the standing wall)
+		var r: Array = L.walls[i]["rows"]
+		var top := hex_pos(Vector2i(BattleLogic.WALL_X, r[0])).y - 150
+		var bot := hex_pos(Vector2i(BattleLogic.WALL_X, r[-1])).y + 20
+		_obstacle_rects.append(Rect2(1290, top, 110, bot - top))
 
-## Shows a wall segment intact or as rubble.
+## Shows a wall segment intact or breached.
 func _set_wall(i: int, broken: bool) -> void:
-	var kind: String = L.walls[i]["kind"]
-	var p := _wall_tex(kind, broken)
-	for s in _wall_nodes[i]:
-		s.modulate = Color.WHITE
-		if not Assets.has(p):
-			s.texture = null
-			continue
-		s.texture = Assets.tex(p)
-		s.centered = false
-		s.scale = Vector2.ONE * WALL_SCALE
-		var anc := Assets.anchor(p)
-		if anc.x < 0.0:
-			anc = Vector2(0.5, 0.95)
-		s.offset = -anc * Vector2(s.texture.get_size())
+	if i < _ruins.size() and _ruins[i].texture:
+		var s: Sprite2D = _ruins[i]
+		s.visible = broken
+		if broken:
+			s.modulate.a = 0.0
+			s.create_tween().tween_property(s, "modulate:a", 1.0, 0.25)
+	_cracks.queue_redraw()
 
 ## The catapult's boulder: a high arc onto a wall segment; a hit throws up dust, a breach turns it to rubble.
 func _anim_catapult(ev: Dictionary) -> void:
 	var n := _unit(ev["s"])
-	var seg: Dictionary = L.walls[ev["seg"]]
-	var row: int = seg["rows"][seg["rows"].size() / 2]
-	var to := hex_pos(Vector2i(BattleLogic.WALL_X, row)) + Vector2(0, -40)
+	var band: Array = WALL_BANDS[ev["seg"]]
+	var to := Vector2(1340, maxf(210.0, (band[0] + band[1]) * 0.5))  # (the painted wall's face)
 	if not ev["hit"]:
 		to += Vector2(-HEX_W * 0.9, 50)  # short: into the moat
 	var spr: Sprite2D = n.get_node("Sprite")
@@ -1352,11 +1386,8 @@ func _anim_catapult(ev: Dictionary) -> void:
 				d2.position = to + Vector2(randf_range(-40, 40), 50 + k * 20)
 				d2.big = true
 				_fx.add_child(d2)
-		else:  # cracked: it stays darker
-			for s in _wall_nodes[ev["seg"]]:
-				var t2: Tween = s.create_tween()
-				t2.tween_property(s, "modulate", Color(1.5, 1.3, 1.1), 0.06)
-				t2.tween_property(s, "modulate", Color(0.72, 0.66, 0.62), 0.3)
+		else:  # cracked
+			_cracks.queue_redraw()
 	await get_tree().create_timer(0.35).timeout
 
 ## A slain stack leaves the turn queue at once (not with the next turn).
@@ -1751,6 +1782,8 @@ class _Grid extends Node2D:
 		for y in BattleLogic.ROWS:
 			for x in BattleLogic.COLS:
 				var h := Vector2i(x, y)
+				if b.L.wall_blocks(h, 0) and not reach.has(h):
+					continue  # (the standing wall: no grid on its stones)
 				var c: Vector2 = b.hex_pos(h)
 				var poly: PackedVector2Array = b.hex_poly(c, 2.0)
 				# where the active stack can go: shaded (as the classic game), with a brighter outline
@@ -1815,6 +1848,7 @@ class _Badge extends Node2D:
 class _QueueIcon extends Control:
 	var st: Dictionary
 	var first := false
+	var tex: Texture2D = null  # (instead of the creature's sprite: an arrow tower's archer)
 	static var _crops := {}
 	const HEAD := {"vampire_lord": Rect2(192, 44, 136, 136)}  # (sprite pixels: the wings rise above the head)
 
@@ -1880,13 +1914,13 @@ class _QueueIcon extends Control:
 			var g := inner.grow(-k * inner.size.x * 0.07)
 			g.position.y -= k * 3
 			draw_rect(g, Color(col.darkened(0.35), 0.16))
-		var tex := Assets.creature(st["id"])
-		var src := head_crop(st["id"], tex)
+		var t2: Texture2D = tex if tex else Assets.creature(st["id"])
+		var src := head_crop(st["id"] if tex == null else "tower_%d" % tex.get_instance_id(), t2)
 		if st["side"] == 1:
 			draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
-		draw_texture_rect_region(tex, inner, src)
+		draw_texture_rect_region(t2, inner, src)
 		draw_set_transform(Vector2.ZERO)
-		var txt := str(st["count"])
+		var txt := "" if st.get("machine", false) else str(st["count"])
 		var f := UI.title_font()
 		var fs := 28 if first else 23
 		var band := 30.0 if first else 26.0
@@ -1972,7 +2006,31 @@ class _Boulder extends Node2D:
 		draw_circle(p, 15, Color(0.36, 0.32, 0.28))
 		draw_circle(p + Vector2(-4, -4), 8, Color(0.55, 0.5, 0.44))
 
-## Water in the moat before a besieged town's wall (none before the gate: the bridge).
+## Painted cracks on the face of each cracked (hit once) wall segment.
+class _Cracks extends Node2D:
+	var b
+	func _draw() -> void:
+		for i in b.L.walls.size():
+			var w: Dictionary = b.L.walls[i]
+			if w["hp"] != 1:
+				continue
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 77 + i
+			var band: Array = b.WALL_BANDS[i]
+			var y0: float = maxf(200.0, band[0])
+			var y1: float = band[1]
+			for k in 3:
+				var p := Vector2(1305 + rng.randf() * 70, y0 + rng.randf() * maxf(10.0, (y1 - y0) - 110))
+				var pts := PackedVector2Array([p])
+				for j in 6:
+					p += Vector2(rng.randf_range(-12, 12), rng.randf_range(10, 22))
+					pts.append(p)
+				draw_polyline(pts, Color(0.06, 0.05, 0.05, 0.85), 3.5)
+				draw_polyline(pts, Color(1, 0.95, 0.85, 0.25), 1.0)
+				var f := pts[2] + Vector2(rng.randf_range(-16, 16), 14)
+				draw_line(pts[2], f, Color(0.06, 0.05, 0.05, 0.8), 2.5)
+
+## Where the moat stops a move: a light wash over the painted water (none before the gate: the bridge).
 class _Moat extends Node2D:
 	var b
 	func _draw() -> void:
@@ -1980,14 +2038,11 @@ class _Moat extends Node2D:
 			var h := Vector2i(BattleLogic.MOAT_X, y)
 			if not b.L.is_moat(h):
 				continue
-			var c: Vector2 = b.hex_pos(h)
-			draw_colored_polygon(b.hex_poly(c, -6.0), Color(0.24, 0.19, 0.11, 0.8))  # muddy bank
-			draw_colored_polygon(b.hex_poly(c, 3.0), Color(0.12, 0.22, 0.2, 0.95))  # dark water, lighter towards the middle
-			draw_colored_polygon(b.hex_poly(c, 14.0), Color(0.16, 0.3, 0.28, 0.9))
-			draw_colored_polygon(b.hex_poly(c, 26.0), Color(0.2, 0.36, 0.33, 0.8))
-			for k in 2:  # a glint of the sky
-				var o := Vector2(-14 + k * 22, -8 + k * 12)
-				draw_line(c + o, c + o + Vector2(14, 0), Color(0.75, 0.85, 0.8, 0.35), 2.0, true)
+			var poly: PackedVector2Array = b.hex_poly(b.hex_pos(h), 3.0)
+			draw_colored_polygon(poly, Color(0.3, 0.6, 0.8, 0.13))
+			var closed := poly.duplicate()
+			closed.append(poly[0])
+			draw_polyline(closed, Color(0.55, 0.85, 1.0, 0.4), 1.5, true)
 
 class _Burst extends Node2D:
 	var color := Color.WHITE
