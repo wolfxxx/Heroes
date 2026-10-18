@@ -10,10 +10,18 @@ uniform float saturation = 1.15;
 // optional owner-colour ring outside the ink (heroes on the map): alpha 0 = off
 uniform vec4 team : source_color = vec4(0.0);
 
+// see-through windows (battle): ellipses in canvas space (centre x, y, radius x, y) where the figure fades to
+// hole_alpha, so a stack standing behind it stays readable
+uniform vec4 holes[4];
+uniform int hole_count = 0;
+uniform float hole_alpha = 0.4;
+
 varying vec4 vcol;
+varying vec2 world;
 
 void vertex() {
 	vcol = COLOR;  // modulate (hit flashes, fades)
+	world = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 
 void fragment() {
@@ -45,5 +53,10 @@ void fragment() {
 		rgb = (rgb * alpha + team.rgb * ta * (1.0 - alpha)) / max(a2, 0.0001);
 		alpha = a2;
 	}
-	COLOR = vec4(rgb, alpha) * vcol;
+	float keep = 1.0;
+	for (int i = 0; i < hole_count; i++) {
+		vec2 d = (world - holes[i].xy) / holes[i].zw;
+		keep = min(keep, mix(hole_alpha, 1.0, smoothstep(0.5, 1.0, length(d))));
+	}
+	COLOR = vec4(rgb, alpha * keep) * vcol;
 }

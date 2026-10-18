@@ -295,9 +295,13 @@ func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, 
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(v)
 	var t := UI.label(title, title_size, UI.GOLD, true)
+	t.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02, 0.95))
+	t.add_theme_constant_override("outline_size", 6)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(t)
 	var d := UI.label(sub, 19, UI.TEXT)
+	d.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02, 0.85))
+	d.add_theme_constant_override("outline_size", 4)
 	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(d)
@@ -346,7 +350,7 @@ func _select_faction(f: String) -> void:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(300, 132)
-		_card(b, Assets.hero_portrait(hid), 84, h["name"], h["class"], 19)
+		_card(b, Assets.hero_portrait(hid), 84, h["name"], h["class"], 20)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)

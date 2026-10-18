@@ -206,8 +206,10 @@ func refresh() -> void:
 	for e in entries:
 		var b := _pic_button(_building_pic(e[1]), e[0], e[4] if e[3] else "%s: not built yet" % e[0], e[2], Vector2(132, 76))
 		b.disabled = not e[3]
-		if not e[3]:
-			b.get_child(0).modulate = Color(0.4, 0.38, 0.36)
+		if not e[3]:  # not built: the picture dark and the caption grey, as the unbuilt dwellings beside it
+			b.get_meta("pic").modulate = Color(0.26, 0.25, 0.24)
+			b.get_meta("band").add_theme_color_override("font_color", Color(0.55, 0.52, 0.48))
+			b.get_meta("band").add_theme_color_override("font_disabled_color", Color(0.55, 0.52, 0.48))
 		brow.add_child(b)
 	var ex := UI.button("Exit", _exit, 20)
 	ex.custom_minimum_size = Vector2(132, 76)
@@ -243,6 +245,8 @@ func _pic_button(tex: Texture2D, caption: String, tip: String, cb: Callable, sz 
 	band.size = Vector2(sz.x - 10, 28)
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(band)
+	b.set_meta("pic", pic)
+	b.set_meta("band", band)
 	return b
 
 ## One dwelling in the bar: the creature's portrait and how many can be recruited (dimmed if not built).

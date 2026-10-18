@@ -107,7 +107,7 @@ func _build_panel() -> void:
 			_town_list = lst
 	v.add_child(HSeparator.new())
 	_detail = VBoxContainer.new()
-	_detail.add_theme_constant_override("separation", 6)
+	_detail.add_theme_constant_override("separation", 11)
 	v.add_child(_detail)
 
 	# the status window over the buttons (as the classic panel): the date, and the kingdom at a glance
@@ -232,26 +232,33 @@ func refresh() -> void:
 		_town_list.add_child(_town_card(world["towns"][me["towns"][i]]))
 	if me["towns"].is_empty():
 		_town_list.add_child(_empty_slot(SLOT_H))
-	# status window: the day, and income / heroes / towns
+	# status window: the kingdom at a glance (the date is in the resource bar below)
 	for c in _info_box.get_children():
 		c.queue_free()
-	var d: int = world["day"]
-	_info_box.add_child(UI.label("Month %d · Week %d · Day %d" % [(d - 1) / 28 + 1, ((d - 1) / 7) % 4 + 1, (d - 1) % 7 + 1], 18, UI.GOLD))
 	var inc := 0
 	for tid in me["towns"]:
 		inc += TownLogic.daily_income(world["towns"][tid])
 	for o in world["objects"].values():
 		if o["type"] == "mine" and o["owner"] == adv._human() and GameData.MINES[o["mine"]]["resource"] == "gold":
 			inc += GameData.MINES[o["mine"]]["amount"]
-	_info_box.add_child(UI.label("+%d gold a day   ·   %d hero%s, %d town%s" % [inc, me["heroes"].size(),
-		"" if me["heroes"].size() == 1 else "es", me["towns"].size(), "" if me["towns"].size() == 1 else "s"], 16, Color(0.85, 0.8, 0.68)))
+	var mines := 0
+	for o in world["objects"].values():
+		if o["type"] == "mine" and o["owner"] == adv._human():
+			mines += 1
+	var gl := HBoxContainer.new()
+	gl.add_theme_constant_override("separation", 6)
+	gl.add_child(UI.icon(Assets.tex("icons/res_gold.png"), Vector2(24, 24)))
+	gl.add_child(UI.label("+%d gold a day" % inc, 18, UI.GOLD))
+	_info_box.add_child(gl)
+	_info_box.add_child(UI.label("%d hero%s · %d town%s · %d mine%s" % [me["heroes"].size(), "" if me["heroes"].size() == 1 else "es",
+		me["towns"].size(), "" if me["towns"].size() == 1 else "s", mines, "" if mines == 1 else "s"], 16, Color(0.85, 0.8, 0.68)))
 	for c in _detail.get_children():
 		c.queue_free()
 	var hero: Dictionary = adv.selected_hero()
 	if not hero.is_empty():
 		var top := HBoxContainer.new()
 		top.add_theme_constant_override("separation", 10)
-		var portrait := UI.icon(Assets.hero_portrait(hero["id"]), Vector2(84, 84))
+		var portrait := UI.icon(Assets.hero_portrait(hero["id"]), Vector2(92, 92))
 		top.add_child(portrait)
 		var info := VBoxContainer.new()
 		info.add_theme_constant_override("separation", 0)
@@ -271,6 +278,26 @@ func refresh() -> void:
 			box.tooltip_text = st.capitalize()
 			g.add_child(box)
 		_detail.add_child(g)
+		# morale, luck and experience (as the classic hero panel)
+		var ml := HBoxContainer.new()
+		ml.add_theme_constant_override("separation", 6)
+		var mo: Array = HeroScreen._morale(hero)
+		var lk := int(hero["skills"].get("luck", 0)) + GameState.hero_stat(hero, "luck")
+		for e in [["skill_leadership", mo[0], "Morale %+d" % mo[0]], ["skill_luck", lk, "Luck %+d" % lk]]:
+			var ic := UI.icon(Assets.tex("icons/%s.png" % e[0]), Vector2(32, 32))
+			ic.tooltip_text = e[2]
+			ic.mouse_filter = Control.MOUSE_FILTER_PASS
+			ml.add_child(ic)
+			var val: int = e[1]
+			ml.add_child(UI.label("%+d" % val if val != 0 else "0", 20, Color(0.6, 0.92, 0.5) if val > 0 else (Color(1, 0.55, 0.45) if val < 0 else UI.TEXT)))
+		var nxt := 0
+		for t in GameData.XP_LEVELS:
+			if t > int(hero["xp"]):
+				nxt = t
+				break
+		var xl := UI.label("  Exp %d / %d" % [hero["xp"], nxt] if nxt > 0 else "  Exp %d" % hero["xp"], 17, Color(0.85, 0.8, 0.68))
+		ml.add_child(xl)
+		_detail.add_child(ml)
 		var army := ArmyStrip.new()
 		army.slot_size = Vector2(41, 41)
 		army.editable = false

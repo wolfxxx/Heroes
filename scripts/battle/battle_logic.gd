@@ -581,6 +581,7 @@ func _strike(a: Dictionary, d: Dictionary, ranged: bool, moved: int, retaliation
 	var verb := ("shoot" if ranged else "attack") + ("s" if a["count"] == 1 else "")
 	log_lines.append("%s %s %s for %d damage.%s" % [_name(a), verb, _name(d), dmg,
 		(" %d perish." % killed) if killed > 0 else ""])
+	ev[0]["log"] = log_lines.size()
 	if has_ab(a, "life_drain") and a["alive"] and not has_ab(d, "undead"):
 		var g := heal(a, dmg / 2, true)
 		if g > 0:
@@ -699,6 +700,7 @@ func cast(side: int, spell: String, hex: Vector2i) -> Array:
 			slain += ev["killed"].get(k, 0)
 		line += ", %d damage" % total + (", %d perish" % slain if slain > 0 else "")
 	log_lines.append(line + ".")
+	ev["log"] = log_lines.size()
 	return out
 
 # ---------------------------------------------------------------------------------------------

@@ -931,9 +931,18 @@ func _on_spells() -> void:
 # ---------------------------------------------------------------------------------------------
 func _play(events: Array) -> void:
 	for ev in events:
+		if ev.has("log"):  # this blow's line, as it lands (the numbers on the field and the log agree)
+			for k in range(_log_seen, mini(int(ev["log"]), L.log_lines.size())):
+				_set_log(L.log_lines[k])
+			_log_seen = maxi(_log_seen, int(ev["log"]))
 		match ev["t"]:
 			"move":
+				var keep: Dictionary = _grid.active
+				_grid.active = {}  # (it would mark the end of the path before the stack gets there)
+				_grid.queue_redraw()
 				await _anim_move(ev["s"], ev["path"])
+				_grid.active = keep
+				_grid.queue_redraw()
 			"attack":
 				await _anim_attack(ev)
 			"spell":
@@ -1156,18 +1165,19 @@ func _anim_spell(ev: Dictionary) -> void:
 			centers.append(_unit(t).position + Vector2(0, -70))
 	var fx: String = FX_OF.get(sp, "arcane")
 	for c in centers:
-		if sp == "lightning_bolt":
-			var burst := _Burst.new()  # the bolt from the sky; the painted sparks are the impact
-			burst.bolt = true
-			burst.position = c
-			_fx.add_child(burst)
 		var p: Vector2 = c
+		if sp == "lightning_bolt":
+			var burst := _Burst.new()  # the bolt from the sky; the painted sparks are the impact, at the feet
+			burst.bolt = true
+			burst.position = c + Vector2(0, 62)
+			_fx.add_child(burst)
+			p = c + Vector2(0, 40)
 		if fx == "holy":
 			p += Vector2(0, -20)  # a column rising from the feet: its ring sits at the bottom of the frame
 		if area:
 			_play_fx(fx, p, Vector2(1.3, 0.95), 1.1)
 		else:
-			_play_fx(fx, p, Vector2.ONE * 0.95, 0.8, 0.7 if fx == "spark" else 1.0)
+			_play_fx(fx, p, Vector2.ONE * (0.75 if fx == "spark" else 0.95), 0.8, 0.5 if fx == "spark" else 1.0)
 	await get_tree().create_timer(0.35).timeout
 	for t in targets:
 		if ev["dmg"].has(t["uid"]):
@@ -1224,13 +1234,13 @@ func _refresh_badge(st: Dictionary) -> void:
 		_reset_info()
 		_update_info()
 
-## Damage to a stack: one compact label, "-45  2 slain", in line with its count badge on the stack's own side (over
-## its own figure, not toward the enemy where another stack may stand) and moving with it, so it can't be read as
-## another stack's.
+## Damage to a stack: one compact label, "-45  2 slain", at its feet behind the figure (opposite its count badge, away
+## from the enemy that struck it) and moving with it, so it can't be read as another stack's.
 func _damage_text(d: Dictionary, txt: String, killed: int, lucky := false, delay := 0.0) -> void:
 	var n := _unit(d)
+	var home: Vector2 = n.get_node("Badge").get_meta("home")
 	_float_text(Vector2.ZERO, txt, Color(1, 0.85, 0.3) if lucky else Color(1, 0.95, 0.85), 34,
-		("%d slain" % killed) if killed > 0 else "", delay, n, n.get_node("Badge").get_meta("home"), -1 if d["side"] == 0 else 1)
+		("%d slain" % killed) if killed > 0 else "", delay, n, Vector2(-home.x, home.y), -1 if d["side"] == 0 else 1)
 
 ## Keeps count badges of neighbouring stacks from touching ("2" and "4" side by side read as "24"): a badge that
 ## would overlap one placed before it moves down below it.
@@ -1258,6 +1268,37 @@ func _settle_badges() -> void:
 
 func _process(_d: float) -> void:
 	_settle_badges()
+	_see_through()
+
+## Where a figure in front rises well over a stack standing behind it (the row above), it turns see-through around
+## that stack's feet: the one behind keeps its ring, legs and badge readable instead of seeming to stand on the other.
+func _see_through() -> void:
+	var info := []
+	for k in units:
+		var n: Node2D = units[k]
+		if n.get_node("Badge").st.get("alive", false):
+			info.append([n, n.global_position, float(n.get_meta("top", 120.0)), HEX_W * (0.95 if L.is_wide(n.get_node("Badge").st) else 0.5)])
+	for k in units:
+		var n: Node2D = units[k]
+		var holes := PackedVector4Array()
+		for f in info:
+			if f[0] != n:
+				continue
+			for bk in info:
+				var dy: float = f[1].y - bk[1].y
+				if bk == f or dy < 20.0 or f[2] - dy < 36.0 or absf(f[1].x - bk[1].x) > (f[3] + bk[3]) * 0.75:
+					continue
+				if holes.size() < 4:
+					holes.append(Vector4(bk[1].x, bk[1].y - 26.0, bk[3] * 0.95, 52.0))
+		var m := n.get_node("Sprite").material as ShaderMaterial
+		var key := str(holes)
+		if m == null or n.get_meta("holes_key", "") == key:
+			continue
+		n.set_meta("holes_key", key)
+		m.set_shader_parameter("hole_count", holes.size())
+		while holes.size() < 4:
+			holes.append(Vector4(0, 0, 1, 1))
+		m.set_shader_parameter("holes", holes)
 
 ## A floating label at `p` (field space), or, with `follow`, beside the point `at` of that unit (toward `dir`) and
 ## moving with it.
@@ -1293,16 +1334,16 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	box.reset_size()
 	var origin: Vector2 = follow.position if follow else Vector2.ZERO
 	var r := Rect2(p - Vector2(box.size.x * 0.5, 0), box.size)
-	if follow and dir != 0:
-		r = Rect2(origin + at + Vector2(34.0 if dir > 0 else -34.0 - box.size.x, -box.size.y * 0.5), box.size)
-	elif follow:
-		r.position += origin
 	var now := Time.get_ticks_msec()
 	_floats = _floats.filter(func(o): return is_instance_valid(o) and now - int(o.get_meta("born")) < 1500)
+	if follow and dir != 0:
+		r = _label_spot(follow, origin, at, dir, box.size)
+	elif follow:
+		r.position += origin
 	# don't land on a label that just appeared or on another stack's count badge: step aside (outward from the stack
 	# for a damage label), never up into the next row where it would read as that stack's
 	var step := dir if dir != 0 else (1 if p.x < 960 else -1)
-	for k in 4:
+	for k in (0 if follow and dir != 0 else 4):
 		var hit = null
 		for o in _floats:
 			if r.intersects(o.get_meta("float_rect").grow(-2)):
@@ -1327,6 +1368,45 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	tw.tween_property(box, "position:y", box.position.y - (6 if dir != 0 else 40), 1.3).set_ease(Tween.EASE_OUT)
 	tw.tween_property(box, "modulate:a", 0.0, 0.5).set_delay(1.0)
 	tw.chain().tween_callback(box.queue_free)
+
+## Where a damage label for the stack of `n` goes: behind its feet (opposite its badge), in front of them beyond the
+## badge, above its head or over its body; the first spot that covers no other stack, badge or label, else the one
+## that covers least.
+func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2) -> Rect2:
+	var top: float = n.get_meta("top", 120.0)
+	var cands := [
+		Rect2(origin + at + Vector2(34.0 if dir > 0 else -34.0 - sz.x, -sz.y * 0.5), sz),
+		Rect2(origin + Vector2(-at.x, at.y) + Vector2(-34.0 - sz.x if dir > 0 else 34.0, -sz.y * 0.5), sz),
+		Rect2(origin + Vector2(-sz.x * 0.5, -top - sz.y - 4), sz),
+		Rect2(origin + Vector2(-sz.x * 0.5, -top * 0.55 - sz.y * 0.5), sz)]
+	var blocks := []
+	for u in units:
+		var o: Node2D = units[u]
+		var b: Node2D = o.get_node("Badge")
+		if not b.st.get("alive", false):
+			continue
+		if o != n:
+			var half := HEX_W * (0.95 if L.is_wide(b.st) else 0.45)
+			var t: float = o.get_meta("top", 120.0)
+			blocks.append(Rect2(o.position.x - half, o.position.y - t, half * 2, t + 10))
+		blocks.append(Rect2(o.position + b.position - Vector2(20, 13), Vector2(40, 26)))
+	for f in _floats:
+		blocks.append(f.get_meta("float_rect"))
+	var best: Rect2 = cands[0]
+	var best_cost := INF
+	for i in cands.size():
+		var c: Rect2 = cands[i]
+		if c.position.y < 150 or c.end.y > BAR_Y - 4 or c.position.x < 4 or c.end.x > 1916:
+			continue
+		var cost := i * 50.0  # (ties go to the earlier spot)
+		for bl in blocks:
+			if c.intersects(bl):
+				var ov := c.intersection(bl)
+				cost += ov.get_area()
+		if cost < best_cost:
+			best_cost = cost
+			best = c
+	return best
 
 ## Spell name as a banner under the turn queue (not over the units), tinted by the caster's side.
 func _spell_banner(t: String, side: int) -> void:
@@ -1682,11 +1762,13 @@ class _Burst extends Node2D:
 				p = p.lerp(Vector2.ZERO, 1.0 / (8 - i)) + Vector2(randf_range(-30, 30), 0)
 				pts.append(p)
 			var a2 := 1.0 - t * 2.0
-			draw_polyline(pts, Color(0.45, 0.65, 1.0, 0.22 * a2), 34.0)  # outer glow
-			draw_polyline(pts, Color(0.6, 0.8, 1.0, 0.5 * a2), 16.0)
-			draw_polyline(pts, Color(0.85, 0.95, 1.0, a2), 7.0)
-			draw_polyline(pts, Color(1, 1, 1, a2), 3.0)
-			draw_circle(Vector2.ZERO, 60.0 * (1.0 - t), Color(0.9, 0.95, 1.0, 0.55 * a2))  # impact flash
+			draw_polyline(pts, Color(0.45, 0.65, 1.0, 0.16 * a2), 22.0)  # outer glow
+			draw_polyline(pts, Color(0.6, 0.8, 1.0, 0.4 * a2), 10.0)
+			draw_polyline(pts, Color(0.85, 0.95, 1.0, a2), 5.0)
+			draw_polyline(pts, Color(1, 1, 1, a2), 2.0)
+			draw_set_transform(Vector2.ZERO, 0, Vector2(1, 0.35))  # impact flash on the ground
+			draw_circle(Vector2.ZERO, 70.0 * (1.0 - t), Color(0.9, 0.95, 1.0, 0.45 * a2))
+			draw_set_transform(Vector2.ZERO)
 		if bolt:
 			return
 		draw_circle(Vector2.ZERO, radius * (0.3 + t * 0.9), Color(color, 0.35 * a))

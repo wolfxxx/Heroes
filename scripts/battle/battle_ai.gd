@@ -46,6 +46,7 @@ static func decide(L: BattleLogic, s: Dictionary) -> Dictionary:
 			# prefer staying put when already adjacent
 			if h == s["hex"]:
 				score += 5.0
+			score -= _stage_cost(L, s, e, h)
 			if score > best_score:
 				best_score = score
 				best_act = {"type": "melee", "target": e, "from": h}
@@ -69,6 +70,26 @@ static func decide(L: BattleLogic, s: Dictionary) -> Dictionary:
 	if best_h == s["hex"]:
 		return {"type": "defend"}
 	return {"type": "move", "hex": best_h}
+
+## Staging of a melee (a tie-break between spots to strike the same target from): side by side in the target's row
+## reads best, as in the classics; a spot right above or below other stacks piles the figures on each other.
+static func _stage_cost(L: BattleLogic, s: Dictionary, e: Dictionary, h: Vector2i) -> float:
+	var cost := 0.0 if h.y == e["hex"].y else 3.0
+	var mine: Array = L.cells(s, h)
+	for o in L.alive_stacks(0) + L.alive_stacks(1):
+		if o == s:
+			continue
+		var near := false
+		for c in L.cells(o):
+			for m in mine:
+				if absi(c.y - m.y) == 1 and absf(_col(c) - _col(m)) <= 0.5:
+					near = true
+		if near:
+			cost += 2.0
+	return cost
+
+static func _col(h: Vector2i) -> float:
+	return h.x + (0.5 if h.y % 2 == 1 else 0.0)
 
 static func decide_spell(L: BattleLogic, side: int) -> Dictionary:
 	if not L.can_cast(side):
