@@ -194,7 +194,17 @@ NL = chr(10)
 def _sprite_ratio(name):
     return json.load(open("imagegen/batch4/in/sprites.json"))[name]["ratio"]
 
+def _base(cid):
+    """An upgraded creature takes its base creature's notes (how it attacks, what to keep)."""
+    sys.path.insert(0, os.path.dirname(__file__))
+    import upgrade_paint
+    return upgrade_paint.UPGRADES.get(cid, (cid,))[0]
+
 def prompt_for(name):
+    if name.startswith(("upg__", "uport__", "udw__", "ucard__")):  # batch 23: upgraded creatures and dwellings
+        sys.path.insert(0, os.path.dirname(__file__))
+        import upgrade_paint
+        return upgrade_paint.prompt(name)
     if name.startswith("portrait_"):
         return PORTRAIT, "1:1"
     if name.startswith("card__"):  # batch 9: building pictures for buildings cut off by the town screen edge
@@ -212,14 +222,14 @@ def prompt_for(name):
         cid = name.split("__")[1]
         kd = json.load(open("imagegen/batch8/in/cycles.json"))[name]["kind"]
         what, frames = CYCLE_FRAMES[kd]
-        extra = CREATURE_NOTES.get(cid, "")
+        extra = CREATURE_NOTES.get(_base(cid), "")
         return CYCLE.format(what=what, frames=frames) + (NL + extra if extra else ""), "16:9"
     if name.startswith("gallop__"):  # batch 7: map hero gallop sheet
         return GALLOP + ("\n" + HERO_NOTES.get(name.split("__")[1], "")), "16:9"
     if name.startswith("pose__"):  # batch 6: extra battle poses on a magenta backdrop
         _, cid, pose = name.split("__")
-        note = POSE_NOTES.get(cid, "") if pose == "attack" else ""
-        extra = CREATURE_NOTES.get(cid, "")
+        note = POSE_NOTES.get(_base(cid), "") if pose == "attack" else ""
+        extra = CREATURE_NOTES.get(_base(cid), "")
         r = json.load(open("imagegen/batch6/in/poses.json"))[name]["ratio"]
         return POSE.format(pose=POSE_TEXT[pose]) + "".join("\n" + t for t in (note, extra) if t), r
     if name == "menu__bg":  # batch 5: title screen

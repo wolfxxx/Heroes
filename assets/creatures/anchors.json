@@ -31,6 +31,70 @@
 0.4847,
 0.8849
 ],
+"arch_lich.png": [
+0.2878,
+0.9309
+],
+"arch_lich_attack.png": [
+0.2651,
+0.8921
+],
+"arch_lich_dead.png": [
+0.4188,
+0.8776
+],
+"arch_lich_hit.png": [
+0.2801,
+0.9159
+],
+"arch_lich_move0.png": [
+0.3499,
+0.9597
+],
+"arch_lich_move1.png": [
+0.2995,
+0.9601
+],
+"arch_lich_move2.png": [
+0.3511,
+0.9601
+],
+"arch_lich_move3.png": [
+0.3137,
+0.9584
+],
+"archangel.png": [
+0.3956,
+0.9429
+],
+"archangel_attack.png": [
+0.3782,
+0.947
+],
+"archangel_dead.png": [
+0.3851,
+0.9381
+],
+"archangel_hit.png": [
+0.4432,
+0.945
+],
+"archangel_move0.png": [
+0.4878,
+0.8091
+],
+"archangel_move1.png": [
+0.489,
+0.905
+],
+"archangel_move2.png": [
+0.48,
+0.9553
+],
+"archangel_move3.png": [
+0.489,
+0.8614
+],
 "archer.png": [
 0.5,
 0.9046
@@ -127,6 +191,102 @@
 0.3908,
 0.9728
 ],
+"champion.png": [
+0.3215,
+0.9577
+],
+"champion_attack.png": [
+0.4136,
+0.9427
+],
+"champion_dead.png": [
+0.4731,
+0.9175
+],
+"champion_hit.png": [
+0.3667,
+0.9556
+],
+"champion_move0.png": [
+0.4271,
+0.9744
+],
+"champion_move1.png": [
+0.3937,
+0.9724
+],
+"champion_move2.png": [
+0.4135,
+0.9746
+],
+"champion_move3.png": [
+0.3603,
+0.977
+],
+"crusader.png": [
+0.3412,
+0.9324
+],
+"crusader_attack.png": [
+0.3354,
+0.9196
+],
+"crusader_dead.png": [
+0.3933,
+0.8769
+],
+"crusader_hit.png": [
+0.3538,
+0.9187
+],
+"crusader_move0.png": [
+0.3639,
+0.9556
+],
+"crusader_move1.png": [
+0.2639,
+0.955
+],
+"crusader_move2.png": [
+0.3106,
+0.9534
+],
+"crusader_move3.png": [
+0.2535,
+0.9583
+],
+"doom_rider.png": [
+0.2929,
+0.9571
+],
+"doom_rider_attack.png": [
+0.2857,
+0.9486
+],
+"doom_rider_dead.png": [
+0.4782,
+0.9298
+],
+"doom_rider_hit.png": [
+0.4608,
+0.9484
+],
+"doom_rider_move0.png": [
+0.3955,
+0.9731
+],
+"doom_rider_move1.png": [
+0.3966,
+0.9734
+],
+"doom_rider_move2.png": [
+0.3873,
+0.973
+],
+"doom_rider_move3.png": [
+0.3532,
+0.9754
+],
 "dread_knight.png": [
 0.5,
 0.9232
@@ -170,6 +330,38 @@
 "ghost_dead.png": [
 0.4792,
 0.8596
+],
+"ghost_dragon.png": [
+0.3766,
+0.956
+],
+"ghost_dragon_attack.png": [
+0.2917,
+0.9548
+],
+"ghost_dragon_dead.png": [
+0.417,
+0.938
+],
+"ghost_dragon_hit.png": [
+0.365,
+0.9537
+],
+"ghost_dragon_move0.png": [
+0.5548,
+0.9034
+],
+"ghost_dragon_move1.png": [
+0.4912,
+1.0279
+],
+"ghost_dragon_move2.png": [
+0.5106,
+1.0582
+],
+"ghost_dragon_move3.png": [
+0.4951,
+0.961
 ],
 "ghost_hit.png": [
 0.3279,
@@ -223,6 +415,38 @@
 0.5255,
 0.8349
 ],
+"halberdier.png": [
+0.3436,
+0.9331
+],
+"halberdier_attack.png": [
+0.4428,
+0.919
+],
+"halberdier_dead.png": [
+0.4198,
+0.8777
+],
+"halberdier_hit.png": [
+0.4111,
+0.9268
+],
+"halberdier_move0.png": [
+0.3512,
+0.9567
+],
+"halberdier_move1.png": [
+0.3374,
+0.9578
+],
+"halberdier_move2.png": [
+0.339,
+0.9538
+],
+"halberdier_move3.png": [
+0.3437,
+0.9573
+],
 "lich.png": [
 0.5,
 0.8995
@@ -254,6 +478,38 @@
 "lich_move3.png": [
 0.3745,
 0.9583
+],
+"marksman.png": [
+0.3032,
+0.9149
+],
+"marksman_attack.png": [
+0.3385,
+0.9164
+],
+"marksman_dead.png": [
+0.4428,
+0.8776
+],
+"marksman_hit.png": [
+0.4419,
+0.9231
+],
+"marksman_move0.png": [
+0.2944,
+0.9493
+],
+"marksman_move1.png": [
+0.2723,
+0.9485
+],
+"marksman_move2.png": [
+0.3002,
+0.9496
+],
+"marksman_move3.png": [
+0.2925,
+0.9498
 ],
 "monk.png": [
 0.5,
@@ -319,6 +575,70 @@
 0.3489,
 0.9627
 ],
+"plague_zombie.png": [
+0.3161,
+0.9187
+],
+"plague_zombie_attack.png": [
+0.2972,
+0.9145
+],
+"plague_zombie_dead.png": [
+0.4248,
+0.8425
+],
+"plague_zombie_hit.png": [
+0.3076,
+0.9161
+],
+"plague_zombie_move0.png": [
+0.307,
+0.9504
+],
+"plague_zombie_move1.png": [
+0.2836,
+0.9524
+],
+"plague_zombie_move2.png": [
+0.304,
+0.9502
+],
+"plague_zombie_move3.png": [
+0.2817,
+0.9486
+],
+"royal_griffin.png": [
+0.4345,
+0.9189
+],
+"royal_griffin_attack.png": [
+0.4655,
+0.9455
+],
+"royal_griffin_dead.png": [
+0.471,
+0.8996
+],
+"royal_griffin_hit.png": [
+0.429,
+0.9346
+],
+"royal_griffin_move0.png": [
+0.4809,
+0.8732
+],
+"royal_griffin_move1.png": [
+0.493,
+0.9279
+],
+"royal_griffin_move2.png": [
+0.4439,
+1.0463
+],
+"royal_griffin_move3.png": [
+0.4815,
+0.881
+],
 "skeleton.png": [
 0.5,
 0.8678
@@ -350,6 +670,38 @@
 "skeleton_move3.png": [
 0.2484,
 0.9554
+],
+"skeleton_warrior.png": [
+0.2502,
+0.927
+],
+"skeleton_warrior_attack.png": [
+0.2701,
+0.9327
+],
+"skeleton_warrior_dead.png": [
+0.4417,
+0.8899
+],
+"skeleton_warrior_hit.png": [
+0.3187,
+0.9233
+],
+"skeleton_warrior_move0.png": [
+0.2924,
+0.9535
+],
+"skeleton_warrior_move1.png": [
+0.2923,
+0.9518
+],
+"skeleton_warrior_move2.png": [
+0.2702,
+0.9545
+],
+"skeleton_warrior_move3.png": [
+0.2573,
+0.9511
 ],
 "swordsman.png": [
 0.5,
@@ -399,6 +751,38 @@
 0.4569,
 0.9335
 ],
+"vampire_lord.png": [
+0.4911,
+0.9326
+],
+"vampire_lord_attack.png": [
+0.4638,
+0.9292
+],
+"vampire_lord_dead.png": [
+0.4417,
+0.9152
+],
+"vampire_lord_hit.png": [
+0.4491,
+0.9306
+],
+"vampire_lord_move0.png": [
+0.6423,
+0.8586
+],
+"vampire_lord_move1.png": [
+0.5554,
+0.923
+],
+"vampire_lord_move2.png": [
+0.6362,
+0.977
+],
+"vampire_lord_move3.png": [
+0.5842,
+0.8797
+],
 "vampire_move0.png": [
 0.6817,
 0.8933
@@ -414,6 +798,70 @@
 "vampire_move3.png": [
 0.576,
 0.9769
+],
+"wraith.png": [
+0.3246,
+0.9205
+],
+"wraith_attack.png": [
+0.2785,
+0.9012
+],
+"wraith_dead.png": [
+0.4329,
+0.871
+],
+"wraith_hit.png": [
+0.4522,
+0.9128
+],
+"wraith_move0.png": [
+0.4819,
+0.9632
+],
+"wraith_move1.png": [
+0.4449,
+0.8953
+],
+"wraith_move2.png": [
+0.4896,
+0.9733
+],
+"wraith_move3.png": [
+0.4397,
+0.942
+],
+"zealot.png": [
+0.2738,
+0.9243
+],
+"zealot_attack.png": [
+0.2251,
+0.9102
+],
+"zealot_dead.png": [
+0.3948,
+0.8506
+],
+"zealot_hit.png": [
+0.4033,
+0.9135
+],
+"zealot_move0.png": [
+0.3348,
+0.9498
+],
+"zealot_move1.png": [
+0.2465,
+0.9535
+],
+"zealot_move2.png": [
+0.326,
+0.9519
+],
+"zealot_move3.png": [
+0.2679,
+0.9541
 ],
 "zombie.png": [
 0.5,

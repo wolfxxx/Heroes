@@ -100,7 +100,7 @@ func _demo_setup() -> Dictionary:
 	var a := GameState.make_hero("sir_aldric", 0)
 	var d := GameState.make_hero("lord_morthis", 1)
 	for h in [a, d]:
-		var c: Array = GameData.FACTIONS[h["faction"]]["creatures"]
+		var c: Array = GameData.FACTIONS[h["faction"]]["upgrades" if Shot.setup == "upgraded" else "creatures"]
 		for i in 7:
 			h["army"][i] = {"id": c[i], "count": [30, 18, 9, 6, 4, 2, 1][i]}
 		h["spells"] = GameData.SPELLS.keys() if Shot.setup == "all_spells" else ["magic_arrow", "bless", "lightning_bolt", "fireball", "haste", "cure"]
@@ -1050,7 +1050,7 @@ func _anim_attack(ev: Dictionary) -> void:
 	if ev["ranged"]:
 		_pose(a, "attack", 0.55)
 		var proj := _Projectile.new()
-		proj.kind = "magic" if a["id"] in ["monk", "lich"] else "arrow"
+		proj.kind = "magic" if GameData.base_of(a["id"]) in ["monk", "lich"] else "arrow"
 		proj.from = na.position + Vector2(0, -_top(a) * 0.6)
 		proj.to = nd.position + Vector2(0, -60)
 		_fx.add_child(proj)
@@ -1073,7 +1073,7 @@ func _anim_attack(ev: Dictionary) -> void:
 		tw2.tween_property(spr, "position", home + dir * 24, 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 		tw2.tween_property(spr, "rotation", 0.05 * lean, 0.08)
 		await tw2.finished
-		Audio.creature_sfx(a["id"], "attack", "claw_hit" if a["id"] in ["griffin", "bone_dragon", "ghost", "vampire"] else ("blunt_hit" if a["id"] in ["zombie", "monk"] else "sword_hit"))
+		Audio.creature_sfx(a["id"], "attack", "claw_hit" if GameData.base_of(a["id"]) in ["griffin", "bone_dragon", "ghost", "vampire"] else ("blunt_hit" if GameData.base_of(a["id"]) in ["zombie", "monk"] else "sword_hit"))
 		_hit_flash(d, dir, big)
 		await get_tree().create_timer(0.07).timeout  # hit-stop: let the blow land
 		var tw3 := spr.create_tween().set_parallel(true)
@@ -1130,7 +1130,7 @@ func _anim_death(st: Dictionary) -> void:
 		return
 	n.set_meta("fallen", true)
 	var c := L.cdata(st)
-	Audio.creature_sfx(st["id"], "death", "death_undead" if "undead" in c["abilities"] else ("death_beast" if st["id"] in ["griffin"] else "death_human"))
+	Audio.creature_sfx(st["id"], "death", "death_undead" if "undead" in c["abilities"] else ("death_beast" if GameData.base_of(st["id"]) in ["griffin"] else "death_human"))
 	var s: Sprite2D = n.get_node("Sprite")
 	n.get_node("Badge").visible = false
 	n.get_node("Shadow").visible = false
@@ -1189,6 +1189,7 @@ func _anim_spell(ev: Dictionary) -> void:
 		if sp == "lightning_bolt":
 			var burst := _Burst.new()  # the bolt from the sky; the painted sparks are the impact, at the feet
 			burst.bolt = true
+			burst.slant = 1.0 if c.x > 960 else -1.0
 			burst.position = c + Vector2(0, 62)
 			_fx.add_child(burst)
 			p = c + Vector2(0, 40)
@@ -1348,7 +1349,7 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 		await get_tree().create_timer(delay).timeout
 	var box := PanelContainer.new()
 	var bg := StyleBoxFlat.new()  # soft dark backing so numbers stay readable over busy sprites
-	bg.bg_color = Color(0, 0, 0, 0.42)
+	bg.bg_color = Color(0.05, 0.03, 0.02, 0.72) if follow else Color(0, 0, 0, 0.42)
 	bg.set_corner_radius_all(8)
 	bg.content_margin_left = 10
 	bg.content_margin_right = 10
@@ -1405,6 +1406,14 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 		var tip := _LabelTip.new()
 		tip.color = Color(0.85, 0.3, 0.25) if dir < 0 else Color(0.35, 0.5, 1.0)
 		tip.position = Vector2(box.size.x * 0.5, box.size.y)
+		if r.end.x < origin.x - 8:  # left of the stack: points right
+			tip.side = 1
+			tip.rotation = -PI * 0.5
+			tip.position = Vector2(box.size.x, box.size.y * 0.5)
+		elif r.position.x > origin.x + 8:
+			tip.side = -1
+			tip.rotation = PI * 0.5
+			tip.position = Vector2(0, box.size.y * 0.5)
 		box.add_child(tip)
 		bg.border_color = tip.color
 		bg.set_border_width_all(2)
@@ -1417,14 +1426,18 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	tw.chain().tween_callback(box.queue_free)
 
 ## Where a damage label for the stack of `n` goes: centred over its head, or higher up the same column when another
-## stack, badge or label is there, else over its own body; the lowest spot that covers nothing, else the one that
-## covers least.
+## stack, badge or label is there, else beside its head; the first spot that covers nothing, else the one that covers
+## least.
 func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2) -> Rect2:
 	var top: float = n.get_meta("top", 120.0)
 	var cands := []
-	for k in 4:  # over the head, then higher up the same column
+	for k in 3:  # over the head, then higher up the same column
 		cands.append(Rect2(origin + Vector2(-sz.x * 0.5, -top - sz.y - 6 - k * 30.0), sz))
-	cands.append(Rect2(origin + Vector2(-sz.x * 0.5, -top * 0.55 - sz.y * 0.5), sz))  # over its own body
+	# beside the head, pointing in at it (never over its own body: the label hid the figure)
+	var own_half := HEX_W * (0.7 if L.is_wide(n.get_node("Badge").st) else 0.36)
+	var hy := -top * 0.8 - sz.y * 0.5
+	cands.append(Rect2(origin + Vector2(own_half + 14, hy), sz))
+	cands.append(Rect2(origin + Vector2(-own_half - 14 - sz.x, hy), sz))
 	var blocks := []
 	for u in units:
 		var o: Node2D = units[u]
@@ -1435,7 +1448,9 @@ func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2)
 			var half := HEX_W * (0.95 if L.is_wide(b.st) else 0.45)
 			var t: float = o.get_meta("top", 120.0)
 			blocks.append(Rect2(o.position.x - half, o.position.y - t, half * 2, t + 10))
-		blocks.append(Rect2(o.position + b.position - Vector2(20, 13), Vector2(40, 26)))
+		var br := Rect2(o.position + b.position - Vector2(20, 13), Vector2(40, 26))
+		for k in 3:  # (a badge under a label read as part of it: "-34 / 2")
+			blocks.append(br)
 	for f in _floats:
 		blocks.append(f.get_meta("float_rect"))
 	var light := blocks.size()  # (obstacles count less: a label centred over its stack still reads as that stack's)
@@ -1446,11 +1461,12 @@ func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2)
 		var c: Rect2 = cands[i]
 		if c.position.y < 150 or c.end.y > BAR_Y - 4 or c.position.x < 4 or c.end.x > 1916:
 			continue
-		var cost := i * 400.0  # (the lowest free spot wins)
+		var cost := i * 150.0  # (the lowest free spot wins, then beside the head)
+		var hit := c.grow_individual(0, 0, 0, 14) if i < 3 else c  # (with the pointer under it)
 		for j in blocks.size():
 			var bl: Rect2 = blocks[j]
-			if c.intersects(bl):
-				cost += c.intersection(bl).get_area() * (0.15 if j >= light else 1.0)
+			if hit.intersects(bl):
+				cost += hit.intersection(bl).get_area() * (0.15 if j >= light else 1.0)
 		if cost < best_cost:
 			best_cost = cost
 			best = c
@@ -1459,6 +1475,7 @@ func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2)
 ## Small triangle under a damage label, pointing down at the stack it belongs to.
 class _LabelTip extends Node2D:
 	var color := Color.WHITE
+	var side := 0  # 0: under the label pointing down; 1 / -1: at its right / left edge pointing out
 	func _draw() -> void:
 		draw_colored_polygon(PackedVector2Array([Vector2(-13, -1), Vector2(13, -1), Vector2(0, 14)]), Color(0, 0, 0, 0.6))
 		draw_colored_polygon(PackedVector2Array([Vector2(-10, -1), Vector2(10, -1), Vector2(0, 11)]), color)
@@ -1798,6 +1815,7 @@ class _Burst extends Node2D:
 	var color := Color.WHITE
 	var radius := 70.0
 	var bolt := false
+	var slant := 1.0  # the bolt comes down slanted from this side (the field's outer edge), not through the stacks above
 	var t := 0.0
 	var _seeds := []
 	func _ready() -> void:
@@ -1811,10 +1829,10 @@ class _Burst extends Node2D:
 	func _draw() -> void:
 		var a := 1.0 - t
 		if bolt and t < 0.5:
-			var p := Vector2(0, -700)
+			var p := Vector2(380.0 * slant, -620)
 			var pts := PackedVector2Array([p])
 			for i in 8:
-				p = p.lerp(Vector2.ZERO, 1.0 / (8 - i)) + Vector2(randf_range(-30, 30), 0)
+				p = p.lerp(Vector2.ZERO, 1.0 / (8 - i)) + Vector2(randf_range(-22, 22), randf_range(-14, 14)) * (1.0 if i < 7 else 0.0)
 				pts.append(p)
 			var a2 := 1.0 - t * 2.0
 			draw_polyline(pts, Color(0.45, 0.65, 1.0, 0.16 * a2), 22.0)  # outer glow

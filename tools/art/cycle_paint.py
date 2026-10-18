@@ -20,7 +20,8 @@ KIND = {"griffin": "fly", "angel": "fly", "vampire": "fly", "bone_dragon": "fly"
         "cavalier": "gallop", "dread_knight": "gallop"}  # everything else walks
 
 def kind(cid):
-    return KIND.get(cid, "walk")
+    from upgrade_paint import UPGRADES  # (an upgraded creature moves like its base one)
+    return KIND.get(UPGRADES.get(cid, (cid,))[0], "walk")
 
 def prep(cids):
     os.makedirs(f"{BATCH}/in", exist_ok=True)

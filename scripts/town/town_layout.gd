@@ -29,6 +29,8 @@ static func slot_of(id: String) -> String:
 		return "fort"
 	if id.begins_with("mage_guild"):
 		return "mage_guild"
+	if id.begins_with("dwelling_") and id.ends_with("u"):
+		return id.trim_suffix("u")  # (the upgraded dwelling stands where the base one stood)
 	return id
 
 static func sprite_id(id: String) -> String:

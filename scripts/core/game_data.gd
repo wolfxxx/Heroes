@@ -19,12 +19,14 @@ const FACTIONS := {
 		"name": "Haven",
 		"desc": "Knights and holy warriors sworn to the Shattered Crown.",
 		"creatures": ["pikeman", "archer", "griffin", "swordsman", "monk", "cavalier", "angel"],
+		"upgrades": ["halberdier", "marksman", "royal_griffin", "crusader", "zealot", "champion", "archangel"],
 		"terrain": "grass",
 	},
 	"necropolis": {
 		"name": "Necropolis",
 		"desc": "Necromancers commanding legions of the restless dead.",
 		"creatures": ["skeleton", "zombie", "ghost", "vampire", "lich", "dread_knight", "bone_dragon"],
+		"upgrades": ["skeleton_warrior", "plague_zombie", "wraith", "vampire_lord", "arch_lich", "doom_rider", "ghost_dragon"],
 		"terrain": "dirt",
 	},
 }
@@ -80,6 +82,49 @@ const CREATURES := {
 	"bone_dragon": {"name": "Bone Dragon", "plural": "Bone Dragons", "faction": "necropolis", "tier": 7,
 		"attack": 17, "defense": 15, "dmg": [25, 50], "hp": 150, "speed": 9, "growth": 1, "shots": 0,
 		"cost": {"gold": 1800}, "abilities": ["undead", "flying", "fear", "two_hex"], "ai_value": 3388},
+	# ---------------- UPGRADES (from an upgraded dwelling; "upgrade_of" names the base creature) ----------------
+	"halberdier": {"name": "Halberdier", "plural": "Halberdiers", "faction": "haven", "tier": 1, "upgrade_of": "pikeman",
+		"attack": 6, "defense": 5, "dmg": [2, 3], "hp": 10, "speed": 5, "growth": 14, "shots": 0,
+		"cost": {"gold": 75}, "abilities": ["anti_cavalry"], "ai_value": 115},
+	"marksman": {"name": "Marksman", "plural": "Marksmen", "faction": "haven", "tier": 2, "upgrade_of": "archer",
+		"attack": 7, "defense": 4, "dmg": [2, 4], "hp": 10, "speed": 6, "growth": 9, "shots": 24,
+		"cost": {"gold": 150}, "abilities": ["ranged"], "ai_value": 184},
+	"royal_griffin": {"name": "Royal Griffin", "plural": "Royal Griffins", "faction": "haven", "tier": 3, "upgrade_of": "griffin",
+		"attack": 9, "defense": 9, "dmg": [3, 6], "hp": 25, "speed": 9, "growth": 7, "shots": 0,
+		"cost": {"gold": 240}, "abilities": ["flying", "two_retaliations", "two_hex"], "ai_value": 448},
+	"crusader": {"name": "Crusader", "plural": "Crusaders", "faction": "haven", "tier": 4, "upgrade_of": "swordsman",
+		"attack": 12, "defense": 12, "dmg": [7, 10], "hp": 35, "speed": 6, "growth": 4, "shots": 0,
+		"cost": {"gold": 400}, "abilities": ["double_strike"], "ai_value": 588},
+	"zealot": {"name": "Zealot", "plural": "Zealots", "faction": "haven", "tier": 5, "upgrade_of": "monk",
+		"attack": 12, "defense": 10, "dmg": [10, 12], "hp": 30, "speed": 7, "growth": 3, "shots": 24,
+		"cost": {"gold": 450}, "abilities": ["ranged"], "ai_value": 750},
+	"champion": {"name": "Champion", "plural": "Champions", "faction": "haven", "tier": 6, "upgrade_of": "cavalier",
+		"attack": 16, "defense": 16, "dmg": [20, 25], "hp": 100, "speed": 9, "growth": 2, "shots": 0,
+		"cost": {"gold": 1200}, "abilities": ["jousting", "two_hex"], "ai_value": 2100},
+	"archangel": {"name": "Archangel", "plural": "Archangels", "faction": "haven", "tier": 7, "upgrade_of": "angel",
+		"attack": 30, "defense": 30, "dmg": [50, 50], "hp": 250, "speed": 18, "growth": 1, "shots": 0,
+		"cost": {"gold": 5000, "gems": 3}, "abilities": ["flying", "hates_undead", "two_hex"], "ai_value": 8776},
+	"skeleton_warrior": {"name": "Skeleton Warrior", "plural": "Skeleton Warriors", "faction": "necropolis", "tier": 1, "upgrade_of": "skeleton",
+		"attack": 6, "defense": 6, "dmg": [1, 3], "hp": 6, "speed": 5, "growth": 12, "shots": 0,
+		"cost": {"gold": 70}, "abilities": ["undead"], "ai_value": 85},
+	"plague_zombie": {"name": "Plague Zombie", "plural": "Plague Zombies", "faction": "necropolis", "tier": 2, "upgrade_of": "zombie",
+		"attack": 7, "defense": 6, "dmg": [2, 3], "hp": 25, "speed": 4, "growth": 8, "shots": 0,
+		"cost": {"gold": 140}, "abilities": ["undead", "disease"], "ai_value": 180},
+	"wraith": {"name": "Wraith", "plural": "Wraiths", "faction": "necropolis", "tier": 3, "upgrade_of": "ghost",
+		"attack": 7, "defense": 7, "dmg": [3, 5], "hp": 18, "speed": 9, "growth": 7, "shots": 0,
+		"cost": {"gold": 230}, "abilities": ["undead", "flying", "regenerate"], "ai_value": 315},
+	"vampire_lord": {"name": "Vampire Lord", "plural": "Vampire Lords", "faction": "necropolis", "tier": 4, "upgrade_of": "vampire",
+		"attack": 10, "defense": 10, "dmg": [5, 8], "hp": 40, "speed": 9, "growth": 4, "shots": 0,
+		"cost": {"gold": 500}, "abilities": ["undead", "flying", "no_retaliation", "life_drain"], "ai_value": 783},
+	"arch_lich": {"name": "Arch Lich", "plural": "Arch Liches", "faction": "necropolis", "tier": 5, "upgrade_of": "lich",
+		"attack": 13, "defense": 10, "dmg": [11, 15], "hp": 40, "speed": 7, "growth": 3, "shots": 24,
+		"cost": {"gold": 600}, "abilities": ["undead", "ranged", "death_cloud"], "ai_value": 1079},
+	"doom_rider": {"name": "Doom Rider", "plural": "Doom Riders", "faction": "necropolis", "tier": 6, "upgrade_of": "dread_knight",
+		"attack": 20, "defense": 20, "dmg": [20, 35], "hp": 130, "speed": 9, "growth": 2, "shots": 0,
+		"cost": {"gold": 1500}, "abilities": ["undead", "death_blow", "two_hex"], "ai_value": 2950},
+	"ghost_dragon": {"name": "Ghost Dragon", "plural": "Ghost Dragons", "faction": "necropolis", "tier": 7, "upgrade_of": "bone_dragon",
+		"attack": 19, "defense": 17, "dmg": [25, 50], "hp": 200, "speed": 14, "growth": 1, "shots": 0,
+		"cost": {"gold": 3000, "mercury": 1}, "abilities": ["undead", "flying", "fear", "two_hex"], "ai_value": 4696},
 }
 
 const ABILITY_TEXT := {
@@ -170,6 +215,14 @@ const BUILDINGS := {
 	"dwelling_5": {"name": "Dwelling V", "cost": {"gold": 3000, "wood": 5, "ore": 5, "crystal": 5, "gems": 5}, "dwelling_tier": 5, "requires": ["dwelling_3", "mage_guild_1"]},
 	"dwelling_6": {"name": "Dwelling VI", "cost": {"gold": 5000, "wood": 10, "ore": 10, "sulfur": 5}, "dwelling_tier": 6, "requires": ["dwelling_4", "blacksmith"]},
 	"dwelling_7": {"name": "Dwelling VII", "cost": {"gold": 20000, "ore": 10, "mercury": 10, "gems": 10}, "dwelling_tier": 7, "requires": ["dwelling_5", "dwelling_6", "citadel"]},
+	# upgraded dwellings replace their base one and recruit (and upgrade stacks to) the faction's upgraded creature
+	"dwelling_1u": {"name": "Upg. Dwelling I", "cost": {"gold": 1000, "ore": 5}, "dwelling_tier": 1, "requires": ["dwelling_1", "blacksmith"], "replaces": "dwelling_1"},
+	"dwelling_2u": {"name": "Upg. Dwelling II", "cost": {"gold": 1000, "wood": 5, "ore": 5}, "dwelling_tier": 2, "requires": ["dwelling_2"], "replaces": "dwelling_2"},
+	"dwelling_3u": {"name": "Upg. Dwelling III", "cost": {"gold": 1000, "wood": 5, "ore": 5}, "dwelling_tier": 3, "requires": ["dwelling_3"], "replaces": "dwelling_3"},
+	"dwelling_4u": {"name": "Upg. Dwelling IV", "cost": {"gold": 1500, "wood": 5, "ore": 5, "crystal": 5}, "dwelling_tier": 4, "requires": ["dwelling_4"], "replaces": "dwelling_4"},
+	"dwelling_5u": {"name": "Upg. Dwelling V", "cost": {"gold": 3000, "wood": 5, "ore": 5, "crystal": 2, "gems": 2}, "dwelling_tier": 5, "requires": ["dwelling_5", "mage_guild_2"], "replaces": "dwelling_5"},
+	"dwelling_6u": {"name": "Upg. Dwelling VI", "cost": {"gold": 3000, "wood": 10, "ore": 10, "sulfur": 5}, "dwelling_tier": 6, "requires": ["dwelling_6"], "replaces": "dwelling_6"},
+	"dwelling_7u": {"name": "Upg. Dwelling VII", "cost": {"gold": 20000, "ore": 10, "mercury": 10, "gems": 10}, "dwelling_tier": 7, "requires": ["dwelling_7", "mage_guild_3"], "replaces": "dwelling_7"},
 }
 
 const DWELLING_NAMES := {
@@ -222,11 +275,22 @@ static func creature(id: String) -> Dictionary:
 static func faction_creature(faction: String, tier: int) -> String:
 	return FACTIONS[faction]["creatures"][tier - 1]
 
-static func dwelling_name(faction: String, tier: int) -> String:
-	return DWELLING_NAMES[faction][tier - 1]
+static func dwelling_name(faction: String, tier: int, upgraded := false) -> String:
+	return ("Upg. " if upgraded else "") + DWELLING_NAMES[faction][tier - 1]
+
+## The upgraded creature of a base one ("" when it has none: already upgraded, or not a faction creature).
+static func upgrade_of_base(cid: String) -> String:
+	var c: Dictionary = CREATURES.get(cid, {})
+	if c.is_empty() or c.has("upgrade_of") or not FACTIONS.has(c.get("faction", "")):
+		return ""
+	return FACTIONS[c["faction"]].get("upgrades", [])[c["tier"] - 1]
+
+## The base creature of an upgraded one (itself for a base creature): sounds and attack effects follow it.
+static func base_of(cid: String) -> String:
+	return CREATURES.get(cid, {}).get("upgrade_of", cid)
 
 static func building_name(faction: String, id: String) -> String:
 	var b: Dictionary = BUILDINGS[id]
 	if b.has("dwelling_tier"):
-		return dwelling_name(faction, b["dwelling_tier"])
+		return dwelling_name(faction, b["dwelling_tier"], b.has("replaces"))
 	return b["name"]

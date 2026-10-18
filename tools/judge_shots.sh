@@ -9,7 +9,7 @@ run --shot=$D/menu.png --delay=3
 run --shot=$D/newgame.png --delay=3 --setup=new_game
 run --shot=$D/adventure_start.png --scene=res://scenes/adventure.tscn --delay=4 --setup=demo
 run --shot=$D/adventure_overview.png --scene=res://scenes/adventure.tscn --delay=4 --setup=x --reveal --cam=20,20 --zoom=0.7
-run --shot=$D/adventure_close.png --scene=res://scenes/adventure.tscn --delay=4 --setup=x --seed=4242 --faction=necropolis --reveal --cam=12,14 --zoom=1.0
+run --shot=$D/adventure_close.png --scene=res://scenes/adventure.tscn --delay=4 --setup=x --seed=4242 --faction=necropolis --reveal --cam=12,12 --zoom=1.0
 run --shot=$D/adventure_snow.png --scene=res://scenes/adventure.tscn --delay=4 --setup=rich --reveal --cam=9,17 --zoom=1.3
 # one click on a road tile plans the route (arrows), a second would walk it
 run --shot=$D/adventure_path.png --scene=res://scenes/adventure.tscn --delay=4 --setup=demo --click=810,598
@@ -18,8 +18,12 @@ run --shot=$D/town_haven_early.png --scene=res://scenes/town.tscn --delay=3 --se
 run --shot=$D/town_haven_full.png --scene=res://scenes/town.tscn --delay=3 --setup=rich
 run --shot=$D/town_necro_full.png --scene=res://scenes/town.tscn --delay=3 --setup=necro_rich
 run --shot=$D/town_build.png --scene=res://scenes/town.tscn --delay=3 --setup=demo --keys=B
+run --shot=$D/town_build_rich.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --keys=B
+# right click the hero's pikemen: the upgraded guardhouse offers to upgrade them
+run --shot=$D/town_upgrade.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --click=r528,966
 run --shot=$D/town_recruit.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --keys=R
 run --shot=$D/battle.png --scene=res://scenes/battle.tscn --delay=2 --setup=demo --shots=3 --interval=5 --keys=A
+run --shot=$D/battle_upgraded.png --scene=res://scenes/battle.tscn --delay=3 --setup=upgraded
 # hover twice: the first hover panel of a run can be mispositioned; keep the second
 run --shot=$D/hv.png --scene=res://scenes/battle.tscn --delay=3 --setup=demo --hover="264,410;270,412" --shots=2 --interval=0.5
 mv -f $D/hv_1.png $D/battle_hover.png; rm -f $D/hv_0.png

@@ -83,7 +83,7 @@ static func build(town: Dictionary, player: Dictionary, id: String) -> bool:
 		town["buildings"].erase(b["replaces"])
 	town["buildings"].append(id)
 	town["built_today"] = true
-	if b.has("dwelling_tier"):
+	if b.has("dwelling_tier") and not b.has("replaces"):  # (an upgrade keeps the base dwelling's stock)
 		var tier: int = b["dwelling_tier"]
 		var cid := GameData.faction_creature(town["faction"], tier)
 		town["available"][tier - 1] += GameData.CREATURES[cid]["growth"]
@@ -123,6 +123,42 @@ static func daily_income(town: Dictionary) -> int:
 			return GameData.BUILDINGS[id]["income"]
 	return 0
 
+## The creature a dwelling recruits: the upgraded one once its dwelling is upgraded.
+static func dwelling_creature(town: Dictionary, tier: int) -> String:
+	if has_building(town, "dwelling_%du" % tier):
+		return GameData.FACTIONS[town["faction"]]["upgrades"][tier - 1]
+	return GameData.faction_creature(town["faction"], tier)
+
+## What a stack of `cid` can be upgraded to in this town ("" if nothing: no upgraded dwelling, other faction, done).
+static func upgrade_target(town: Dictionary, cid: String) -> String:
+	var up := GameData.upgrade_of_base(cid)
+	if up == "" or GameData.CREATURES[cid]["faction"] != town["faction"]:
+		return ""
+	return up if has_building(town, "dwelling_%du" % GameData.CREATURES[cid]["tier"]) else ""
+
+## Price of upgrading `count` creatures: the difference in recruiting cost, per resource.
+static func upgrade_cost(cid: String, up: String, count: int) -> Dictionary:
+	var out := {}
+	var a: Dictionary = GameData.CREATURES[cid]["cost"]
+	var b: Dictionary = GameData.CREATURES[up]["cost"]
+	for r in b:
+		var d: int = (b[r] - a.get(r, 0)) * count
+		if d > 0:
+			out[r] = d
+	return out
+
+## Upgrades a whole stack in place; false when it can't be upgraded here or the player can't pay.
+static func upgrade_stack(town: Dictionary, player: Dictionary, stack: Dictionary) -> bool:
+	var up := upgrade_target(town, stack["id"])
+	if up == "":
+		return false
+	var cost := upgrade_cost(stack["id"], up, stack["count"])
+	if not can_afford(player, cost):
+		return false
+	pay(player, cost)
+	stack["id"] = up
+	return true
+
 static func weekly_growth(town: Dictionary) -> void:
 	var mult := 1.5 if has_building(town, "citadel") else 1.0
 	for tier in range(1, 8):
@@ -131,7 +167,7 @@ static func weekly_growth(town: Dictionary) -> void:
 			town["available"][tier - 1] += int(GameData.CREATURES[cid]["growth"] * mult)
 
 static func recruit(town: Dictionary, player: Dictionary, tier: int, count: int, army: Array) -> bool:
-	var cid := GameData.faction_creature(town["faction"], tier)
+	var cid := dwelling_creature(town, tier)
 	var cost: Dictionary = GameData.CREATURES[cid]["cost"]
 	if count <= 0 or count > town["available"][tier - 1] or not can_afford(player, cost, count):
 		return false
@@ -142,7 +178,7 @@ static func recruit(town: Dictionary, player: Dictionary, tier: int, count: int,
 	return true
 
 static func max_recruitable(town: Dictionary, player: Dictionary, tier: int) -> int:
-	var cid := GameData.faction_creature(town["faction"], tier)
+	var cid := dwelling_creature(town, tier)
 	var cost: Dictionary = GameData.CREATURES[cid]["cost"]
 	var n: int = town["available"][tier - 1]
 	for r in cost:

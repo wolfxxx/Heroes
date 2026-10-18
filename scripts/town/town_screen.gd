@@ -40,7 +40,7 @@ func _resolve_state() -> void:
 		if Shot.setup.contains("rich"):
 			var t: Dictionary = world["towns"][uid]
 			t["buildings"] = ["city_hall", "citadel", "tavern", "marketplace", "mage_guild_2", "blacksmith",
-				"dwelling_1", "dwelling_2", "dwelling_3", "dwelling_4", "dwelling_5", "dwelling_6", "dwelling_7"]
+				"dwelling_1u", "dwelling_2u", "dwelling_3u", "dwelling_4", "dwelling_5", "dwelling_6u", "dwelling_7"]
 			TownLogic.learn_guild_spells(t)
 			TownLogic.weekly_growth(t)
 	town = world["towns"][uid]
@@ -158,6 +158,8 @@ func refresh() -> void:
 	flag.tooltip_text = "Garrison"
 	row1.add_child(flag)
 	var g := ArmyStrip.new()
+	g.upgrade_town = town
+	g.upgrade_player = player
 	g.bind(town["garrison"], _group, false)
 	g.changed.connect(_on_army_changed)
 	row1.add_child(g)
@@ -182,6 +184,8 @@ func refresh() -> void:
 		p.tooltip_text = "%s, level %d %s" % [hero["name"], hero["level"], hero["class"]]
 		row2.add_child(p)
 		var hs := ArmyStrip.new()
+		hs.upgrade_town = town
+		hs.upgrade_player = player
 		hs.bind(hero["army"], _group, true)
 		hs.changed.connect(_on_army_changed)
 		row2.add_child(hs)
@@ -251,7 +255,7 @@ func _pic_button(tex: Texture2D, caption: String, tip: String, cb: Callable, sz 
 
 ## One dwelling in the bar: the creature's portrait and how many can be recruited (dimmed if not built).
 func _creature_cell(tier: int) -> Button:
-	var cid := GameData.faction_creature(town["faction"], tier)
+	var cid := TownLogic.dwelling_creature(town, tier)
 	var built := TownLogic.has_building(town, "dwelling_%d" % tier)
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(76, 100)
@@ -269,7 +273,7 @@ func _creature_cell(tier: int) -> Button:
 	n.size = Vector2(76, 26)
 	n.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(n)
-	var name := GameData.dwelling_name(town["faction"], tier)
+	var name := GameData.dwelling_name(town["faction"], tier, TownLogic.has_building(town, "dwelling_%du" % tier))
 	HoverInfo.attach(b, func():
 		var v := HoverInfo.creature(cid, -1, name)
 		HoverInfo.line(v, ("%d available. Click to recruit." % town["available"][tier - 1]) if built else "Dwelling not built yet.", UI.GOLD, 18)
@@ -316,13 +320,16 @@ func _rebuild_buildings() -> void:
 	for it in items:
 		var id: String = it[0]
 		var lay: Array = TownLayout.POS[it[1]]
-		var path := "town/%s_%s.png" % [town["faction"], TownLayout.sprite_id(id)]
+		var sid := TownLayout.sprite_id(id)
+		if not Assets.has("town/%s_%s.png" % [town["faction"], sid]):
+			sid = TownLayout.slot_of(id)
+		var path := "town/%s_%s.png" % [town["faction"], sid]
 		var tex := Assets.tex(path, Vector2i(200, 150))
 		var tr := TextureRect.new()
 		tr.texture = tex
 		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tr.stretch_mode = TextureRect.STRETCH_SCALE
-		var rect = rendered.get(TownLayout.sprite_id(id))
+		var rect = rendered.get(sid, rendered.get(TownLayout.slot_of(id)))
 		if rect != null and Assets.has(path):
 			tr.position = Vector2(rect[0], rect[1])
 			tr.size = Vector2(rect[2], rect[3])
@@ -403,10 +410,13 @@ func _building_info(id: String, in_town := false) -> Control:
 	var v: VBoxContainer
 	if b.has("dwelling_tier"):
 		var tier: int = b["dwelling_tier"]
-		var cid := GameData.faction_creature(town["faction"], tier)
+		var cid := _dwelling_cid(id)
 		var c: Dictionary = GameData.CREATURES[cid]
 		v = HoverInfo.creature(cid, -1, GameData.building_name(town["faction"], id))
 		HoverInfo.line(v, "Recruits %s, +%d per week." % [c["plural"], c["growth"]], UI.TEXT, 18)
+		if b.has("replaces"):
+			HoverInfo.line(v, "Upgrades %s to %s in this town." % [GameData.CREATURES[GameData.base_of(cid)]["plural"], c["plural"]],
+				Color(0.75, 0.85, 1.0), 18)
 		if built:
 			HoverInfo.line(v, "%d available. Click to recruit." % town["available"][tier - 1] if in_town else
 				"%d available." % town["available"][tier - 1], UI.GOLD, 18)
@@ -450,9 +460,18 @@ func _open_building(id: String) -> void:
 # ---------------------------------------------------------------------------------------------
 ## Building picture for dialogs (tools/art/building_cards.py), falling back to the town sprite.
 func _building_pic(id: String) -> Texture2D:
-	var sid := TownLayout.sprite_id(id)
-	var p := "icons/building_%s_%s.png" % [town["faction"], sid]
-	return Assets.tex(p if Assets.has(p) else "town/%s_%s.png" % [town["faction"], sid])
+	for sid in [TownLayout.sprite_id(id), TownLayout.slot_of(id)]:
+		for p in ["icons/building_%s_%s.png" % [town["faction"], sid], "town/%s_%s.png" % [town["faction"], sid]]:
+			if Assets.has(p):
+				return Assets.tex(p)
+	return Assets.tex("town/%s_%s.png" % [town["faction"], TownLayout.sprite_id(id)])
+
+## The creature a dwelling building recruits (an upgraded dwelling: the upgraded creature).
+func _dwelling_cid(id: String) -> String:
+	var b: Dictionary = GameData.BUILDINGS[id]
+	if b.has("replaces"):
+		return GameData.FACTIONS[town["faction"]]["upgrades"][b["dwelling_tier"] - 1]
+	return GameData.faction_creature(town["faction"], b["dwelling_tier"])
 
 ## Status of a building for this player: [label, colour]. Colours follow the classic hall screen.
 func _build_status(id: String) -> Array:
@@ -525,12 +544,16 @@ func _building_detail(id: String) -> void:
 	v.custom_minimum_size = Vector2(440, 0)
 	h.add_child(v)
 	if b.has("dwelling_tier"):
-		var cid := GameData.faction_creature(town["faction"], b["dwelling_tier"])
+		var cid := _dwelling_cid(id)
 		var c: Dictionary = GameData.CREATURES[cid]
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
 		row.add_child(UI.icon(Assets.creature_portrait(cid), Vector2(72, 72)))
-		row.add_child(UI.label("Recruits %s.\n+%d per week." % [c["plural"], c["growth"]], 21))
+		var what := "Recruits %s.\n+%d per week." % [c["plural"], c["growth"]]
+		if b.has("replaces"):
+			what = "Recruits %s, and upgrades your %s\nhere. +%d per week." % [c["plural"],
+				GameData.CREATURES[GameData.base_of(cid)]["plural"], c["growth"]]
+		row.add_child(UI.label(what, 21))
 		v.add_child(row)
 	elif b.get("desc", "") != "":
 		var dl := UI.label(b["desc"], 21)
@@ -589,7 +612,7 @@ func _flash_building(id: String) -> void:
 			tw.tween_property(n, "modulate", Color.WHITE, 0.9)
 
 func _recruit_tier(tier: int) -> void:
-	var cid := GameData.faction_creature(town["faction"], tier)
+	var cid := TownLogic.dwelling_creature(town, tier)
 	await AdventureHUD.recruit_dialog(self, cid, town["available"][tier - 1], player, town["garrison"], func(n): town["available"][tier - 1] -= n)
 	refresh()
 
@@ -601,13 +624,14 @@ func _open_recruit_all() -> void:
 	g.add_theme_constant_override("v_separation", 12)
 	m.body.add_child(g)
 	for tier in range(1, 8):
-		var cid := GameData.faction_creature(town["faction"], tier)
+		var cid := TownLogic.dwelling_creature(town, tier)
 		var built := TownLogic.has_building(town, "dwelling_%d" % tier)
+		var upg := TownLogic.has_building(town, "dwelling_%du" % tier)
 		var card := _DwellingCard.new()
-		card.pic = _building_pic("dwelling_%d" % tier)
+		card.pic = _building_pic("dwelling_%d%s" % [tier, "u" if upg else ""])
 		card.creature = Assets.creature(cid)
 		card.anchor = Assets.anchor("creatures/%s.png" % cid)
-		card.title = GameData.dwelling_name(town["faction"], tier)
+		card.title = GameData.dwelling_name(town["faction"], tier, upg)
 		card.c = GameData.CREATURES[cid]
 		card.available = town["available"][tier - 1] if built else -1
 		card.growth = int(card.c["growth"] * (1.5 if TownLogic.has_building(town, "citadel") else 1.0))

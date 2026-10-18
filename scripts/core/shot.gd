@@ -35,8 +35,9 @@ func _run() -> void:
 	var base: String = args["shot"]
 	for i in count:
 		if i < clicks.size():
-			var xy := clicks[i].split(",")
-			_click(Vector2(float(xy[0]), float(xy[1])))
+			var right := clicks[i].begins_with("r")  # "r960,540": a right click
+			var xy := clicks[i].trim_prefix("r").split(",")
+			_click(Vector2(float(xy[0]), float(xy[1])), MOUSE_BUTTON_RIGHT if right else MOUSE_BUTTON_LEFT)
 			await get_tree().create_timer(0.6).timeout
 		if i < hovers.size() and hovers[i] != "-":
 			var hp := hovers[i].split(",")
@@ -58,7 +59,7 @@ func _run() -> void:
 			await get_tree().create_timer(interval).timeout
 	get_tree().quit()
 
-func _click(pos: Vector2) -> void:
+func _click(pos: Vector2, button := MOUSE_BUTTON_LEFT) -> void:
 	var vp := get_viewport()
 	# Convert from 1920x1080 design coordinates into the window's coordinates.
 	var xf := vp.get_final_transform()
@@ -68,7 +69,7 @@ func _click(pos: Vector2) -> void:
 	Input.parse_input_event(m)
 	for pressed in [true, false]:
 		var e := InputEventMouseButton.new()
-		e.button_index = MOUSE_BUTTON_LEFT
+		e.button_index = button
 		e.pressed = pressed
 		e.position = p
 		Input.parse_input_event(e)

@@ -70,6 +70,8 @@ func sfx(name: String, volume_offset := 0.0, pitch_var := 0.06) -> void:
 			return
 
 func creature_sfx(creature_id: String, kind: String, fallback: String) -> void:
+	if not Assets.has("audio/sfx/%s_%s.mp3" % [creature_id, kind]):
+		creature_id = GameData.base_of(creature_id)  # (an upgraded creature sounds like its base one)
 	if Assets.has("audio/sfx/%s_%s.mp3" % [creature_id, kind]):
 		sfx("%s_%s" % [creature_id, kind])
 	else:

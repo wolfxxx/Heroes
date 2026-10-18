@@ -5,7 +5,8 @@ class_name AdvAI
 
 const BUILD_ORDER := ["tavern", "dwelling_1", "dwelling_2", "town_hall", "dwelling_3", "fort", "mage_guild_1",
 	"dwelling_4", "marketplace", "citadel", "blacksmith", "dwelling_5", "city_hall", "dwelling_6", "mage_guild_2",
-	"dwelling_7", "mage_guild_3", "mage_guild_4"]
+	"dwelling_7", "dwelling_1u", "dwelling_2u", "dwelling_3u", "dwelling_4u", "mage_guild_3", "dwelling_5u", "dwelling_6u",
+	"dwelling_7u", "mage_guild_4"]
 
 var rules: AdvRules
 var world: Dictionary
@@ -85,7 +86,7 @@ func manage_towns(player: Dictionary) -> void:
 					break
 		for tier in range(7, 0, -1):
 			var n := TownLogic.max_recruitable(town, player, tier)
-			var cid := GameData.faction_creature(town["faction"], tier)
+			var cid := TownLogic.dwelling_creature(town, tier)
 			var price: int = GameData.CREATURES[cid]["cost"].get("gold", 0)
 			if price > 0:
 				n = mini(n, maxi(0, (player["resources"]["gold"] - save) / price))

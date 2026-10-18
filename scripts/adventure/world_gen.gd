@@ -561,7 +561,8 @@ func _town_positions() -> Array:
 
 func _guard(o: Dictionary) -> void:
 	var p: Vector2i = o["pos"]
-	var cands := [Vector2i(0, 1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, 0), Vector2i(-1, 0)]
+	# beside the entrance, not on it (the figure hid the door); the entrance is still in its zone of control
+	var cands := [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 0), Vector2i(-1, 0)]
 	if footprint_for(o["type"]).is_empty():
 		cands = [Vector2i(0, 1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1)]
 	for d in cands:
