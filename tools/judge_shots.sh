@@ -17,6 +17,7 @@ run --shot=$D/hero_screen.png --scene=res://scenes/adventure.tscn --delay=3 --se
 run --shot=$D/town_haven_early.png --scene=res://scenes/town.tscn --delay=3 --setup=demo
 run --shot=$D/town_haven_full.png --scene=res://scenes/town.tscn --delay=3 --setup=rich
 run --shot=$D/town_necro_full.png --scene=res://scenes/town.tscn --delay=3 --setup=necro_rich
+run --shot=$D/town_capitol.png --scene=res://scenes/town.tscn --delay=3 --setup=necro_max
 run --shot=$D/town_build.png --scene=res://scenes/town.tscn --delay=3 --setup=demo --keys=B
 run --shot=$D/town_build_rich.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --keys=B
 # right click the hero's pikemen: the upgraded guardhouse offers to upgrade them

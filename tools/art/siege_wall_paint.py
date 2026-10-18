@@ -110,7 +110,8 @@ RUIN_PROMPT = ("This is a castle siege battlefield from a fantasy strategy game.
 
 _GAP = ("the stretch of curtain wall (knock a wide V-shaped gap right through it, down to the ground, its broken "
         "ends jagged, the stones heaped in front of it)")
-SEG_WHAT = ["the round corner tower at the top", _GAP, "the top of the gatehouse and the wall beside it",
+SEG_WHAT = ["the round corner tower at the top", _GAP, "the crenellated top of the gatehouse and the wall walk beside "
+            "it (knock the whole top off in a wide jagged gap, the merlons and blocks fallen and heaped in front)",
             "the gatehouse and its gate", _GAP, "the stretch of curtain wall and the round tower",
             "the round corner tower at the bottom"]
 
@@ -152,11 +153,21 @@ def breach(names):
                 print("FAILED", n, flush=True)
 
 
+HAVEN_FROM_NECRO = ("Repaint this castle siege battlefield from a fantasy strategy game as the siege of a NOBLE HUMAN "
+                    "CASTLE. " + vp.STYLE + "\nVERY IMPORTANT: keep the castle wall, the gatehouse and its gate, the "
+                    "drawbridge, the moat, the round tower, the big keep on the right, the courtyard and the open grass "
+                    "exactly where they are, the same shapes and sizes, the same camera. Only change their materials and "
+                    "colours: pale cream limestone blocks, blue slate roofs with gold trim, blue-and-gold banners. Replace "
+                    "the dark necromancer town behind the wall with the white towers, blue roofs and golden domes of a "
+                    "noble city, and the dark green-lit sky with a bright blue sky with white clouds. Keep the left side of "
+                    "the picture (the grass, the camp, the trees, the mountains) as it is. No units, no people, no text.")
+
+
 def paint(names):
     from google import genai
     client = genai.Client(vertexai=True, project=vp.PROJECT, location=vp.LOCATION)
     os.makedirs(f"{BATCH}/out", exist_ok=True)
-    for fac in FACTIONS:
+    for fac in ["necropolis", "haven"]:
         for kind in ["wall", "ruin"]:
             n = f"{kind}_{fac}"
             if names and n not in names:
@@ -164,7 +175,11 @@ def paint(names):
             dst = f"{BATCH}/out/{n}.png"
             if os.path.exists(dst) and not names:
                 print("skip", n); continue
-            if kind == "wall":
+            if kind == "wall" and fac == "haven":  # (after the Necropolis castle: the same wall line)
+                src = f"{BATCH}/in/wall_necropolis_1920.png"
+                Image.open(f"{BATCH}/out/wall_necropolis.png").convert("RGB").resize((1920, 1080)).save(src)
+                prompt = HAVEN_FROM_NECRO
+            elif kind == "wall":
                 src, prompt = f"{BATCH}/in/mock_{fac}.png", WALL_PROMPT.format(town=TOWN[fac])
             else:
                 src = f"{BATCH}/in/wall_{fac}_1920.png"
@@ -188,9 +203,8 @@ def ingest():
             continue
         wall = Image.open(w).convert("RGB").resize((1920, 1080), Image.LANCZOS)
         wall.save(f"assets/battle/bg_siege_{fac}.png")
-        if not os.path.exists(r):
-            continue
-        ruin = Image.open(r).convert("RGB").resize((1920, 1080), Image.LANCZOS)
+        # (the whole ruined copy is only the fallback for a segment without its own breach painting)
+        ruin = Image.open(r).convert("RGB").resize((1920, 1080), Image.LANCZOS) if os.path.exists(r) else wall
         segs = []
         for i, rows in enumerate(SEGMENTS):
             # the band of the picture this segment owns (the wall runs straight down the screen, so the bands

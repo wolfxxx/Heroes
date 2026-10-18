@@ -224,15 +224,22 @@ const BUILDINGS := {
 	"village_hall": {"name": "Village Hall", "cost": {}, "income": 500, "requires": [], "desc": "+500 gold per day."},
 	"town_hall": {"name": "Town Hall", "cost": {"gold": 2500}, "income": 1000, "requires": ["village_hall", "tavern"], "replaces": "village_hall", "desc": "+1000 gold per day."},
 	"city_hall": {"name": "City Hall", "cost": {"gold": 5000}, "income": 2000, "requires": ["town_hall", "marketplace", "mage_guild_1"], "replaces": "town_hall", "desc": "+2000 gold per day."},
-	"fort": {"name": "Fort", "cost": {"gold": 5000, "wood": 20, "ore": 20}, "requires": [], "desc": "Walls defend the town during sieges."},
-	"citadel": {"name": "Citadel", "cost": {"gold": 2500, "ore": 5}, "requires": ["fort"], "replaces": "fort", "desc": "+50% creature growth."},
+	"capitol": {"name": "Capitol", "cost": {"gold": 10000, "wood": 10, "ore": 10}, "income": 4000, "requires": ["city_hall", "castle"], "replaces": "city_hall", "desc": "+4000 gold per day. Only one Capitol per kingdom."},
+	"fort": {"name": "Fort", "cost": {"gold": 5000, "wood": 20, "ore": 20}, "requires": [], "desc": "A wall, a gate and a moat defend the town in sieges."},
+	"citadel": {"name": "Citadel", "cost": {"gold": 2500, "ore": 5}, "requires": ["fort"], "replaces": "fort", "desc": "+50% creature growth. A keep with an arrow turret defends the town in sieges."},
+	"castle": {"name": "Castle", "cost": {"gold": 5000, "wood": 10, "ore": 10}, "requires": ["citadel"], "replaces": "citadel", "desc": "+100% creature growth. Two more arrow towers defend the town in sieges."},
 	"tavern": {"name": "Tavern", "cost": {"gold": 500, "wood": 5}, "requires": [], "desc": "Hire heroes. +1 morale on defense."},
 	"marketplace": {"name": "Marketplace", "cost": {"gold": 500, "wood": 5}, "requires": [], "desc": "Trade resources."},
 	"mage_guild_1": {"name": "Mage Guild", "cost": {"gold": 2000, "wood": 5, "ore": 5}, "requires": [], "desc": "Teaches level 1 spells."},
 	"mage_guild_2": {"name": "Mage Guild Lv2", "cost": {"gold": 1000, "wood": 5, "ore": 5, "crystal": 4, "gems": 4}, "requires": ["mage_guild_1"], "replaces": "mage_guild_1", "desc": "Teaches level 2 spells."},
 	"mage_guild_3": {"name": "Mage Guild Lv3", "cost": {"gold": 1000, "wood": 5, "ore": 5, "mercury": 4, "sulfur": 4, "crystal": 4, "gems": 4}, "requires": ["mage_guild_2"], "replaces": "mage_guild_2", "desc": "Teaches level 3 spells."},
 	"mage_guild_4": {"name": "Mage Guild Lv4", "cost": {"gold": 1000, "wood": 5, "ore": 5, "mercury": 6, "sulfur": 6, "crystal": 6, "gems": 6}, "requires": ["mage_guild_3"], "replaces": "mage_guild_3", "desc": "Teaches level 4 spells."},
-	"blacksmith": {"name": "Blacksmith", "cost": {"gold": 1000, "wood": 5}, "requires": [], "desc": "Hones a visiting hero's weapons: +1 Attack."},
+	"blacksmith": {"name": "Blacksmith", "cost": {"gold": 1000, "wood": 5}, "requires": [], "desc": "Sells war machines and hones a visiting hero's weapons: +1 Attack."},
+	# faction special buildings ("faction": only that faction's towns can build them)
+	"stables": {"name": "Stables", "faction": "haven", "cost": {"gold": 2000, "wood": 10}, "requires": ["dwelling_6"], "desc": "Heroes who start the day in this town get +400 movement points."},
+	"brotherhood": {"name": "Brotherhood of the Sword", "faction": "haven", "cost": {"gold": 500, "wood": 5}, "requires": ["tavern"], "desc": "+2 morale for the defenders when the town is besieged."},
+	"necromancy_amplifier": {"name": "Necromancy Amplifier", "faction": "necropolis", "cost": {"gold": 1000}, "requires": ["mage_guild_1"], "desc": "All your heroes raise 10% more Skeletons with Necromancy."},
+	"skeleton_transformer": {"name": "Skeleton Transformer", "faction": "necropolis", "cost": {"gold": 1000}, "requires": ["dwelling_1"], "desc": "Turns a visiting hero's living creatures into Skeletons."},
 	"dwelling_1": {"name": "Dwelling I", "cost": {"gold": 1000, "ore": 5}, "dwelling_tier": 1, "requires": ["fort"]},
 	"dwelling_2": {"name": "Dwelling II", "cost": {"gold": 1000, "wood": 5, "ore": 5}, "dwelling_tier": 2, "requires": ["dwelling_1"]},
 	"dwelling_3": {"name": "Dwelling III", "cost": {"gold": 1500, "wood": 5, "ore": 5}, "dwelling_tier": 3, "requires": ["dwelling_1"]},
@@ -249,6 +256,9 @@ const BUILDINGS := {
 	"dwelling_6u": {"name": "Upg. Dwelling VI", "cost": {"gold": 3000, "wood": 10, "ore": 10, "sulfur": 5}, "dwelling_tier": 6, "requires": ["dwelling_6"], "replaces": "dwelling_6"},
 	"dwelling_7u": {"name": "Upg. Dwelling VII", "cost": {"gold": 20000, "ore": 10, "mercury": 10, "gems": 10}, "dwelling_tier": 7, "requires": ["dwelling_7", "mage_guild_3"], "replaces": "dwelling_7"},
 }
+
+## Each faction's special buildings (in the Town Hall's second row).
+const SPECIALS := {"haven": ["stables", "brotherhood"], "necropolis": ["necromancy_amplifier", "skeleton_transformer"]}
 
 const DWELLING_NAMES := {
 	"haven": ["Guardhouse", "Archers' Tower", "Griffin Tower", "Barracks", "Monastery", "Training Grounds", "Portal of Glory"],

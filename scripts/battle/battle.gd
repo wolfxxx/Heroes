@@ -80,6 +80,8 @@ var _hero_rects := [Rect2(), Rect2()]
 var _info_key := ""   # what the hover panel shows: "s<uid>" a stack, "h<side>" a hero, "" nothing
 
 func _ready() -> void:
+	HoverInfo.set_floor(BAR_Y - 70)  # (stack panels stay above the log bar)
+	tree_exiting.connect(func(): HoverInfo.set_floor(-1.0))
 	setup_d = GameState.pending_battle
 	if setup_d.is_empty():
 		setup_d = _demo_setup()
@@ -112,7 +114,7 @@ func _demo_setup() -> Dictionary:
 		"context": {"type": "demo"}, "seed": int(Shot.args.get("seed", "7"))}
 	if Shot.setup.begins_with("siege"):  # Sir Aldric with all his machines before a Necropolis citadel
 		a["machines"] = GameData.WAR_MACHINES.duplicate()
-		out["siege"] = 2
+		out["siege"] = 3
 		out["siege_faction"] = "haven" if Shot.setup == "siege_haven" else "necropolis"
 	return out
 
@@ -126,6 +128,8 @@ static func hex_pos(h: Vector2i) -> Vector2:
 func stand_pos(st: Dictionary, head = null) -> Vector2:
 	var h: Vector2i = st["hex"] if head == null else head
 	var p := hex_pos(h) + Vector2(0, 24)
+	if h.x < 0 or h.x >= BattleLogic.COLS:  # (the machines' back rank: a little further back, clear of the first column)
+		p.x += -30.0 if h.x < 0 else 30.0
 	if L.is_wide(st):
 		p.x += BattleLogic.tail_dir(st["side"]).x * HEX_W * 0.5
 	return p
@@ -484,15 +488,20 @@ func _refresh_queue() -> void:
 		c.queue_free()
 	var up := L.upcoming(14)
 	var this_round := L.order.size() + L.waited.size()
+	var slots := 0
 	for i in up.size():
 		var s: Dictionary = up[i]
-		if i == this_round and i > 0:  # where the next round starts
+		if i == this_round and i > 0:  # where the next round starts (in a card's slot: the frame never changes)
 			var m := _RoundMark.new()
 			m.num = L.round_num + 1
 			m.tooltip_text = "Round %d starts here" % m.num
-			m.custom_minimum_size = Vector2(44, 84)
+			m.custom_minimum_size = Vector2(84, 84)
 			m.size_flags_vertical = Control.SIZE_SHRINK_END
 			_queue_box.add_child(m)
+			slots += 1
+		if slots >= 14:
+			break
+		slots += 1
 		var q := _QueueIcon.new()
 		q.st = s
 		q.first = i == 0
@@ -500,6 +509,11 @@ func _refresh_queue() -> void:
 			q.tex = Assets.tex("battle/siege_%s_archer.png" % L.siege_faction)
 		q.custom_minimum_size = Vector2(110 if i == 0 else 84, 110 if i == 0 else 84)
 		_queue_box.add_child(q)
+	while slots < 14:  # (an empty slot for each stack the queue is short of)
+		var e := Control.new()
+		e.custom_minimum_size = Vector2(110 if slots == 0 else 84, 84)
+		_queue_box.add_child(e)
+		slots += 1
 
 ## Adds a line to the combat log (the bar shows the last two; the arrows and the wheel scroll back).
 func _set_log(t: String) -> void:
@@ -1317,7 +1331,7 @@ var _cracks: _Cracks
 const WALL_BANDS := [[0, 270], [270, 400], [400, 470], [470, 645], [645, 750], [750, 885], [885, 1080]]
 ## Where each arrow tower's crew stands on the painted towers (by wall segment; -1: the keep).
 const ARCHER_SPOTS := {
-	"haven": {0: Vector2(1292, 412), 6: Vector2(1338, 770), -1: Vector2(1738, 598)},
+	"haven": {0: Vector2(1300, 418), 6: Vector2(1338, 800), -1: Vector2(1742, 660)},
 	"necropolis": {0: Vector2(1300, 418), 6: Vector2(1338, 800), -1: Vector2(1742, 660)},
 }
 
@@ -1394,7 +1408,7 @@ func _anim_catapult(ev: Dictionary) -> void:
 func _drop_from_queue(st: Dictionary) -> void:
 	for q in _queue_box.get_children():
 		if q is _QueueIcon and q.st["uid"] == st["uid"]:
-			q.queue_free()
+			q.modulate.a = 0.0  # (its slot stays until the queue is rebuilt: the frame doesn't jump)
 
 func _refresh_badge(st: Dictionary) -> void:
 	var n := _unit(st)
@@ -1693,7 +1707,8 @@ func _end_battle(winner: int) -> void:
 		for id in cas:
 			if not "undead" in GameData.CREATURES[id]["abilities"]:
 				living += cas[id]
-		raised = int(living * 0.1 * int(wh["skills"]["necromancy"]))
+		var amp := 0.1 if TownLogic.player_has(L.players[winner], "necromancy_amplifier") else 0.0
+		raised = int(living * (0.1 * int(wh["skills"]["necromancy"]) + amp))
 	var human_side := 0 if not L.ai_side[0] else (1 if not L.ai_side[1] else -1)
 	var human_won := human_side == winner
 	Audio.music("victory" if human_won or human_side < 0 else "defeat")
@@ -1782,8 +1797,20 @@ class _Grid extends Node2D:
 		for y in BattleLogic.ROWS:
 			for x in BattleLogic.COLS:
 				var h := Vector2i(x, y)
-				if b.L.wall_blocks(h, 0) and not reach.has(h):
-					continue  # (the standing wall: no grid on its stones)
+				var seg: int = b.L.wall_seg(h)
+				if seg >= 0 and not reach.has(h):  # the wall line: stone outline while it stands, rubble once breached
+					var wp: PackedVector2Array = b.hex_poly(b.hex_pos(h), 4.0)
+					var wc := wp.duplicate()
+					wc.append(wp[0])
+					if b.L.walls[seg]["hp"] > 0:
+						draw_colored_polygon(wp, Color(0.1, 0.08, 0.06, 0.18))
+						draw_polyline(wc, Color(0, 0, 0, 0.5), 4.0, true)
+						draw_polyline(wc, Color(0.86, 0.8, 0.68, 0.75), 2.0, true)
+					else:
+						draw_colored_polygon(wp, Color(0.3, 0.2, 0.1, 0.35))
+						draw_polyline(wc, Color(0, 0, 0, 0.35), 3.0, true)
+						draw_polyline(wc, Color(1, 0.7, 0.4, 0.55), 1.5, true)
+					continue
 				var c: Vector2 = b.hex_pos(h)
 				var poly: PackedVector2Array = b.hex_poly(c, 2.0)
 				# where the active stack can go: shaded (as the classic game), with a brighter outline

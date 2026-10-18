@@ -51,8 +51,12 @@ static func pay(player: Dictionary, cost: Dictionary, times := 1) -> void:
 ## Returns "" if buildable, otherwise a human readable reason.
 static func build_block_reason(town: Dictionary, player: Dictionary, id: String) -> String:
 	var b: Dictionary = GameData.BUILDINGS[id]
+	if b.get("faction", town["faction"]) != town["faction"]:
+		return "Not in this town"
 	if has_building(town, id):
 		return "Already built"
+	if id == "capitol" and capitol_elsewhere(town):
+		return "One Capitol per kingdom"
 	if town["built_today"]:
 		return "Already built today"
 	for req in b["requires"]:
@@ -71,8 +75,49 @@ static func buildable_list(town: Dictionary) -> Array:
 		var b: Dictionary = GameData.BUILDINGS[id]
 		if b.has("replaces") and not has_building(town, b["replaces"]):
 			continue
+		if b.get("faction", town["faction"]) != town["faction"]:
+			continue
 		out.append(id)
 	return out
+
+## Does another town of the same owner already have the Capitol?
+static func capitol_elsewhere(town: Dictionary) -> bool:
+	var w: Dictionary = GameState.world
+	if w.is_empty() or town["owner"] < 0:
+		return false
+	for t in w.get("towns", {}).values():
+		if t["uid"] != town["uid"] and t["owner"] == town["owner"] and "capitol" in t["buildings"]:
+			return true
+	return false
+
+## Creature growth: +50% with a Citadel, +100% with a Castle.
+static func growth_mult(town: Dictionary) -> float:
+	return 2.0 if has_building(town, "castle") else (1.5 if has_building(town, "citadel") else 1.0)
+
+## Siege level of the town: 0 none, 1 Fort (wall, gate, moat), 2 Citadel (+ keep turret), 3 Castle (+ two towers).
+static func siege_level(town: Dictionary) -> int:
+	for k in [["castle", 3], ["citadel", 2], ["fort", 1]]:
+		if has_building(town, k[0]):
+			return k[1]
+	return 0
+
+## Skeleton Transformer: a stack of living creatures becomes as many Skeletons (false if it can't).
+static func transform_to_skeletons(stack: Dictionary) -> bool:
+	var c: Dictionary = GameData.CREATURES[stack["id"]]
+	if "undead" in c["abilities"] or c.get("machine", false):
+		return false
+	stack["id"] = "skeleton"
+	return true
+
+## Does the player own this building in any town (e.g. the Necromancy Amplifier)?
+static func player_has(player_index: int, id: String) -> bool:
+	var w: Dictionary = GameState.world
+	if w.is_empty() or player_index < 0:
+		return false
+	for t in w.get("towns", {}).values():
+		if t["owner"] == player_index and has_building(t, id):
+			return true
+	return false
 
 static func build(town: Dictionary, player: Dictionary, id: String) -> bool:
 	if build_block_reason(town, player, id) != "":
@@ -118,7 +163,7 @@ static func mage_guild_level(town: Dictionary) -> int:
 	return 0
 
 static func daily_income(town: Dictionary) -> int:
-	for id in ["city_hall", "town_hall", "village_hall"]:
+	for id in ["capitol", "city_hall", "town_hall", "village_hall"]:
 		if id in town["buildings"]:
 			return GameData.BUILDINGS[id]["income"]
 	return 0
@@ -160,7 +205,7 @@ static func upgrade_stack(town: Dictionary, player: Dictionary, stack: Dictionar
 	return true
 
 static func weekly_growth(town: Dictionary) -> void:
-	var mult := 1.5 if has_building(town, "citadel") else 1.0
+	var mult := growth_mult(town)
 	for tier in range(1, 8):
 		if has_building(town, "dwelling_%d" % tier):
 			var cid := GameData.faction_creature(town["faction"], tier)

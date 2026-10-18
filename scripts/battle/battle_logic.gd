@@ -34,7 +34,8 @@ var rng := RandomNumberGenerator.new()
 var start_counts := {}        # uid -> count at battle start
 var terrain := "grass"
 var _uid := 0
-var siege := 0                # 0: open field, 1: town with a fort (walls, gate, moat), 2: citadel (plus arrow towers)
+var siege := 0                # 0: open field, 1: Fort (wall, gate, moat), 2: Citadel (+ keep turret), 3: Castle (+ two towers)
+var siege_morale := 0         # morale for the defenders of a siege (Brotherhood of the Sword)
 var siege_faction := "haven"
 var walls: Array = []         # segments: {"rows": [int], "kind": "wall"|"tower"|"gate", "hp": int}
 const WALL_X := 11
@@ -57,6 +58,7 @@ func setup(s: Dictionary) -> void:
 	terrain = s.get("terrain", "grass")
 	siege = int(s.get("siege", 0))
 	siege_faction = s.get("siege_faction", "haven")
+	siege_morale = int(s.get("siege_morale", 0))
 	if siege > 0:
 		for sg in SEGMENTS:
 			walls.append({"rows": sg[0], "kind": sg[1], "hp": 2})
@@ -70,8 +72,8 @@ func setup(s: Dictionary) -> void:
 					_deploy_machine(m, side, Vector2i(-1 if side == 0 else COLS, MACHINE_ROWS[m]))
 	if siege > 0 and heroes[0] != null:
 		_deploy_machine("catapult", 0, Vector2i(-1, MACHINE_ROWS["catapult"]))
-	if siege >= 2:  # the two wall towers and the keep (which no catapult can bring down)
-		for i in [0, walls.size() - 1, -1]:
+	if siege >= 2:  # the keep (which no catapult can bring down), and with a Castle the two wall towers
+		for i in ([-1, 0, walls.size() - 1] if siege >= 3 else [-1]):
 			var t := _deploy_machine("arrow_tower", 1, Vector2i(WALL_X, walls[i]["rows"][0]) if i >= 0 else Vector2i(COLS, 5))
 			t["tower"] = true
 			t["seg"] = i
@@ -374,9 +376,12 @@ func morale(side: int, s = null) -> int:
 	var h = heroes[side]
 	if h != null:
 		v += int(h["skills"].get("leadership", 0)) + GameState.hero_stat(h, "morale")
+	if siege > 0 and side == 1:
+		v += siege_morale
 	var factions := {}
 	for o in alive_stacks(side):
-		factions[cdata(o).get("faction", "")] = true
+		if not o.get("machine", false):  # (machines are no faction of their own)
+			factions[cdata(o).get("faction", "")] = true
 	v -= maxi(0, factions.size() - 1)
 	return clampi(v, -3, 3)
 

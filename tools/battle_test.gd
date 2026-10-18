@@ -24,7 +24,7 @@ func _ready() -> void:
 				h["machines"] = GameData.WAR_MACHINES.duplicate()
 				setup["attacker_hero" if k == 0 else "defender_hero"] = h
 			if seed % 3 == 0:
-				setup["siege"] = 1 + seed % 2
+				setup["siege"] = 1 + seed % 3  # (fort, citadel, castle)
 		L.setup(setup)
 		var steps := 0
 		while L.is_over() < 0 and steps < 600:

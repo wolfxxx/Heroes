@@ -37,10 +37,13 @@ func _resolve_state() -> void:
 	var uid: int = GameState.pending_town.get("town_uid", -1)
 	if not world["towns"].has(uid):
 		uid = world["players"][GameState.human_player_index()]["towns"][0]
-		if Shot.setup.contains("rich"):
+		if Shot.setup.contains("rich") or Shot.setup.contains("max"):
 			var t: Dictionary = world["towns"][uid]
-			t["buildings"] = ["city_hall", "citadel", "tavern", "marketplace", "mage_guild_2", "blacksmith",
+			t["buildings"] = ["city_hall", "castle", "tavern", "marketplace", "mage_guild_2", "blacksmith",
 				"dwelling_1u", "dwelling_2u", "dwelling_3u", "dwelling_4", "dwelling_5", "dwelling_6u", "dwelling_7"]
+			t["buildings"].append_array(GameData.SPECIALS[t["faction"]])
+			if Shot.setup.contains("max"):  # (with the Capitol)
+				t["buildings"][0] = "capitol"
 			TownLogic.learn_guild_spells(t)
 			TownLogic.weekly_growth(t)
 	town = world["towns"][uid]
@@ -132,13 +135,13 @@ func refresh() -> void:
 	var pics := HBoxContainer.new()
 	pics.add_theme_constant_override("separation", 12)
 	var hall := "village_hall"
-	for h in ["city_hall", "town_hall"]:
+	for h in ["capitol", "city_hall", "town_hall"]:
 		if TownLogic.has_building(town, h):
 			hall = h
 			break
 	pics.add_child(_pic_button(_building_pic(hall), GameData.building_name(town["faction"], hall),
 		"Build in %s (B)" % town["name"], _open_build))
-	var fort := "citadel" if TownLogic.has_building(town, "citadel") else "fort"
+	var fort := "castle" if TownLogic.has_building(town, "castle") else ("citadel" if TownLogic.has_building(town, "citadel") else "fort")
 	pics.add_child(_pic_button(_building_pic(fort), GameData.building_name(town["faction"], fort) if TownLogic.has_building(town, fort) else "Dwellings",
 		"All creature dwellings: recruit (R)", _open_recruit_all))
 	_info.add_child(pics)
@@ -400,7 +403,8 @@ func _set_hover(id: String) -> void:
 
 const CLICK_HINT := {"hall": "Click to build.", "fort": "Click to see all dwellings.", "tavern": "Click to hire a hero.",
 	"marketplace": "Click to trade resources.", "mage_guild": "Click to see the spells.",
-	"blacksmith": "Click to have the smith hone your hero's weapons."}
+	"blacksmith": "Click to buy war machines or hone your hero's weapons.",
+	"skeleton_transformer": "Click to turn a visiting hero's creatures into Skeletons."}
 
 ## Hover panel for a building: what it does; until built its requirements, cost and status; in the town view
 ## (`in_town`) what clicking it does.
@@ -442,9 +446,13 @@ func _open_building(id: String) -> void:
 	var b: Dictionary = GameData.BUILDINGS[id]
 	if b.has("dwelling_tier"):
 		await _recruit_tier(b["dwelling_tier"])
-	elif id in ["village_hall", "town_hall", "city_hall"]:
+	elif id in ["village_hall", "town_hall", "city_hall", "capitol"]:
 		await _open_build()
-	elif id in ["fort", "citadel"]:
+	elif id == "skeleton_transformer":
+		await _open_transformer()
+	elif id in ["stables", "brotherhood", "necromancy_amplifier"]:
+		await Modal.message(self, GameData.BUILDINGS[id]["name"], GameData.BUILDINGS[id]["desc"]).closed
+	elif id in ["fort", "citadel", "castle"]:
 		await _open_recruit_all()
 	elif id == "tavern":
 		await _open_tavern()
@@ -460,7 +468,7 @@ func _open_building(id: String) -> void:
 # ---------------------------------------------------------------------------------------------
 ## Building picture for dialogs (tools/art/building_cards.py), falling back to the town sprite.
 func _building_pic(id: String) -> Texture2D:
-	for sid in [TownLayout.sprite_id(id), TownLayout.slot_of(id)]:
+	for sid in [id, TownLayout.sprite_id(id), TownLayout.slot_of(id)]:  # (a Castle has its own card, not a sprite)
 		for p in ["icons/building_%s_%s.png" % [town["faction"], sid], "town/%s_%s.png" % [town["faction"], sid]]:
 			if Assets.has(p):
 				return Assets.tex(p)
@@ -486,48 +494,58 @@ func _build_status(id: String) -> Array:
 		return ["Built today", Color(0.7, 0.7, 0.75)]
 	return [reason, Color(1.0, 0.48, 0.4)]
 
+## The Town Hall rows (as the classic hall screen): each card is a chain of levels and shows the next one to build
+## (or the top one, once all are built): town buildings, then magic and the faction's specials, then the dwellings.
+func _hall_rows() -> Array:
+	var dw := func(t: int) -> Array: return ["dwelling_%d" % t, "dwelling_%du" % t]
+	return [
+		[["village_hall", "town_hall", "city_hall", "capitol"], ["fort", "citadel", "castle"], ["tavern"], ["marketplace"],
+			["blacksmith"]],
+		[["mage_guild_1", "mage_guild_2", "mage_guild_3", "mage_guild_4"]] + GameData.SPECIALS[town["faction"]].map(
+			func(s): return [s]),
+		[dw.call(1), dw.call(2), dw.call(3), dw.call(4)],
+		[dw.call(5), dw.call(6), dw.call(7)],
+	]
+
 func _open_build() -> void:
-	var m := Modal.custom(self, "Build in %s" % town["name"], 1660)
-	var g := GridContainer.new()
-	g.columns = 6
-	g.add_theme_constant_override("h_separation", 10)
-	g.add_theme_constant_override("v_separation", 10)
-	m.body.add_child(g)
-	var ids: Array = TownLogic.buildable_list(town)
-	for id in town["buildings"]:
-		if not id in ids:
-			ids.append(id)
-	# buildable first, then can't-afford, then blocked, then built; data order within each group
-	var rank := func(id: String) -> int:
-		if id in town["buildings"]:
-			return 3
-		var rs := TownLogic.build_block_reason(town, player, id)
-		return 0 if rs == "" else (1 if rs == "Not enough resources" else 2)
-	ids.sort_custom(func(a, b):
-		var ra: int = rank.call(a)
-		var rb: int = rank.call(b)
-		return ra < rb if ra != rb else GameData.BUILDINGS.keys().find(a) < GameData.BUILDINGS.keys().find(b))
-	for id in ids:
-		var st := _build_status(id)
-		var card := _BuildCard.new()
-		card.pic = _building_pic(id)
-		card.title = GameData.building_name(town["faction"], id)
-		card.status = st[0]
-		card.status_col = st[1]
-		if st[0] in ["Can build", "Need resources"]:  # the price on the card, short amounts in red
-			card.cost = GameData.BUILDINGS[id]["cost"]
-			card.have = player["resources"]
-		card.custom_minimum_size = Vector2(262, 226)
-		var bid: String = id
-		HoverInfo.attach(card, func(): return _building_info(bid), 0.0, true)
-		card.pressed.connect(func(): m.close(bid))
-		g.add_child(card)
+	var m := Modal.custom(self, "Build in %s" % town["name"], 1400)
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 8)
+	m.body.add_child(rows)
+	for row in _hall_rows():
+		var h := HBoxContainer.new()
+		h.alignment = BoxContainer.ALIGNMENT_CENTER
+		h.add_theme_constant_override("separation", 10)
+		rows.add_child(h)
+		for chain in row:
+			var id: String = chain[-1]
+			for c in chain:
+				if not TownLogic.has_building(town, c):
+					id = c
+					break
+			h.add_child(_hall_card(id, m))
 	m.add_buttons([["Close", ""]])
 	m.set_meta("cancel", "")
 	var r = await m.closed
 	if r == null or r == "":
 		return
 	await _building_detail(r)
+
+func _hall_card(id: String, m: Modal) -> Control:
+	var st := _build_status(id)
+	var card := _BuildCard.new()
+	card.pic = _building_pic(id)
+	card.title = GameData.building_name(town["faction"], id)
+	card.status = st[0]
+	card.status_col = st[1]
+	if st[0] in ["Can build", "Need resources"]:  # the price on the card, short amounts in red
+		card.cost = GameData.BUILDINGS[id]["cost"]
+		card.have = player["resources"]
+	card.custom_minimum_size = Vector2(250, 196)
+	var bid: String = id
+	HoverInfo.attach(card, func(): return _building_info(bid), 0.0, true)
+	card.pressed.connect(func(): m.close(bid))
+	return card
 
 ## Detail panel: big picture, what it does, requirements, cost against what you have, and a Build button.
 func _building_detail(id: String) -> void:
@@ -634,7 +652,7 @@ func _open_recruit_all() -> void:
 		card.title = GameData.dwelling_name(town["faction"], tier, upg)
 		card.c = GameData.CREATURES[cid]
 		card.available = town["available"][tier - 1] if built else -1
-		card.growth = int(card.c["growth"] * (1.5 if TownLogic.has_building(town, "citadel") else 1.0))
+		card.growth = int(card.c["growth"] * TownLogic.growth_mult(town))
 		card.custom_minimum_size = Vector2(372, 300)
 		card.disabled = not built
 		HoverInfo.attach(card, func():
@@ -835,6 +853,43 @@ func _open_guild() -> void:
 	m.add_buttons([["Close", true]])
 	m.set_meta("cancel", true)
 	await m.closed
+
+## The Skeleton Transformer: each living stack of the visiting hero (or the garrison) can be turned into Skeletons.
+func _open_transformer() -> void:
+	while true:
+		var m := Modal.custom(self, "Skeleton Transformer", 1100)
+		m.body.add_child(UI.label("Living creatures thrown in come out as as many Skeletons.", 20))
+		var row := HFlowContainer.new()
+		row.add_theme_constant_override("h_separation", 14)
+		row.add_theme_constant_override("v_separation", 10)
+		row.custom_minimum_size.x = 1040
+		m.body.add_child(row)
+		var any := false
+		for army in ([hero["army"]] if not hero.is_empty() else []) + [town["garrison"]]:
+			for st in army:
+				if st == null or "undead" in GameData.CREATURES[st["id"]]["abilities"]:
+					continue
+				any = true
+				var v := VBoxContainer.new()
+				v.add_child(UI.icon(Assets.creature_portrait(st["id"]), Vector2(150, 150)))
+				var c: Dictionary = GameData.CREATURES[st["id"]]
+				var t := UI.label("%d %s" % [st["count"], c["plural"] if st["count"] != 1 else c["name"]], 18)
+				t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				t.custom_minimum_size.x = 150
+				v.add_child(t)
+				var s2: Dictionary = st
+				v.add_child(UI.button("Transform", func(): m.close(s2), 19))
+				row.add_child(v)
+		if not any:
+			row.add_child(UI.label("There are no living creatures here.", 20, Color(0.8, 0.7, 0.6)))
+		m.add_buttons([["Close", ""]])
+		m.set_meta("cancel", "")
+		var r = await m.closed
+		if not r is Dictionary:
+			break
+		if TownLogic.transform_to_skeletons(r):
+			Audio.sfx("magic_hit", -4)
+		refresh()
 
 ## The Blacksmith sells war machines to a visiting hero (one of each), and hones its weapons once (+1 Attack).
 func _open_smith() -> void:

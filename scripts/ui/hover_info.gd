@@ -35,6 +35,10 @@ static func show_for(owner: Object, content, delay := 0.0, side := 1, clear_x :=
 	_layer().beside = beside
 	_layer().present(owner, content, delay)
 
+## Keep panels above y (a bottom bar), or -1 for the whole screen.
+static func set_floor(y: float) -> void:
+	_layer().floor_y = y
+
 static func hide_for(owner: Object) -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	var l = tree.root.get_node_or_null("HoverLayer")
@@ -117,6 +121,7 @@ class _Layer extends CanvasLayer:
 	var side := 1
 	var clear_x := -1.0
 	var beside := Rect2()
+	var floor_y := -1.0  # (a screen's bottom bar the panel must stay above, e.g. the battle log; -1: none)
 
 	func _init() -> void:
 		layer = 120
@@ -216,8 +221,9 @@ class _Layer extends CanvasLayer:
 			p.x = clampf(maxf(p.x, clear_x) if side > 0 else minf(left, clear_x - sz.x), 8, vs.x - sz.x - 8)
 		elif (side < 0 and left >= 8) or p.x + sz.x > vs.x - 8:
 			p.x = left
-		if p.y + sz.y > vs.y - 8:
-			p.y = maxf(8, vs.y - sz.y - 8)
+		var lim := vs.y - 8 if floor_y < 0.0 else minf(vs.y - 8, floor_y)
+		if p.y + sz.y > lim:
+			p.y = maxf(8, lim - sz.y)
 		panel.position = p
 
 	func _input(e: InputEvent) -> void:

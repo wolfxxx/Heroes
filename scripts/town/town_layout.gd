@@ -19,13 +19,18 @@ const POS := {
 	"dwelling_2": [Vector2(430, 800), 240.0, 6],
 	"dwelling_3": [Vector2(1540, 800), 250.0, 6],
 	"dwelling_4": [Vector2(1800, 770), 250.0, 6],
+	# faction specials (their own slots; rendered towns place them by town/layout_<faction>.json)
+	"stables": [Vector2(700, 800), 230.0, 7],
+	"brotherhood": [Vector2(1220, 800), 220.0, 7],
+	"necromancy_amplifier": [Vector2(700, 800), 220.0, 7],
+	"skeleton_transformer": [Vector2(1220, 800), 220.0, 7],
 }
 
 ## Which layout slot + sprite id a built building uses (upgrades share the base slot).
 static func slot_of(id: String) -> String:
-	if id in ["village_hall", "town_hall", "city_hall"]:
+	if id in ["village_hall", "town_hall", "city_hall", "capitol"]:
 		return "hall"
-	if id in ["fort", "citadel"]:
+	if id in ["fort", "citadel", "castle"]:
 		return "fort"
 	if id.begins_with("mage_guild"):
 		return "mage_guild"
@@ -34,6 +39,8 @@ static func slot_of(id: String) -> String:
 	return id
 
 static func sprite_id(id: String) -> String:
+	if id == "castle":
+		return "citadel"  # (the Citadel's walls span the town picture; the Castle shows on its card)
 	if id.begins_with("mage_guild"):
 		return "mage_guild_1" if id == "mage_guild_1" else "mage_guild_2"
 	return id

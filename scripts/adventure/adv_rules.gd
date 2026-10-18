@@ -520,8 +520,9 @@ func battle_vs_town(att: Dictionary, town: Dictionary) -> Dictionary:
 		"terrain": _battle_terrain(town["pos"]), "attacker_player": att["owner"], "defender_player": town["owner"],
 		"attacker_ai": player_of(att)["is_ai"], "defender_ai": def_ai,
 		"context": {"type": "town", "hero": att["uid"], "town": town["uid"], "defender": def_hero.get("uid", -1)},
-		"siege": 2 if TownLogic.has_building(town, "citadel") else (1 if TownLogic.has_building(town, "fort") else 0),
+		"siege": TownLogic.siege_level(town),
 		"siege_faction": town["faction"],
+		"siege_morale": 2 if TownLogic.has_building(town, "brotherhood") else 0,
 	}
 
 ## Hero defending a town: one of the owner's heroes standing in the gate (never the attacker itself,
@@ -694,6 +695,10 @@ func new_day() -> Dictionary:
 			var hh: Dictionary = world["heroes"][hid]
 			hh["max_movement"] = GameState.hero_max_movement(hh)
 			hh["movement"] = hh["max_movement"]
+			for tid in p["towns"]:  # Stables: +400 movement for a hero starting the day in the town
+				var tt: Dictionary = world["towns"][tid]
+				if tt["pos"] == hh["pos"] and TownLogic.has_building(tt, "stables"):
+					hh["movement"] += 400
 			hh["mana"] = mini(GameState.max_mana(hh), hh["mana"] + 1 + GameState.hero_stat(hh, "knowledge") / 4)
 	for o in world["objects"].values():
 		if o["type"] == "mine" and o["owner"] >= 0:

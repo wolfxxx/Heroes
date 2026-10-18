@@ -5,8 +5,8 @@ class_name AdvAI
 
 const BUILD_ORDER := ["tavern", "dwelling_1", "dwelling_2", "town_hall", "dwelling_3", "fort", "mage_guild_1",
 	"dwelling_4", "marketplace", "citadel", "blacksmith", "dwelling_5", "city_hall", "dwelling_6", "mage_guild_2",
-	"dwelling_7", "dwelling_1u", "dwelling_2u", "dwelling_3u", "dwelling_4u", "mage_guild_3", "dwelling_5u", "dwelling_6u",
-	"dwelling_7u", "mage_guild_4"]
+	"brotherhood", "necromancy_amplifier", "dwelling_7", "castle", "dwelling_1u", "dwelling_2u", "dwelling_3u", "dwelling_4u",
+	"stables", "capitol", "mage_guild_3", "dwelling_5u", "dwelling_6u", "dwelling_7u", "mage_guild_4"]
 
 var rules: AdvRules
 var world: Dictionary
