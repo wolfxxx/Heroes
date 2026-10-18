@@ -134,6 +134,12 @@ static func show_creature_info(owner_node: Node, cid: String, count: int) -> voi
 	m.set_meta("default", true)
 	m.set_meta("cancel", true)
 
+## Head-and-shoulders crop of each portrait (x, y, size as fractions of it) for the small slots of the adventure panel.
+const FOCUS := {"angel": [0.3, 0.25, 0.5], "archer": [0.25, 0.15, 0.5], "bone_dragon": [0.3, 0.1, 0.55],
+	"cavalier": [0.3, 0.33, 0.55], "dread_knight": [0.25, 0.3, 0.55], "ghost": [0.3, 0.25, 0.5], "griffin": [0.35, 0.18, 0.5],
+	"lich": [0.15, 0.3, 0.55], "monk": [0.25, 0.3, 0.5], "pikeman": [0.25, 0.28, 0.5], "skeleton": [0.25, 0.3, 0.5],
+	"swordsman": [0.23, 0.28, 0.5], "vampire": [0.25, 0.25, 0.55], "zombie": [0.25, 0.3, 0.5]}
+
 class _Slot extends Control:
 	var strip: ArmyStrip
 	var index := 0
@@ -155,7 +161,12 @@ class _Slot extends Control:
 		if st:
 			var tex := Assets.creature_portrait(st["id"])
 			var small := size.y < 56
-			draw_texture_rect(tex, r.grow(-3), false, Color(1.3, 1.25, 1.2) if small else Color.WHITE)
+			if small and FOCUS.has(st["id"]):
+				var f: Array = FOCUS[st["id"]]
+				var ts := Vector2(tex.get_size())
+				draw_texture_rect_region(tex, r.grow(-3), Rect2(Vector2(f[0], f[1]) * ts, Vector2(f[2], f[2]) * ts), Color(1.3, 1.25, 1.2))
+			else:
+				draw_texture_rect(tex, r.grow(-3), false, Color(1.3, 1.25, 1.2) if small else Color.WHITE)
 			var txt := str(st["count"])
 			var f := UI.font()
 			var fs := 15 if small else 20

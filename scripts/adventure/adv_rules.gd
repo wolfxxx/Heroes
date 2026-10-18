@@ -32,7 +32,9 @@ func _init(wd: Dictionary) -> void:
 			var t: int = terr[y * w + x]
 			var cost: int = GameData.TERRAINS[WorldGen.TERRAIN_ORDER[t]]["move_cost"]
 			if cost > 0:
-				astar.set_point_weight_scale(Vector2i(x, y), cost / 100.0)
+				# (the cheapest step, road, weighs 1: the octile heuristic must not overestimate, or A* returns
+				# detours off the road)
+				astar.set_point_weight_scale(Vector2i(x, y), cost / 50.0)
 	rebuild()
 
 func inside(p: Vector2i) -> bool:

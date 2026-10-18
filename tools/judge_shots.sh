@@ -11,6 +11,8 @@ run --shot=$D/adventure_start.png --scene=res://scenes/adventure.tscn --delay=4 
 run --shot=$D/adventure_overview.png --scene=res://scenes/adventure.tscn --delay=4 --setup=x --reveal --cam=20,20 --zoom=0.7
 run --shot=$D/adventure_close.png --scene=res://scenes/adventure.tscn --delay=4 --setup=x --seed=4242 --faction=necropolis --reveal --cam=12,14 --zoom=1.0
 run --shot=$D/adventure_snow.png --scene=res://scenes/adventure.tscn --delay=4 --setup=rich --reveal --cam=9,17 --zoom=1.3
+# one click on a road tile plans the route (arrows), a second would walk it
+run --shot=$D/adventure_path.png --scene=res://scenes/adventure.tscn --delay=4 --setup=demo --click=810,598
 run --shot=$D/hero_screen.png --scene=res://scenes/adventure.tscn --delay=3 --setup=all_spells --click=426,475
 run --shot=$D/town_haven_early.png --scene=res://scenes/town.tscn --delay=3 --setup=demo
 run --shot=$D/town_haven_full.png --scene=res://scenes/town.tscn --delay=3 --setup=rich

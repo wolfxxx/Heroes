@@ -795,7 +795,11 @@ func _update_hover() -> void:
 			_hover_action = {"type": "cast", "hex": _hover}
 			txt = "Cast %s" % sp["name"]
 			var t = L.stack_at(_hover)
-			if sp.has("damage") and t:
+			if sp["target"] == "area":
+				var hit: Array = L.stacks_on([_hover] + L.neighbors(_hover)).map(func(s): return L._name(s))
+				if hit.size() > 0:
+					txt += " on %s" % ", ".join(hit) + (" (%d damage each)" % L.spell_damage(cur["side"], _spell) if sp.has("damage") else "")
+			elif sp.has("damage") and t:
 				txt += " on %s (%d damage)" % [L._name(t), L.spell_damage(cur["side"], _spell)]
 		else:
 			txt = "Select a target for %s (right click to cancel)" % sp["name"]
@@ -866,6 +870,9 @@ func _click() -> void:
 			_spell = ""
 			_btns["Spells"].disabled = true
 			_busy = true
+			_grid.hover = Vector2i(-1, -1)
+			_grid.queue_redraw()
+			_set_status("")
 			await _play(L.cast(cur["side"], sp, _hover_action["hex"]))
 			_busy = false
 			if L.is_over() >= 0 or not cur["alive"]:
@@ -947,8 +954,9 @@ func _play(events: Array) -> void:
 			"spell":
 				await _anim_spell(ev)
 			"death":
-				_anim_death(ev["s"])
-				await get_tree().create_timer(0.25).timeout
+				if not _unit(ev["s"]).has_meta("fallen"):  # (most fall with their blow)
+					_anim_death(ev["s"])
+					await get_tree().create_timer(0.25).timeout
 			"heal":
 				_float_text(Vector2(0, -_top(ev["s"]) - 10), "+%d" % ev["amount"], Color(0.5, 1, 0.5), 30, "", 0.0, _unit(ev["s"]))
 				_refresh_badge(ev["s"])
@@ -1081,6 +1089,8 @@ func _anim_attack(ev: Dictionary) -> void:
 	_flush_log(ev)
 	_damage_text(d, txt, ev["killed"], ev["lucky"])
 	_refresh_badge(d)
+	if not d["alive"]:
+		_anim_death(d)
 	await get_tree().create_timer(0.3).timeout
 
 ## Red flash + hit pose; with a direction the unit is knocked back and springs home, otherwise it shudders.
@@ -1116,6 +1126,9 @@ func _shake(strength: float) -> void:
 
 func _anim_death(st: Dictionary) -> void:
 	var n := _unit(st)
+	if n.has_meta("fallen"):
+		return
+	n.set_meta("fallen", true)
 	var c := L.cdata(st)
 	Audio.creature_sfx(st["id"], "death", "death_undead" if "undead" in c["abilities"] else ("death_beast" if st["id"] in ["griffin"] else "death_human"))
 	var s: Sprite2D = n.get_node("Sprite")
@@ -1182,7 +1195,12 @@ func _anim_spell(ev: Dictionary) -> void:
 		if fx == "holy":
 			p += Vector2(0, -20)  # a column rising from the feet: its ring sits at the bottom of the frame
 		if area:
-			_play_fx(fx, p, Vector2(1.3, 0.95), 1.1)
+			# in the field's depth order, just in front of the blast's last row: stacks further forward stand over it
+			var layer := Node2D.new()
+			layer.position = Vector2(p.x, hex_pos(ev["hex"]).y + ROW_STEP + 1)
+			_sorted.add_child(layer)
+			_play_fx(fx, p - layer.position, Vector2(1.3, 0.95), 1.1, 1.0, layer)
+			get_tree().create_timer(1.3).timeout.connect(layer.queue_free)
 		else:
 			_play_fx(fx, p, Vector2.ONE * (0.75 if fx == "spark" else 0.95), 0.8, 0.5 if fx == "spark" else 1.0)
 	await get_tree().create_timer(0.35).timeout
@@ -1192,6 +1210,8 @@ func _anim_spell(ev: Dictionary) -> void:
 			_hit_flash(t)
 			_damage_text(t, "-%d" % ev["dmg"][t["uid"]], ev["killed"].get(t["uid"], 0), false, targets.find(t) * 0.14)
 			_refresh_badge(t)
+			if not t["alive"]:
+				_anim_death(t)
 		else:
 			var s: Sprite2D = _unit(t).get_node("Sprite")
 			var tw := s.create_tween()
@@ -1205,7 +1225,7 @@ const FX_OF := {"fireball": "fire", "meteor_shower": "fire", "frost_ring": "fros
 	"shield": "holy", "stone_skin": "holy", "haste": "holy", "curse": "dark", "slow": "dark", "weakness": "dark",
 	"death_ripple": "dark", "death_cloud": "dark"}
 
-func _play_fx(fx: String, p: Vector2, sc: Vector2, dur := 0.8, alpha := 1.0) -> void:
+func _play_fx(fx: String, p: Vector2, sc: Vector2, dur := 0.8, alpha := 1.0, parent: Node2D = null) -> void:
 	if not Assets.has("battle/fx_%s.png" % fx):
 		return
 	var s := Sprite2D.new()
@@ -1215,11 +1235,11 @@ func _play_fx(fx: String, p: Vector2, sc: Vector2, dur := 0.8, alpha := 1.0) -> 
 	s.position = p
 	s.scale = sc
 	s.modulate.a = alpha  # (additive: lower alpha is a fainter glow, the figures show through)
-	s.z_index = 25
+	s.z_index = 0 if parent else 25
 	var m := CanvasItemMaterial.new()
 	m.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	s.material = m
-	_fx.add_child(s)
+	(parent if parent else _fx).add_child(s)
 	var tw := s.create_tween()
 	tw.tween_property(s, "frame", 15, dur)
 	tw.tween_callback(s.queue_free)
@@ -1266,7 +1286,11 @@ func _settle_badges() -> void:
 		var b: Node2D = n.get_node("Badge")
 		if not b.visible or not b.st.get("alive", false):
 			continue
-		var r := Rect2(n.position + b.get_meta("home") - Vector2(24, 14), Vector2(48, 28))
+		var home: Vector2 = b.get_meta("home")
+		var r := Rect2(n.position + home - Vector2(24, 14), Vector2(48, 28))
+		var mirror := Rect2(n.position + Vector2(-home.x, home.y) - Vector2(24, 14), Vector2(48, 28))
+		if placed.any(func(o): return r.grow(4).intersects(o)) and not placed.any(func(o): return mirror.grow(4).intersects(o)):
+			r = mirror  # (an enemy badge facing it read as one number: "2 6")
 		for i in 3:
 			var moved := false
 			for o in placed:
@@ -1377,6 +1401,13 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	box.set_meta("born", now)
 	_floats.append(box)
 	box.position = r.position - origin
+	if follow and dir != 0:
+		var tip := _LabelTip.new()
+		tip.color = Color(0.85, 0.3, 0.25) if dir < 0 else Color(0.35, 0.5, 1.0)
+		tip.position = Vector2(box.size.x * 0.5, box.size.y)
+		box.add_child(tip)
+		bg.border_color = tip.color
+		bg.set_border_width_all(2)
 	var tw := box.create_tween().set_parallel(true)
 	box.pivot_offset = box.size * 0.5
 	box.scale = Vector2(0.6, 0.6)
@@ -1385,16 +1416,15 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	tw.tween_property(box, "modulate:a", 0.0, 0.5).set_delay(1.0)
 	tw.chain().tween_callback(box.queue_free)
 
-## Where a damage label for the stack of `n` goes: behind its feet (opposite its badge), in front of them beyond the
-## badge, above its head or over its body; the first spot that covers no other stack, badge or label, else the one
-## that covers least.
+## Where a damage label for the stack of `n` goes: centred over its head, or higher up the same column when another
+## stack, badge or label is there, else over its own body; the lowest spot that covers nothing, else the one that
+## covers least.
 func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2) -> Rect2:
 	var top: float = n.get_meta("top", 120.0)
-	var cands := [
-		Rect2(origin + at + Vector2(34.0 if dir > 0 else -34.0 - sz.x, -sz.y * 0.5), sz),
-		Rect2(origin + Vector2(-at.x, at.y) + Vector2(-34.0 - sz.x if dir > 0 else 34.0, -sz.y * 0.5), sz),
-		Rect2(origin + Vector2(-sz.x * 0.5, -top - sz.y - 4), sz),
-		Rect2(origin + Vector2(-sz.x * 0.5, -top * 0.55 - sz.y * 0.5), sz)]
+	var cands := []
+	for k in 4:  # over the head, then higher up the same column
+		cands.append(Rect2(origin + Vector2(-sz.x * 0.5, -top - sz.y - 6 - k * 30.0), sz))
+	cands.append(Rect2(origin + Vector2(-sz.x * 0.5, -top * 0.55 - sz.y * 0.5), sz))  # over its own body
 	var blocks := []
 	for u in units:
 		var o: Node2D = units[u]
@@ -1408,6 +1438,7 @@ func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2)
 		blocks.append(Rect2(o.position + b.position - Vector2(20, 13), Vector2(40, 26)))
 	for f in _floats:
 		blocks.append(f.get_meta("float_rect"))
+	var light := blocks.size()  # (obstacles count less: a label centred over its stack still reads as that stack's)
 	blocks.append_array(_obstacle_rects)
 	var best: Rect2 = cands[0]
 	var best_cost := INF
@@ -1415,15 +1446,22 @@ func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2)
 		var c: Rect2 = cands[i]
 		if c.position.y < 150 or c.end.y > BAR_Y - 4 or c.position.x < 4 or c.end.x > 1916:
 			continue
-		var cost := i * 50.0  # (ties go to the earlier spot)
-		for bl in blocks:
+		var cost := i * 400.0  # (the lowest free spot wins)
+		for j in blocks.size():
+			var bl: Rect2 = blocks[j]
 			if c.intersects(bl):
-				var ov := c.intersection(bl)
-				cost += ov.get_area()
+				cost += c.intersection(bl).get_area() * (0.15 if j >= light else 1.0)
 		if cost < best_cost:
 			best_cost = cost
 			best = c
 	return best
+
+## Small triangle under a damage label, pointing down at the stack it belongs to.
+class _LabelTip extends Node2D:
+	var color := Color.WHITE
+	func _draw() -> void:
+		draw_colored_polygon(PackedVector2Array([Vector2(-13, -1), Vector2(13, -1), Vector2(0, 14)]), Color(0, 0, 0, 0.6))
+		draw_colored_polygon(PackedVector2Array([Vector2(-10, -1), Vector2(10, -1), Vector2(0, 11)]), color)
 
 ## Spell name as a banner under the turn queue (not over the units), tinted by the caster's side.
 func _spell_banner(t: String, side: int) -> void:

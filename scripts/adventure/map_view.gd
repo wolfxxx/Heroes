@@ -368,6 +368,12 @@ func _object_node(o: Dictionary) -> Node2D:
 			var big: bool = "two_hex" in GameData.CREATURES[o["creature"]]["abilities"]
 			# creature renders are 150 px/unit vs 64 for map art; draw them a bit larger than true scale
 			var ms := _sprite(path, Vector2(0, -WorldGen.TILE * 0.5 + 6), 0, o.get("flip", false), 92.0 if big else 72.0, 0.72)
+			var fig := _monster_fig(path.get_file())
+			if not ms.centered and fig.y > 0.0:
+				# one scale for all guards: height by tier, the visible width (wings, horses) kept to about two tiles
+				var sc: float = (88.0 + 5.0 * GameData.CREATURES[o["creature"]]["tier"]) / fig.y
+				sc = minf(sc, (2.4 if big else 1.9) * TILE / fig.x)
+				ms.scale = Vector2.ONE * sc
 			outline(ms)
 			n.add_child(ms)
 		_:
@@ -416,6 +422,21 @@ func tile_center(tile: Vector2i) -> Vector2:
 
 func tile_at(p: Vector2) -> Vector2i:
 	return Vector2i(floori(p.x / TILE), floori(p.y / TILE))
+
+## (visible width, solid height) of a creature render, from creatures/sizes.json
+static var _fig_sizes = null
+static func _monster_fig(file: String) -> Vector2:
+	if _fig_sizes == null:
+		_fig_sizes = {}
+		var p := Assets.path("creatures/sizes.json")
+		if FileAccess.file_exists(p):
+			var d = JSON.parse_string(FileAccess.get_file_as_string(p))
+			if typeof(d) == TYPE_DICTIONARY:
+				_fig_sizes = d
+	var v = _fig_sizes.get(file)
+	if v == null:
+		return Vector2.ZERO
+	return Vector2(float(v[2]) if v.size() > 2 else float(v[0]), float(v[1]))
 
 const PICKABLE := ["monster", "resource", "chest", "campfire", "artifact"]
 var _alpha_cache := {}
