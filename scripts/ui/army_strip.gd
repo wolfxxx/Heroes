@@ -154,10 +154,11 @@ class _Slot extends Control:
 		var st = strip.army[index] if index < strip.army.size() else null
 		if st:
 			var tex := Assets.creature_portrait(st["id"])
-			draw_texture_rect(tex, r.grow(-3), false)
+			var small := size.y < 56
+			draw_texture_rect(tex, r.grow(-3), false, Color(1.3, 1.25, 1.2) if small else Color.WHITE)
 			var txt := str(st["count"])
 			var f := UI.font()
-			var fs := 20
+			var fs := 15 if small else 20
 			var tw := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 			var p := Vector2(size.x - tw - 6, size.y - 6)
 			draw_rect(Rect2(p - Vector2(3, fs - 2), Vector2(tw + 6, fs + 2)), Color(0, 0, 0, 0.6))

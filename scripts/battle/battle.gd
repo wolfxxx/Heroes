@@ -55,6 +55,7 @@ var _sorted: Node2D
 var _corpses: Node2D
 var _fx: Node2D
 var _floats: Array = []
+var _obstacle_rects: Array = []  # (field space) labels keep off them
 var _log_hist: Array = []   # combat log lines, oldest first
 var _log_scroll := 0        # how many lines back from the newest the bar shows
 var _log_seen := 0          # L.log_lines already copied into the log
@@ -188,6 +189,8 @@ func _build_scene() -> void:
 			s.offset = Vector2(0, -s.texture.get_height() * 0.5 + 6)
 		s.position = hex_pos(h) + Vector2(0, 22)
 		_sorted.add_child(s)
+		var rr := s.get_rect()
+		_obstacle_rects.append(Rect2(s.position + rr.position * s.scale, rr.size * s.scale).grow(-8))
 	for st in L.stacks:
 		_make_unit(st)
 	for side in 2:
@@ -931,10 +934,6 @@ func _on_spells() -> void:
 # ---------------------------------------------------------------------------------------------
 func _play(events: Array) -> void:
 	for ev in events:
-		if ev.has("log"):  # this blow's line, as it lands (the numbers on the field and the log agree)
-			for k in range(_log_seen, mini(int(ev["log"]), L.log_lines.size())):
-				_set_log(L.log_lines[k])
-			_log_seen = maxi(_log_seen, int(ev["log"]))
 		match ev["t"]:
 			"move":
 				var keep: Dictionary = _grid.active
@@ -960,6 +959,13 @@ func _play(events: Array) -> void:
 	_log_seen = L.log_lines.size()
 	for k in units:
 		units[k].get_node("Badge").queue_redraw()
+
+## Shows the log up to an attack / spell event's own line: called as its blow lands, with its label and new count.
+func _flush_log(ev: Dictionary) -> void:
+	if ev.has("log"):
+		for k in range(_log_seen, mini(int(ev["log"]), L.log_lines.size())):
+			_set_log(L.log_lines[k])
+		_log_seen = maxi(_log_seen, int(ev["log"]))
 
 func _anim_move(st: Dictionary, path: Array) -> void:
 	var n := _unit(st)
@@ -1072,6 +1078,7 @@ func _anim_attack(ev: Dictionary) -> void:
 	var txt := "-%d" % ev["dmg"]
 	if ev["lucky"]:
 		txt = "Lucky! " + txt
+	_flush_log(ev)
 	_damage_text(d, txt, ev["killed"], ev["lucky"])
 	_refresh_badge(d)
 	await get_tree().create_timer(0.3).timeout
@@ -1179,6 +1186,7 @@ func _anim_spell(ev: Dictionary) -> void:
 		else:
 			_play_fx(fx, p, Vector2.ONE * (0.75 if fx == "spark" else 0.95), 0.8, 0.5 if fx == "spark" else 1.0)
 	await get_tree().create_timer(0.35).timeout
+	_flush_log(ev)
 	for t in targets:
 		if ev["dmg"].has(t["uid"]):
 			_hit_flash(t)
@@ -1230,6 +1238,11 @@ func _refresh_badge(st: Dictionary) -> void:
 		q.queue_redraw()
 	if not st["alive"]:
 		_drop_from_queue(st)
+		if n:
+			var m = n.get_node("Sprite").material
+			if m is ShaderMaterial:
+				m.set_shader_parameter("ink", Color(0.09, 0.06, 0.03, 0.95))
+			n.get_node("Shadow").active = false
 	if _info_key == "s%d" % st["uid"]:  # its hover panel shows the old numbers: rebuild it
 		_reset_info()
 		_update_info()
@@ -1243,7 +1256,7 @@ func _damage_text(d: Dictionary, txt: String, killed: int, lucky := false, delay
 		("%d slain" % killed) if killed > 0 else "", delay, n, Vector2(-home.x, home.y), -1 if d["side"] == 0 else 1)
 
 ## Keeps count badges of neighbouring stacks from touching ("2" and "4" side by side read as "24"): a badge that
-## would overlap one placed before it moves down below it.
+## would overlap one placed before it steps aside toward its own stack.
 func _settle_badges() -> void:
 	var placed: Array = []
 	var keys := units.keys()
@@ -1258,8 +1271,11 @@ func _settle_badges() -> void:
 			var moved := false
 			for o in placed:
 				if r.intersects(o):
-					# down below the other one, or up above it at the bottom of the field (never under the bar)
-					r.position.y = o.end.y + 1 if o.end.y + 1 + r.size.y < BAR_Y - 2 else o.position.y - r.size.y - 1
+					# aside, toward its own stack
+					if n.position.x >= o.get_center().x:
+						r.position.x = o.end.x + 6
+					else:
+						r.position.x = o.position.x - r.size.x - 6
 					moved = true
 			if not moved:
 				break
@@ -1392,6 +1408,7 @@ func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2)
 		blocks.append(Rect2(o.position + b.position - Vector2(20, 13), Vector2(40, 26)))
 	for f in _floats:
 		blocks.append(f.get_meta("float_rect"))
+	blocks.append_array(_obstacle_rects)
 	var best: Rect2 = cands[0]
 	var best_cost := INF
 	for i in cands.size():

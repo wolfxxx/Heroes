@@ -576,11 +576,12 @@ func _strike(a: Dictionary, d: Dictionary, ranged: bool, moved: int, retaliation
 	if has_ab(a, "death_blow") and rng.randf() < 0.2:
 		dmg *= 2
 		lucky = true
+	var dname := _name(d)
 	var killed := apply_damage(d, dmg)
 	var ev := [{"t": "attack", "a": a, "d": d, "ranged": ranged, "retaliation": retaliation, "dmg": dmg, "killed": killed, "lucky": lucky}]
 	var verb := ("shoot" if ranged else "attack") + ("s" if a["count"] == 1 else "")
-	log_lines.append("%s %s %s for %d damage.%s" % [_name(a), verb, _name(d), dmg,
-		(" %d perish." % killed) if killed > 0 else ""])
+	log_lines.append("%s %s %s for %d damage.%s" % [_name(a), verb, dname, dmg,
+		(" %d %s." % [killed, "perishes" if killed == 1 else "perish"]) if killed > 0 else ""])
 	ev[0]["log"] = log_lines.size()
 	if has_ab(a, "life_drain") and a["alive"] and not has_ab(d, "undead"):
 		var g := heal(a, dmg / 2, true)
@@ -656,6 +657,7 @@ func cast(side: int, spell: String, hex: Vector2i) -> Array:
 				if not has_ab(s, "undead"):
 					targets.append(s)
 	ev["targets"] = targets
+	var first_name := _name(targets[0]) if targets.size() > 0 else ""  # (before the damage: "on Liches", not after)
 	var out := [ev]
 	for s in targets:
 		if sp.has("damage"):
@@ -689,7 +691,7 @@ func cast(side: int, spell: String, hex: Vector2i) -> Array:
 	# the log names the target and the damage, so every number on the field has its line
 	var line := "%s casts %s" % [h["name"], sp["name"]]
 	if targets.size() == 1:
-		line += " on %s" % _name(targets[0])
+		line += " on %s" % first_name
 	elif targets.size() > 1:
 		line += " (%d stacks)" % targets.size()
 	if ev["dmg"].size() > 0:
@@ -698,7 +700,7 @@ func cast(side: int, spell: String, hex: Vector2i) -> Array:
 		for k in ev["dmg"]:
 			total += ev["dmg"][k]
 			slain += ev["killed"].get(k, 0)
-		line += ", %d damage" % total + (", %d perish" % slain if slain > 0 else "")
+		line += ", %d damage" % total + ((", %d %s" % [slain, "perishes" if slain == 1 else "perish"]) if slain > 0 else "")
 	log_lines.append(line + ".")
 	ev["log"] = log_lines.size()
 	return out
