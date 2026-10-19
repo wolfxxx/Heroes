@@ -333,7 +333,7 @@ func _start_bonus(p: Dictionary, hero: Dictionary, bonus: String) -> void:
 			p["resources"]["ore"] += 10
 		"artifact":
 			var a: String = GameData.BONUS_ARTIFACTS[rng.randi() % GameData.BONUS_ARTIFACTS.size()]
-			hero["artifacts"].append(a)
+			GameState.give_artifact(hero, a)
 
 # ---------------------------------------------------------------------------------------------
 func _start_positions(np: int) -> Array:

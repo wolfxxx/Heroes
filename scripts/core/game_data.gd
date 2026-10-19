@@ -145,6 +145,8 @@ const CREATURES := {
 
 ## War machines a hero can own (bought at a Blacksmith); the catapult comes with every hero laying siege.
 const WAR_MACHINES := ["ballista", "first_aid_tent", "ammo_cart"]
+## The one war machine each town's Blacksmith forges (as the classic towns: Castle a Ballista, Necropolis a tent).
+const SMITH_MACHINE := {"haven": "ballista", "necropolis": "first_aid_tent"}
 const MACHINE_TEXT := {
 	"ballista": "Shoots an enemy stack every round, guided by the hero's Attack.",
 	"first_aid_tent": "Heals the top creature of a wounded friendly stack every round.",
@@ -234,7 +236,7 @@ const BUILDINGS := {
 	"mage_guild_2": {"name": "Mage Guild Lv2", "cost": {"gold": 1000, "wood": 5, "ore": 5, "crystal": 4, "gems": 4}, "requires": ["mage_guild_1"], "replaces": "mage_guild_1", "desc": "Teaches level 2 spells."},
 	"mage_guild_3": {"name": "Mage Guild Lv3", "cost": {"gold": 1000, "wood": 5, "ore": 5, "mercury": 4, "sulfur": 4, "crystal": 4, "gems": 4}, "requires": ["mage_guild_2"], "replaces": "mage_guild_2", "desc": "Teaches level 3 spells."},
 	"mage_guild_4": {"name": "Mage Guild Lv4", "cost": {"gold": 1000, "wood": 5, "ore": 5, "mercury": 6, "sulfur": 6, "crystal": 6, "gems": 6}, "requires": ["mage_guild_3"], "replaces": "mage_guild_3", "desc": "Teaches level 4 spells."},
-	"blacksmith": {"name": "Blacksmith", "cost": {"gold": 1000, "wood": 5}, "requires": [], "desc": "Sells war machines and hones a visiting hero's weapons: +1 Attack."},
+	"blacksmith": {"name": "Blacksmith", "cost": {"gold": 1000, "wood": 5}, "requires": [], "desc": "Sells the town's war machine to a visiting hero: a Ballista in Haven, a First Aid Tent in Necropolis."},
 	# faction special buildings ("faction": only that faction's towns can build them)
 	"stables": {"name": "Stables", "faction": "haven", "cost": {"gold": 2000, "wood": 10}, "requires": [], "desc": "Heroes who start the day in this town get +400 movement points."},
 	"brotherhood": {"name": "Brotherhood of the Sword", "faction": "haven", "cost": {"gold": 500, "wood": 5}, "requires": ["tavern"], "desc": "+2 morale for the defenders when the town is besieged."},
@@ -284,7 +286,14 @@ const ARTIFACTS := {
 	"ring_of_vitality": {"name": "Ring of Vitality", "slot": "ring", "bonus": {"hp": 1}, "desc": "+1 HP to all creatures"},
 	"clover_of_fortune": {"name": "Clover of Fortune", "slot": "misc", "bonus": {"luck": 1}, "desc": "+1 Luck"},
 	"crown_of_command": {"name": "Crown of Command", "slot": "head", "bonus": {"attack": 2, "defense": 2, "power": 2, "knowledge": 2}, "desc": "+2 to all skills"},
+	"cape_of_courage": {"name": "Cape of Courage", "slot": "cape", "bonus": {"morale": 1}, "desc": "+1 Morale"},
+	"amulet_of_insight": {"name": "Amulet of Insight", "slot": "neck", "bonus": {"power": 1, "knowledge": 1}, "desc": "+1 Spell Power, +1 Knowledge"},
+	"breastplate_of_ironbark": {"name": "Breastplate of Ironbark", "slot": "torso", "bonus": {"defense": 2}, "desc": "+2 Defense"},
 }
+## Where a hero wears artifacts (the classic paper-doll) and how many of each; the rest go into the backpack,
+## where they give nothing.
+const ARTIFACT_SLOTS := {"head": 1, "cape": 1, "neck": 1, "weapon": 1, "shield": 1, "torso": 1, "ring": 2, "feet": 1,
+	"misc": 5}
 
 # ---------------------------------------------------------------------------------------------
 # Scenarios
@@ -334,7 +343,7 @@ static func loss_text(l: Dictionary) -> String:
 const START_BONUSES := {"gold": ["Gold", "+2500 gold"], "artifact": ["Artifact", "A random artifact"],
 	"resource": ["Resources", "+10 wood and ore"]}
 const BONUS_ARTIFACTS := ["sword_of_valor", "shield_of_dawn", "helm_of_wisdom", "orb_of_power", "boots_of_speed",
-	"ring_of_vitality", "clover_of_fortune"]
+	"ring_of_vitality", "clover_of_fortune", "cape_of_courage", "amulet_of_insight", "breastplate_of_ironbark"]
 
 # ---------------------------------------------------------------------------------------------
 # Adventure map

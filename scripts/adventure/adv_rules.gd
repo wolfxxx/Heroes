@@ -382,8 +382,7 @@ func visit(hero: Dictionary, o: Dictionary) -> Dictionary:
 			_remove_object(o)
 		"artifact":
 			var a: String = o["artifact"]
-			hero["artifacts"].append(a)
-			hero["max_movement"] = GameState.hero_max_movement(hero)
+			GameState.give_artifact(hero, a)
 			ev["title"] = GameData.ARTIFACTS[a]["name"]
 			ev["text"] = "You found the %s! (%s)" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
 			ev["icons"] = [[Assets.artifact_icon(a), GameData.ARTIFACTS[a]["desc"]]]
@@ -610,6 +609,7 @@ func apply_battle(result: Dictionary) -> Dictionary:
 			if not def.is_empty():
 				_set_army(def["army"], result["defender_army"])
 				if att_won:
+					_loot(att, def)
 					_kill_hero(def)
 		"town":
 			var town: Dictionary = world["towns"].get(ctx["town"], {})
@@ -620,6 +620,7 @@ func apply_battle(result: Dictionary) -> Dictionary:
 				_set_army(town["garrison"], result["defender_army"])
 			if att_won and not town.is_empty():
 				if not def.is_empty():
+					_loot(att, def)
 					_kill_hero(def)
 				for i in 7:
 					town["garrison"][i] = null
@@ -635,10 +636,20 @@ func apply_battle(result: Dictionary) -> Dictionary:
 		if not dh.is_empty():
 			ev["hero"] = dh["uid"]
 			ev["levels"] = gain_xp(dh, int(result.get("xp", 0)))
+			_loot(dh, att)
 		_kill_hero(att)
 	rebuild()
 	check_eliminations()
 	return ev
+
+## The winner of a battle between heroes takes the loser's artifacts, worn and carried (as the classic game).
+func _loot(winner: Dictionary, loser: Dictionary) -> void:
+	if winner.is_empty():
+		return
+	for a in loser.get("artifacts", []) + loser.get("backpack", []):
+		GameState.give_artifact(winner, a)
+	loser["artifacts"] = []
+	loser["backpack"] = []
 
 func _set_army(dst: Array, src: Array) -> void:
 	for i in 7:

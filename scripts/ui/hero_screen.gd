@@ -1,15 +1,27 @@
 extends RefCounted
 class_name HeroScreen
-## The hero screen: portrait and primary skills, eight secondary-skill sockets, the paper-doll with the artifact
-## sockets on the hero's body, the spellbook and the army.
+## The hero screen: portrait and primary skills, eight secondary-skill sockets and the army; the paper-doll with every
+## classic artifact socket on the hero's body, the war machines and the spellbook down its sides, and a scrolling
+## backpack under it. Click an artifact to take it off into the backpack, or to put it on from the backpack.
 ##   var r = await HeroScreen.open(owner, hero).closed    # "close" or "dismiss"
 
 const SKILL_LEVEL := ["", "Basic", "Advanced", "Expert"]
-const DOLL := Vector2(390, 520)
-## Artifact sockets on the paper-doll (fractions of the painting): over the body part they dress.
-const SOCKETS := {"head": Vector2(0.5, 0.19), "misc": Vector2(0.5, 0.385), "weapon": Vector2(0.235, 0.555),
-	"shield": Vector2(0.765, 0.555), "ring": Vector2(0.765, 0.72), "ring2": Vector2(0.235, 0.72), "feet": Vector2(0.5, 0.875)}
-const SOCKET_NAME := {"head": "Head", "misc": "Charm", "weapon": "Weapon", "shield": "Shield", "ring": "Ring", "ring2": "Ring", "feet": "Feet"}
+const DOLL := Vector2(450, 600)
+const SOCK := 58.0
+## Artifact sockets on the paper-doll (fractions of the painting): over the body part they dress, the five misc
+## sockets down the right edge (as the classic hero screen). [where, slot kind, which one of that kind]
+const SOCKETS := {
+	"head": [Vector2(0.5, 0.15), "head", 0], "cape": [Vector2(0.29, 0.25), "cape", 0], "neck": [Vector2(0.5, 0.28), "neck", 0],
+	"torso": [Vector2(0.5, 0.41), "torso", 0], "weapon": [Vector2(0.27, 0.53), "weapon", 0],
+	"shield": [Vector2(0.73, 0.53), "shield", 0], "ring": [Vector2(0.27, 0.69), "ring", 0],
+	"ring2": [Vector2(0.73, 0.69), "ring", 1], "feet": [Vector2(0.5, 0.88), "feet", 0],
+	"misc1": [Vector2(0.92, 0.1), "misc", 0], "misc2": [Vector2(0.92, 0.23), "misc", 1],
+	"misc3": [Vector2(0.92, 0.36), "misc", 2], "misc4": [Vector2(0.92, 0.49), "misc", 3],
+	"misc5": [Vector2(0.92, 0.62), "misc", 4]}
+const SLOT_NAME := {"head": "Head", "cape": "Shoulders", "neck": "Neck", "torso": "Torso", "weapon": "Right hand",
+	"shield": "Left hand", "ring": "Ring", "feet": "Feet", "misc": "Miscellaneous"}
+## The war machines down the doll's left edge (the spellbook sits at the foot of the right).
+const MACHINES := ["ballista", "ammo_cart", "first_aid_tent", "catapult"]
 const BACKPACK := 5
 const STAT_TIP := {"attack": "Attack: added to the Attack of every creature in the army.",
 	"defense": "Defense: added to the Defense of every creature in the army.",
@@ -41,6 +53,18 @@ static func _morale(h: Dictionary) -> Array:
 
 static func open(owner: Node, h: Dictionary) -> Modal:
 	var m := Modal.custom(owner, "", 1240)
+	m.set_meta("bp", 0)  # (the backpack's scroll)
+	_fill(m, owner, h)
+	m.set_meta("default", "close")
+	m.set_meta("cancel", "close")
+	return m
+
+## (Re)builds the whole screen: after an artifact moves, every number that depends on it shows afresh.
+static func _fill(m: Modal, owner: Node, h: Dictionary) -> void:
+	for c in m.body.get_children():
+		m.body.remove_child(c)
+		c.queue_free()
+	var redo := func(): _fill.call_deferred(m, owner, h)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 30)
 	m.body.add_child(row)
@@ -132,39 +156,20 @@ static func open(owner: Node, h: Dictionary) -> Modal:
 	for i in 8:
 		sk.add_child(_skill_cell(ids[i] if i < ids.size() else "", int(h["skills"].get(ids[i], 0)) if i < ids.size() else 0))
 
-	# the paper-doll, and the spellbook under it
-	var right := VBoxContainer.new()
-	right.add_theme_constant_override("separation", 10)
-	row.add_child(right)
-	right.add_child(_doll(h))
-	right.add_child(_backpack(h))
-	var sb := HBoxContainer.new()
-	sb.add_theme_constant_override("separation", 14)
-	sb.alignment = BoxContainer.ALIGNMENT_CENTER
-	right.add_child(sb)
-	var n: int = h["spells"].size()
-	sb.add_child(UI.label(("%d spell%s known" % [n, "" if n == 1 else "s"]) if n > 0 else "No spells known", 19, Color(0.85, 0.8, 0.68)))
-	if n > 0:
-		var bk := UI.button("Spellbook", func(): SpellBook.open(owner, h), 20)
-		bk.custom_minimum_size = Vector2(160, 46)
-		sb.add_child(bk)
-
-	# the army, and beside it the war machine sockets (as the classic hero screen)
-	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 40)
-	m.body.add_child(bottom)
-	var av := VBoxContainer.new()
-	bottom.add_child(av)
-	av.add_child(UI.label("Army", 22, UI.GOLD, true))
+	# the army
+	left.add_child(UI.label("Army", 24, UI.GOLD, true))
 	var strip := ArmyStrip.new()
 	strip.bind(h["army"], {}, true)
 	strip.tooltip_text = "Click a stack, then another slot, to move or swap it. Shift+click to split. Right click: details."
-	av.add_child(strip)
-	bottom.add_child(_machines(h))
+	left.add_child(strip)
+
+	# the paper-doll (machines and spellbook on its edges), the backpack under it
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 10)
+	row.add_child(right)
+	right.add_child(_doll(owner, h, redo))
+	right.add_child(_backpack(m, h, redo))
 	m.add_buttons([["Close", "close"], ["Dismiss Hero", "dismiss"]])
-	m.set_meta("default", "close")
-	m.set_meta("cancel", "close")
-	return m
 
 ## A small labelled meter: title, value and a thin bar.
 static func _meter(title: String, value: String, frac: float, col: Color) -> Control:
@@ -188,7 +193,7 @@ static func _meter(title: String, value: String, frac: float, col: Color) -> Con
 static func _skill_cell(id: String, lvl: int) -> Control:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 12)
-	h.custom_minimum_size = Vector2(370, 76)
+	h.custom_minimum_size = Vector2(340, 76)
 	var so := _Socket.new()
 	so.custom_minimum_size = Vector2(72, 72)
 	h.add_child(so)
@@ -206,91 +211,113 @@ static func _skill_cell(id: String, lvl: int) -> Control:
 	HoverInfo.attach(h, func(): return tip)
 	return h
 
-## Which socket each artifact sits in; the rest go into the backpack.
-static func _placed(h: Dictionary) -> Array:
-	var by_slot := {}
-	var extra := []
+## The worn artifact in each doll socket (rings and misc fill their sockets in order).
+static func _placed(h: Dictionary) -> Dictionary:
+	var seen := {}
+	var out := {}
 	for a in h["artifacts"]:
-		var sl: String = GameData.ARTIFACTS[a]["slot"]
-		if by_slot.has(sl) and sl == "ring" and not by_slot.has("ring2"):
-			sl = "ring2"
-		if by_slot.has(sl):
-			extra.append(a)
-		else:
-			by_slot[sl] = a
-	return [by_slot, extra]
+		var kind: String = GameData.ARTIFACTS[a]["slot"]
+		var k: int = seen.get(kind, 0)
+		seen[kind] = k + 1
+		for sl in SOCKETS:
+			if SOCKETS[sl][1] == kind and SOCKETS[sl][2] == k:
+				out[sl] = a
+	return out
 
-static func _artifact_tip(a: String) -> String:
-	return "%s
-%s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
+static func _artifact_tip(a: String, hint := "") -> String:
+	var t := "%s\n%s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
+	return t + ("\n" + hint if hint != "" else "")
 
-## The painted figure with a socket on each body part.
-static func _doll(h: Dictionary) -> Control:
+## The painted figure with a socket on each body part, the war machines down its left edge, the misc sockets and the
+## spellbook down its right.
+static func _doll(owner: Node, h: Dictionary, redo: Callable) -> Control:
 	var doll := TextureRect.new()
 	doll.texture = Assets.tex("ui/paperdoll.png")
 	doll.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	doll.custom_minimum_size = DOLL
-	var by_slot: Dictionary = _placed(h)[0]
+	doll.size_flags_horizontal = Control.SIZE_SHRINK_CENTER  # (the sockets are placed on the painting at this size)
+	var worn := _placed(h)
 	for sl in SOCKETS:
-		var so := _Socket.new()
-		so.size = Vector2(68, 68)
-		so.position = SOCKETS[sl] * DOLL - so.size * 0.5
-		so.empty = not by_slot.has(sl)
+		var so := _sock(doll, SOCKETS[sl][0])
+		var kind: String = SOCKETS[sl][1]
 		so.glass = true
-		var tip: String = _artifact_tip(by_slot[sl]) if by_slot.has(sl) else "%s: empty" % SOCKET_NAME[sl]
-		if by_slot.has(sl):
-			so.tex = Assets.artifact_icon(by_slot[sl])
-		HoverInfo.attach(so, func(): return tip)
-		doll.add_child(so)
-	return doll
-
-## The four war machine sockets: the hero's ballista, ammo cart and first aid tent (bought at a Blacksmith), and the
-## catapult every hero brings to a siege.
-static func _machines(h: Dictionary) -> Control:
-	var v := VBoxContainer.new()
-	v.add_child(UI.label("War Machines", 22, UI.GOLD, true))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	v.add_child(row)
+		if worn.has(sl):
+			var a: String = worn[sl]
+			so.tex = Assets.artifact_icon(a)
+			var tip := _artifact_tip(a, "Click: take it off into the backpack.")
+			HoverInfo.attach(so, func(): return tip)
+			so.pressed = func():
+				GameState.swap_artifact(h, a, true)
+				Audio.sfx("click")
+				redo.call()
+		else:
+			so.empty = true
+			var tip := "%s: empty" % SLOT_NAME[kind]
+			HoverInfo.attach(so, func(): return tip)
 	var have: Array = h.get("machines", [])
-	for id in ["ballista", "ammo_cart", "first_aid_tent", "catapult"]:
-		var so := _Socket.new()
-		so.custom_minimum_size = Vector2(92, 92)
+	for i in MACHINES.size():
+		var id: String = MACHINES[i]
+		var so := _sock(doll, Vector2(0.08, 0.1 + 0.13 * i))
 		so.empty = not (id in have or id == "catapult")
 		so.tex = Assets.creature_portrait(id)
 		var c: Dictionary = GameData.CREATURES[id]
 		var tip: String = "%s%s\n%s" % [c["name"], "" if not so.empty else " (not owned: buy one at a Blacksmith)",
 			GameData.MACHINE_TEXT[id]]
 		HoverInfo.attach(so, func(): return tip)
-		var cell := VBoxContainer.new()  # (with its name under it: gold when the hero has it)
-		cell.add_theme_constant_override("separation", 2)
-		cell.add_child(so)
-		var nm := UI.label(c["name"].replace("First Aid ", "Aid ") if not so.empty else "(none)", 15,
-			UI.GOLD if not so.empty else Color(0.55, 0.5, 0.45))
-		nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		nm.custom_minimum_size.x = 92
-		cell.add_child(nm)
-		row.add_child(cell)
-	return v
+	var bk := _sock(doll, Vector2(0.92, 0.88))
+	bk.tex = Assets.tex("icons/stat_knowledge.png")
+	var n: int = h["spells"].size()
+	var btip := ("Spellbook: %d spell%s known. Click to open." % [n, "" if n == 1 else "s"]) if n > 0 else "Spellbook: no spells known."
+	HoverInfo.attach(bk, func(): return btip)
+	if n > 0:
+		bk.pressed = func(): SpellBook.open(owner, h)
+	return doll
 
-## A row of backpack sockets under the figure, for artifacts with no free body slot.
-static func _backpack(h: Dictionary) -> Control:
-	var extra: Array = _placed(h)[1]
+static func _sock(doll: Control, at: Vector2) -> _Socket:
+	var so := _Socket.new()
+	so.size = Vector2(SOCK, SOCK)
+	so.position = at * DOLL - so.size * 0.5
+	doll.add_child(so)
+	return so
+
+## The backpack: five sockets with arrows to scroll through the rest, as the classic hero screen.
+static func _backpack(m: Modal, h: Dictionary, redo: Callable) -> Control:
+	var pack: Array = h.get("backpack", [])
+	var off: int = clampi(int(m.get_meta("bp", 0)), 0, maxi(0, pack.size() - BACKPACK))
+	m.set_meta("bp", off)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", 6)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var l := UI.label("Backpack", 18, UI.GOLD)
-	l.custom_minimum_size.x = 92
+	l.custom_minimum_size.x = 84
 	row.add_child(l)
-	for i in maxi(BACKPACK, extra.size()):
+	var arrow := func(t: String, d: int) -> Button:
+		var b := UI.button(t, func():
+			m.set_meta("bp", off + d)
+			redo.call(), 20)
+		b.custom_minimum_size = Vector2(34, SOCK)
+		b.disabled = off + d < 0 or off + d > pack.size() - BACKPACK
+		return b
+	row.add_child(arrow.call("<", -1))
+	for i in BACKPACK:
 		var so := _Socket.new()
-		so.custom_minimum_size = Vector2(54, 54)
-		so.empty = i >= extra.size()
+		so.custom_minimum_size = Vector2(SOCK, SOCK)
+		so.empty = off + i >= pack.size()
 		if not so.empty:
-			so.tex = Assets.artifact_icon(extra[i])
-			var tip := _artifact_tip(extra[i])
+			var a: String = pack[off + i]
+			so.tex = Assets.artifact_icon(a)
+			var hint := "Click: put it on." if GameState.can_wear(h, a) else "Click: put it on in place of the one worn there."
+			var tip := _artifact_tip(a, hint)
 			HoverInfo.attach(so, func(): return tip)
+			so.pressed = func():
+				GameState.swap_artifact(h, a, false)
+				Audio.sfx("click")
+				redo.call()
 		row.add_child(so)
+	row.add_child(arrow.call(">", 1))
+	var cnt := UI.label(str(pack.size()) if pack.size() > BACKPACK else "", 16, Color(0.85, 0.8, 0.68))
+	cnt.custom_minimum_size.x = 22
+	row.add_child(cnt)
 	return row
 
 ## A recessed square socket: dark well, bevelled rim, thin gold frame; holds an icon (or nothing).
@@ -298,8 +325,15 @@ class _Socket extends Control:
 	var tex: Texture2D
 	var empty := false
 	var glass := false  # on the paper-doll: a translucent well, so the figure shows through when empty
+	var pressed := Callable()  # (a left click on it)
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_PASS
+		mouse_entered.connect(queue_redraw)
+		mouse_exited.connect(queue_redraw)
+	func _gui_input(e: InputEvent) -> void:
+		if pressed.is_valid() and e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			accept_event()
+			pressed.call()
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		draw_rect(r, Color(0.02, 0.02, 0.025, (0.22 if glass else 0.4) if empty else 0.92))
@@ -312,7 +346,9 @@ class _Socket extends Control:
 		draw_line(Vector2(1, 1), Vector2(1, size.y - 1), Color(0, 0, 0, 0.8), 3)
 		draw_line(Vector2(2, size.y - 1), Vector2(size.x - 1, size.y - 1), Color(1, 0.9, 0.7, 0.18), 2)
 		draw_line(Vector2(size.x - 1, 2), Vector2(size.x - 1, size.y - 1), Color(1, 0.9, 0.7, 0.18), 2)
-		draw_rect(r.grow(1), Color(0.66, 0.5, 0.25) if empty else Color(0.86, 0.68, 0.32), false, 2.0)
+		var lit := pressed.is_valid() and get_global_rect().has_point(get_global_mouse_position())
+		draw_rect(r.grow(1), Color(1, 0.9, 0.5) if lit else (Color(0.66, 0.5, 0.25) if empty else Color(0.86, 0.68, 0.32)),
+			false, 3.0 if lit else 2.0)
 
 class _Bar extends Control:
 	var frac := 0.0

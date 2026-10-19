@@ -8,6 +8,7 @@ class_name HoverInfo
 ## clear_x (>= 0): keep the panel on that side of this screen x (e.g. clear of a battle stack and its neighbours).
 ## beside: a screen rect (e.g. a card) to put the panel next to, right of it or else left, top-aligned, instead of
 ## following the cursor; attach(..., true) does this with the control's own rect.
+## area: a screen rect the panel must stay inside (e.g. the map view, clear of the side panel), or the whole screen.
 ## Content is a Control, a String, or null (nothing to show).
 
 const WIDTH := 400.0
@@ -29,8 +30,10 @@ static func attach(c: Control, build: Callable, delay := 0.0, beside := false) -
 	c.mouse_exited.connect(func(): hide_for(c))
 	c.tree_exiting.connect(func(): hide_for(c))
 
-static func show_for(owner: Object, content, delay := 0.0, side := 1, clear_x := -1.0, beside := Rect2()) -> void:
+static func show_for(owner: Object, content, delay := 0.0, side := 1, clear_x := -1.0, beside := Rect2(),
+		area := Rect2()) -> void:
 	_layer().side = side
+	_layer().area = area
 	_layer().clear_x = clear_x
 	_layer().beside = beside
 	_layer().present(owner, content, delay)
@@ -122,6 +125,7 @@ class _Layer extends CanvasLayer:
 	var clear_x := -1.0
 	var beside := Rect2()
 	var floor_y := -1.0  # (a screen's bottom bar the panel must stay above, e.g. the battle log; -1: none)
+	var area := Rect2()
 
 	func _init() -> void:
 		layer = 120
@@ -205,6 +209,12 @@ class _Layer extends CanvasLayer:
 		var vp := get_viewport()
 		var m := mouse
 		var vs := vp.get_visible_rect().size
+		var x0 := 0.0
+		var y_floor := floor_y
+		if area.size != Vector2.ZERO:
+			x0 = area.position.x
+			vs.x = area.end.x
+			y_floor = area.end.y if floor_y < 0.0 else minf(floor_y, area.end.y)
 		var sz := panel.get_combined_minimum_size()
 		panel.size = sz
 		if beside.size != Vector2.ZERO:
@@ -219,9 +229,9 @@ class _Layer extends CanvasLayer:
 		var left := m.x - sz.x - 16
 		if clear_x >= 0.0:
 			p.x = clampf(maxf(p.x, clear_x) if side > 0 else minf(left, clear_x - sz.x), 8, vs.x - sz.x - 8)
-		elif (side < 0 and left >= 8) or p.x + sz.x > vs.x - 8:
+		elif (side < 0 and left >= x0 + 8) or p.x + sz.x > vs.x - 8:
 			p.x = left
-		var lim := vs.y - 8 if floor_y < 0.0 else minf(vs.y - 8, floor_y)
+		var lim := vs.y - 8 if y_floor < 0.0 else minf(vs.y - 8, y_floor)
 		if p.y + sz.y > lim:
 			p.y = maxf(8, lim - sz.y)
 		panel.position = p

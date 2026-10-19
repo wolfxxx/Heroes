@@ -40,7 +40,12 @@ func _ready() -> void:
 			for h in GameState.world["heroes"].values():  # a seasoned hero: spells, skills and some gear
 				h["spells"] = GameData.SPELLS.keys()
 				h["skills"].merge({"wisdom": 2, "offense": 1, "logistics": 3})
-				h["artifacts"] = ["sword_of_valor", "helm_of_wisdom", "boots_of_speed", "ring_of_vitality"]
+				h["artifacts"] = ["sword_of_valor", "helm_of_wisdom", "boots_of_speed", "ring_of_vitality",
+					"cape_of_courage", "amulet_of_insight", "orb_of_power"]
+				h["backpack"] = ["crown_of_command", "shield_of_dawn", "clover_of_fortune", "breastplate_of_ironbark",
+					"orb_of_power", "ring_of_vitality"]
+				h["max_movement"] = GameState.hero_max_movement(h)
+				h["movement"] = h["max_movement"]
 	world = GameState.world
 	RenderingServer.set_default_clear_color(Color(0.02, 0.02, 0.03))
 	rules = AdvRules.new(world)
@@ -244,7 +249,8 @@ func _unhandled_input(e: InputEvent) -> void:
 		hud.set_status(_describe_tile(t))
 		if t != _info_tile and not busy:
 			_info_tile = t
-			HoverInfo.show_for(self, _tile_info(t), 0.3)
+			# (inside the map view: not over the side panel)
+			HoverInfo.show_for(self, _tile_info(t), 0.3, 1, -1.0, Rect2(), Rect2(0, 0, AdventureHUD.PANEL_X - 6, 1036))
 	elif e is InputEventMouseButton:
 		if e.button_index == MOUSE_BUTTON_MIDDLE:
 			if e.pressed:

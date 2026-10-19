@@ -7,7 +7,7 @@ extends Node
 ##            "attack": int, "defense": int, "power": int, "knowledge": int,
 ##            "level": int, "xp": int, "mana": int, "movement": int, "max_movement": int,
 ##            "army": army, "spells": Array[String], "skills": {skill_id: level},
-##            "artifacts": Array[String], "pos": Vector2i}
+##            "artifacts": Array[String] (worn), "backpack": Array[String], "pos": Vector2i}
 ##   world : owned by the adventure map (scripts/adventure/*). Stored here so it survives scene changes.
 ##
 ## Battle handoff:
@@ -105,7 +105,7 @@ func make_hero(hero_id: String, owner: int) -> Dictionary:
 		"owner": owner, "attack": d["attack"], "defense": d["defense"], "power": d["power"],
 		"knowledge": d["knowledge"], "level": 1, "xp": 0, "mana": 0, "movement": 1500, "max_movement": 1500,
 		"army": army, "spells": d.get("spells", []).duplicate(), "skills": d.get("skills", {}).duplicate(),
-		"artifacts": [], "pos": Vector2i.ZERO,
+		"artifacts": [], "backpack": [], "pos": Vector2i.ZERO,
 		# might heroes march with a ballista, magic heroes with a first aid tent (more at a Blacksmith)
 		"machines": ["ballista"] if d["class"] in ["Knight", "Death Knight"] else ["first_aid_tent"],
 	}
@@ -119,6 +119,49 @@ func hero_stat(h: Dictionary, stat: String) -> int:
 	for a in h.get("artifacts", []):
 		v += GameData.ARTIFACTS[a]["bonus"].get(stat, 0)
 	return v
+
+## Whether the hero has a free body slot for the artifact (worn ones count, the backpack does not).
+func can_wear(h: Dictionary, a: String) -> bool:
+	var sl: String = GameData.ARTIFACTS[a]["slot"]
+	var n := 0
+	for w in h.get("artifacts", []):
+		if GameData.ARTIFACTS[w]["slot"] == sl:
+			n += 1
+	return n < int(GameData.ARTIFACT_SLOTS.get(sl, 1))
+
+## A found or won artifact: worn if its slot is free, else into the backpack (as the classic game).
+func give_artifact(h: Dictionary, a: String) -> void:
+	if can_wear(h, a):
+		h["artifacts"].append(a)
+		h["max_movement"] = hero_max_movement(h)
+	else:
+		if not h.has("backpack"):
+			h["backpack"] = []
+		h["backpack"].append(a)
+
+## Takes a worn artifact off into the backpack, or puts one from the backpack on (swapping out what wears its slot
+## when that is full). Movement left today never grows from it.
+func swap_artifact(h: Dictionary, a: String, worn: bool) -> void:
+	if not h.has("backpack"):
+		h["backpack"] = []
+	if worn:
+		h["artifacts"].erase(a)
+		h["backpack"].append(a)
+	else:
+		var i: int = h["backpack"].find(a)
+		if i < 0:
+			return
+		h["backpack"].remove_at(i)
+		if not can_wear(h, a):
+			var sl: String = GameData.ARTIFACTS[a]["slot"]
+			for w in h["artifacts"]:
+				if GameData.ARTIFACTS[w]["slot"] == sl:
+					h["artifacts"].erase(w)
+					h["backpack"].insert(i, w)
+					break
+		h["artifacts"].append(a)
+	h["max_movement"] = hero_max_movement(h)
+	h["movement"] = mini(h["movement"], h["max_movement"])
 
 func max_mana(h: Dictionary) -> int:
 	return hero_stat(h, "knowledge") * 10
