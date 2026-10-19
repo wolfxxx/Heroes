@@ -26,6 +26,9 @@ WALL_X, MOAT_X = 11, 10
 SEGMENTS = [[0], [1, 2], [3, 4], [5], [6, 7], [8, 9], [10]]  # battle_logic.gd SEGMENTS
 BANDS = [(0, 270), (270, 400), (400, 470), (470, 645), (645, 750), (750, 885), (885, 1080)]  # (screen y, per segment)
 FEATHER = 24
+# (the wall above the gate owns only a thin band, the gatehouse's battlements; its breach is cut from a taller band so
+# the hole reaches down into the gatehouse and reads as a way through, not chipped battlements)
+CUT_BANDS = {2: (330, 570)}
 
 
 def hex_pos(x, y):
@@ -222,7 +225,7 @@ def ingest():
         for i, rows in enumerate(SEGMENTS):
             # the band of the picture this segment owns (the wall runs straight down the screen, so the bands
             # split it by height; the gate takes the whole gatehouse), overlapping its neighbours by the feather
-            y0, y1 = BANDS[i]
+            y0, y1 = CUT_BANDS.get(i, BANDS[i])
             y0, y1 = max(0, y0 - FEATHER // 2), min(1080, y1 + FEATHER // 2)
             x0, x1 = 1200, 1570
             box = (x0, y0, x1, y1)

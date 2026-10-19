@@ -44,7 +44,10 @@ const SEGMENTS := [[[0], "tower"], [[1, 2], "wall"], [[3, 4], "wall"], [[5], "ga
 	[[10], "tower"]]
 const MACHINE_ROWS := {"ballista": 2, "catapult": 4, "ammo_cart": 6, "first_aid_tent": 8}
 const SEG_NAMES := ["the upper tower", "the upper wall", "the wall above the gate", "the gate",
-	"the wall below the gate", "the lower wall", "the lower tower"]
+	"the roof of the lower tower", "the side of the lower tower", "the lower tower"]
+## The painted lower tower stands over rows 6-10 of the wall: a breach there wrecks the tower, but no one walks
+## through a tower (as in the classic, where only wall stretches and the gate open a way in).
+const SOLID_SEGS := [4, 5, 6]
 
 # ---------------------------------------------------------------------------------------------
 func setup(s: Dictionary) -> void:
@@ -157,7 +160,11 @@ func wall_seg(h: Vector2i) -> int:
 ## Does an intact wall keep a stack of `side` off this hex? (Defenders pass their own gate.)
 func wall_blocks(h: Vector2i, side: int) -> bool:
 	var i := wall_seg(h)
-	if i < 0 or walls[i]["hp"] <= 0:
+	if i < 0:
+		return false
+	if i in SOLID_SEGS:
+		return true
+	if walls[i]["hp"] <= 0:
 		return false
 	return not (walls[i]["kind"] == "gate" and side == 1)
 
@@ -176,7 +183,7 @@ func behind_wall(a: Dictionary, d: Dictionary) -> bool:
 	if siege == 0 or a["side"] != 0:
 		return false
 	var i := wall_seg(Vector2i(WALL_X, d["hex"].y))
-	return i >= 0 and walls[i]["hp"] > 0 and a["hex"].x < WALL_X and d["hex"].x > WALL_X
+	return i >= 0 and (walls[i]["hp"] > 0 or i in SOLID_SEGS) and a["hex"].x < WALL_X and d["hex"].x > WALL_X
 
 ## A war machine's turn: the ballista and the towers shoot, the tent heals, the catapult batters the wall.
 func machine_act(s: Dictionary) -> Array:

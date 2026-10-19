@@ -823,7 +823,8 @@ func _stack_info(st: Dictionary) -> Control:
 		why.append("Shooter: half damage in melee and beyond 10 hexes")
 	if why.size() > 0:
 		HoverInfo.line(v, "\n".join(why), Color(0.85, 0.82, 0.72), 17)
-	var ab: Array = c["abilities"].map(func(a): return GameData.ABILITY_TEXT.get(a, a))
+	# (shooting is told above, with its rule)
+	var ab: Array = c["abilities"].filter(func(a): return a != "ranged").map(func(a): return GameData.ABILITY_TEXT.get(a, a))
 	if ab.size() > 0:
 		HoverInfo.line(v, ", ".join(ab), Color(0.75, 0.85, 1.0), 17)
 	if st["retaliations"] <= 0:
@@ -1379,6 +1380,10 @@ func _set_wall(i: int, broken: bool) -> void:
 		if broken:
 			s.modulate.a = 0.0
 			s.create_tween().tween_property(s, "modulate:a", 1.0, 0.25)
+	if broken and i == 5:  # the lower tower's crew stood at the window this breach tears out: up to the parapet
+		for st in L.stacks:
+			if st.get("tower", false) and st.get("seg", -1) == 6 and units.has(st["uid"]):
+				units[st["uid"]].position.y = 758.0
 	_cracks.queue_redraw()
 
 ## The catapult's boulder: a high arc onto a wall segment; a hit throws up dust, a breach turns it to rubble.
@@ -1475,9 +1480,10 @@ func _settle_badges() -> void:
 		if not b.visible or not b.st.get("alive", false):
 			continue
 		var home: Vector2 = b.get_meta("home")
-		var r := Rect2(n.position + home - Vector2(24, 14), Vector2(48, 28))
-		var mirror := Rect2(n.position + Vector2(-home.x, home.y) - Vector2(24, 14), Vector2(48, 28))
-		# (an enemy badge facing it read as one number, "2 6"; one on another stack's figure read as that stack's)
+		# (an enemy badge facing it read as one number, "2 6"; one on another stack's figure read as that stack's):
+		# its usual corner, else the other side, else lower down at its feet, else further out; the first that is clear
+		var spots := [home, Vector2(-home.x, home.y), home + Vector2(0, 26), Vector2(-home.x, home.y + 26),
+			Vector2(home.x * 1.45, home.y + 14)]
 		var bodies := _figure_rects(n)
 		var hit := func(q: Rect2) -> float:
 			var c := 0.0
@@ -1488,8 +1494,14 @@ func _settle_badges() -> void:
 				if q.intersects(o):
 					c += q.intersection(o).get_area()
 			return c
-		if hit.call(r) > 0.0 and hit.call(mirror) < hit.call(r):
-			r = mirror
+		var r := Rect2(n.position + home - Vector2(24, 14), Vector2(48, 28))
+		var best := INF
+		for j in spots.size():
+			var q := Rect2(n.position + spots[j] - Vector2(24, 14), Vector2(48, 28))
+			var c: float = hit.call(q) + j * 20.0  # (ties keep the usual corner)
+			if c < best:
+				best = c
+				r = q
 		for i in 3:
 			var moved := false
 			for o in placed:
