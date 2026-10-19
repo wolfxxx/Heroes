@@ -676,6 +676,13 @@ func _unhandled_input(e: InputEvent) -> void:
 					ArmyStrip.show_creature_info(self, s["id"], s["count"])
 	elif e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_A:
 		_on_auto()  # (also while something is acting: it takes over from the next turn)
+	elif e is InputEventKey and e.pressed and not e.echo and e.keycode == KEY_G:  # the full hex grid, any time
+		GameState.show_grid = not GameState.show_grid
+		_grid.queue_redraw()
+		for m in _field.get_children():
+			if m is _Moat:
+				m.queue_redraw()
+		_set_log("Hex grid shown." if GameState.show_grid else "Hex grid hidden: only where the active stack can go.")
 	elif e is InputEventKey and e.pressed and not e.echo and not _busy:
 		match e.keycode:
 			KEY_W: _on_wait()
@@ -1808,29 +1815,19 @@ class _Grid extends Node2D:
 				var closed := poly.duplicate()
 				closed.append(poly[0])
 				draw_polyline(closed, line, width, true)
+	## As the classic: only the hexes the active stack can reach are shaded and outlined (the "movement shadow");
+	## the full grid is an option (G). The castle wall never gets hexes drawn over it.
 	func _draw() -> void:
 		for y in BattleLogic.ROWS:
 			for x in BattleLogic.COLS:
 				var h := Vector2i(x, y)
-				var seg: int = b.L.wall_seg(h)
-				if seg >= 0 and not reach.has(h):  # the wall line: stone outline while it stands, rubble once breached
-					var wp: PackedVector2Array = b.hex_poly(b.hex_pos(h), 4.0)
-					var wc := wp.duplicate()
-					wc.append(wp[0])
-					if b.L.walls[seg]["hp"] > 0:
-						draw_colored_polygon(wp, Color(0.1, 0.08, 0.06, 0.18))
-						draw_polyline(wc, Color(0, 0, 0, 0.5), 4.0, true)
-						draw_polyline(wc, Color(0.86, 0.8, 0.68, 0.75), 2.0, true)
-					else:
-						draw_colored_polygon(wp, Color(0.3, 0.2, 0.1, 0.35))
-						draw_polyline(wc, Color(0, 0, 0, 0.35), 3.0, true)
-						draw_polyline(wc, Color(1, 0.7, 0.4, 0.55), 1.5, true)
+				if not reach.has(h) and (not GameState.show_grid or b.L.wall_seg(h) >= 0):
 					continue
 				var c: Vector2 = b.hex_pos(h)
 				var poly: PackedVector2Array = b.hex_poly(c, 2.0)
 				# where the active stack can go: shaded (as the classic game), with a brighter outline
 				if reach.has(h):
-					draw_colored_polygon(poly, Color(0.04, 0.025, 0.0, 0.42))
+					draw_colored_polygon(poly, Color(0.04, 0.025, 0.0, 0.34))
 				var closed := poly.duplicate()
 				closed.append(poly[0])
 				draw_polyline(closed, Color(0, 0, 0, 0.22), 3.0, true)  # dark under-line keeps the grid visible on light ground
@@ -2076,6 +2073,8 @@ class _Cracks extends Node2D:
 class _Moat extends Node2D:
 	var b
 	func _draw() -> void:
+		if not GameState.show_grid:  # (the painted water says it all; outlined only with the full grid)
+			return
 		for y in BattleLogic.ROWS:
 			var h := Vector2i(BattleLogic.MOAT_X, y)
 			if not b.L.is_moat(h):

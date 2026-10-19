@@ -27,6 +27,7 @@ var _pending_click := Vector2i(-1, -1)  # clicked while the hero was still movin
 const DRAG_START := 10.0
 const EDGE := 14.0           # edge-scroll band (screen pixels), also just outside the window
 var _cam_target := Vector2.ZERO
+var _follow := -1            # the walking hero the camera rides along with (its sprite, not its tile)
 
 func _ready() -> void:
 	if GameState.world.is_empty():
@@ -150,7 +151,13 @@ func _process(delta: float) -> void:
 	_poll_drag()
 	if move != Vector2.ZERO:
 		_cam_target = _clamp_cam(_cam_target + move.normalized() * 900.0 * delta / cam.zoom.x)
-	cam.position = cam.position.lerp(_cam_target, minf(1.0, delta * 10.0))
+	var hn: Node2D = view.hero_node(_follow) if _follow >= 0 else null
+	if hn:
+		# glide with the figure as it walks: a target that moves smoothly, not one step a tile
+		center_on_world(hn.position - Vector2(0, TILE * 0.5 - 6))
+		cam.position = cam.position.lerp(_cam_target, minf(1.0, delta * 6.0))
+	else:
+		cam.position = cam.position.lerp(_cam_target, minf(1.0, delta * 10.0))
 	var mpos := get_viewport().get_mouse_position()
 	if _modal_open():
 		if _info_tile != Vector2i(-3, -3):  # a window is up: the status line and tile highlight would show under it
@@ -603,7 +610,9 @@ func _execute_move() -> void:
 	busy = true
 	hero["asleep"] = false
 	view.clear_path()
+	_follow = hero["uid"]
 	await move_hero(hero, _plan, true)
+	_follow = -1
 	busy = false
 	if not is_inside_tree():
 		return
@@ -645,7 +654,7 @@ func move_hero(hero: Dictionary, plan: Dictionary, animate: bool) -> String:
 			view.move_hero_step(hero["uid"], p, 0.14 if human else 0.09)
 			if human or _visible_to_human(p):
 				Audio.sfx("footstep_horse", -12, 0.12)
-				if human:
+				if human and _follow != hero["uid"]:
 					center_on(p)
 			await get_tree().create_timer(0.14 if human else 0.09).timeout
 			if not is_inside_tree():

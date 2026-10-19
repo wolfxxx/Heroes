@@ -32,6 +32,7 @@ var pending_battle: Dictionary = {}
 var battle_result: Dictionary = {}
 var pending_town: Dictionary = {}   # {"town_uid": int}
 var return_scene := SCENE_ADVENTURE
+var show_grid := false  # battle: the whole hex grid (G), or only where the active stack can go (the default)
 var new_game_settings := {"faction": "haven", "hero": "sir_aldric", "difficulty": 1, "map_size": 48, "seed": 0}
 var _uid := 1000
 
