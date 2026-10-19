@@ -18,7 +18,7 @@ const OBSTACLES := {
 	"swamp": ["swamp_tree", "rotten_log", "thorns", "dead_tree", "skull_pile"],
 }
 ## Widest figure in hexes, wings and capes included: 1-hex and 2-hex units (a stack mustn't swallow its neighbours).
-const VIS_MAX_W := [1.3, 2.2]
+const VIS_MAX_W := [1.2, 2.2]
 
 static var _sizes = null
 
@@ -53,6 +53,7 @@ var units := {}            # uid -> Node2D
 var _field: Node2D
 var _grid: _Grid
 var _sorted: Node2D
+var _rings: Node2D  # every stack's ground ring, under all the figures (a ring never cuts across the stack behind)
 var _corpses: Node2D
 var _fx: Node2D
 var _floats: Array = []
@@ -204,6 +205,8 @@ func _build_scene() -> void:
 	var ground := Node2D.new()  # low obstacles (thorns, boulders, a crater): under every figure, never over one
 	ground.y_sort_enabled = true
 	_field.add_child(ground)
+	_rings = Node2D.new()
+	_field.add_child(_rings)
 	_sorted = Node2D.new()
 	_sorted.y_sort_enabled = true
 	_field.add_child(_sorted)
@@ -224,6 +227,8 @@ func _build_scene() -> void:
 			s.offset = Vector2(0, -s.texture.get_height() * 0.5 + 6)
 		s.position = hex_pos(h) + Vector2(0, 22)
 		var vis_h := Vector2(s.texture.get_size()).y * s.scale.y
+		if vis_h < 90.0:  # a low one lies inside its own hex (its middle on the ground where the stacks stand), not up into the hex behind
+			s.position.y = hex_pos(h).y + 14.0 + vis_h * 0.5 - (6.0 * s.scale.y if kind != "stump" else 0.0)
 		(ground if vis_h < 90.0 else _sorted).add_child(s)
 		var rr := s.get_rect()
 		_obstacle_rects.append(Rect2(s.position + rr.position * s.scale, rr.size * s.scale).grow(-8))
@@ -268,8 +273,9 @@ func _make_unit(st: Dictionary) -> void:
 	var shadow := _Shadow.new()
 	shadow.big = wide
 	shadow.side = st["side"]
-	shadow.name = "Shadow"
-	n.add_child(shadow)
+	shadow.position = n.position
+	_rings.add_child(shadow)
+	n.set_meta("shadow", shadow)
 	var s := Sprite2D.new()
 	s.name = "Sprite"
 	s.texture = Assets.creature(st["id"])
@@ -312,7 +318,7 @@ func _make_unit(st: Dictionary) -> void:
 	if st.get("machine", false):
 		badge.visible = false  # (a machine is one piece, no count; its ring shows whose it is)
 		if st.get("tower", false):  # an arrow tower: the crew behind the parapet of a painted tower
-			shadow.visible = false
+			shadow.on = false
 			var spots: Dictionary = ARCHER_SPOTS.get(L.siege_faction, ARCHER_SPOTS["haven"])
 			n.position = spots.get(st.get("seg", -1), Vector2(1760, 600))
 			var ap := "battle/siege_%s_archer.png" % L.siege_faction
@@ -594,7 +600,7 @@ func _next() -> void:
 	_update_info()  # stats may have changed: show the panel under the cursor again, up to date
 	_grid.active = s
 	for k in units:
-		units[k].get_node("Shadow").active = k == s["uid"]
+		_ring(units[k]).active = k == s["uid"]
 		var m: ShaderMaterial = units[k].get_node("Sprite").material
 		if m:  # the active unit gets a thick gold outline instead of the ink one
 			m.set_shader_parameter("ink", Color(1, 0.82, 0.25, 1) if k == s["uid"] else Color(0.09, 0.06, 0.03, 0.95))
@@ -1035,7 +1041,7 @@ func _on_surrender() -> void:
 	if L.heroes[side] == null or L.heroes[1 - side] == null:
 		return
 	var cost := _surrender_cost(side)
-	var have := 0
+	var have := 99999  # (a test battle launched on its own: no kingdom, no treasury to run short)
 	if not GameState.world.is_empty() and L.players[side] >= 0:
 		have = int(GameState.world["players"][L.players[side]]["resources"]["gold"])
 	var foe: String = L.heroes[1 - side]["name"]
@@ -1313,7 +1319,7 @@ func _anim_death(st: Dictionary) -> void:
 	Audio.creature_sfx(st["id"], "death", "death_undead" if "undead" in c["abilities"] else ("death_beast" if GameData.base_of(st["id"]) in ["griffin"] else "death_human"))
 	var s: Sprite2D = n.get_node("Sprite")
 	n.get_node("Badge").visible = false
-	n.get_node("Shadow").visible = false
+	_ring(n).on = false
 	_drop_from_queue(st)
 	if n.has_meta("breath"):
 		n.get_meta("breath").kill()
@@ -1553,7 +1559,7 @@ func _refresh_badge(st: Dictionary) -> void:
 			var m = n.get_node("Sprite").material
 			if m is ShaderMaterial:
 				m.set_shader_parameter("ink", Color(0.09, 0.06, 0.03, 0.95))
-			n.get_node("Shadow").active = false
+			_ring(n).active = false
 	if _info_key == "s%d" % st["uid"]:  # its hover panel shows the old numbers: rebuild it
 		_reset_info()
 		_update_info()
@@ -1613,8 +1619,21 @@ func _settle_badges() -> void:
 		b.position = r.position + Vector2(24, 14) - n.position
 
 func _process(_d: float) -> void:
+	_follow_rings()
 	_settle_badges()
 	_see_through()
+
+func _ring(n: Node2D) -> _Shadow:
+	return n.get_meta("shadow")
+
+## The rings live on their own layer under the figures: each follows its stack (moving, flying, fading).
+func _follow_rings() -> void:
+	for k in units:
+		var n: Node2D = units[k]
+		var r := _ring(n)
+		r.global_position = n.global_position
+		r.visible = r.on and n.is_visible_in_tree()
+		r.modulate.a = n.modulate.a
 
 ## Where a figure in front rises well over a stack standing behind it (the row above), it turns see-through around
 ## that stack's feet: the one behind keeps its ring, legs and badge readable instead of seeming to stand on the other.
@@ -1710,7 +1729,7 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	if follow and dir != 0:
 		var tip := _LabelTip.new()
 		tip.color = Color(0.85, 0.3, 0.25) if dir < 0 else Color(0.35, 0.5, 1.0)
-		var sh = follow.get_node_or_null("Shadow")
+		var sh = follow.get_meta("shadow", null)
 		if sh:
 			sh.hit_until = Time.get_ticks_msec() + 1200  # (its ring flashes: the label is this stack's, in a crowd too)
 		tip.position = Vector2(box.size.x * 0.5, box.size.y)
@@ -1983,6 +2002,7 @@ class _Grid extends Node2D:
 			_fill(_body(attack_from), Color(1, 0.4, 0.2, 0.25))
 
 class _Shadow extends Node2D:
+	var on := true  # (off: the stack has fallen, or is a tower's crew)
 	var big := false
 	var side := 0
 	var hit_until := 0  # (msec) its ring flashes while a damage label of this stack shows

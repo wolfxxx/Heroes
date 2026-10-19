@@ -370,27 +370,38 @@ func _kingdom_view(me: Dictionary) -> void:
 		inc[r] = 0
 	for tid in me["towns"]:
 		inc["gold"] += TownLogic.daily_income(world["towns"][tid])
-	var mines := 0
+	var mines := {}  # resource -> mines held
 	for o in world["objects"].values():
 		if o["type"] == "mine" and o["owner"] == adv._human():
-			mines += 1
 			var m: Dictionary = GameData.MINES[o["mine"]]
 			inc[m["resource"]] += m["amount"]
+			mines[m["resource"]] = mines.get(m["resource"], 0) + 1
+	var dim := Color(0.6, 0.56, 0.5)
 	_detail.add_child(UI.label("Income a day", 17, Color(0.85, 0.8, 0.68)))
-	var g := GridContainer.new()
-	g.columns = 2
-	g.add_theme_constant_override("h_separation", 22)
-	g.add_theme_constant_override("v_separation", 2)
-	for r in GameData.RESOURCES:
+	# gold across the top (towns and mines), the six others in pairs under it, each with the mines that bring it
+	var cell := func(r: String, w: float) -> HBoxContainer:
 		var box := HBoxContainer.new()
 		box.add_theme_constant_override("separation", 6)
+		box.custom_minimum_size.x = w
 		box.add_child(UI.icon(Assets.res_icon(r), Vector2(26, 26)))
-		box.add_child(UI.label("+%d" % inc[r], 18, UI.GOLD if inc[r] > 0 else Color(0.6, 0.56, 0.5)))
-		box.custom_minimum_size.x = 130
-		g.add_child(box)
+		box.add_child(UI.label("+%d" % inc[r], 18, UI.GOLD if inc[r] > 0 else dim))
+		var n: int = mines.get(r, 0)
+		if n > 0:
+			box.add_child(UI.label("%d mine%s" % [n, "" if n == 1 else "s"], 15, Color(0.85, 0.8, 0.68)))
+		return box
+	var gold: HBoxContainer = cell.call("gold", MINI - 24)
+	var src := UI.label("%d town%s" % [me["towns"].size(), "" if me["towns"].size() == 1 else "s"], 15, Color(0.85, 0.8, 0.68))
+	gold.add_child(src)
+	_detail.add_child(gold)
+	var g := GridContainer.new()
+	g.columns = 2
+	g.add_theme_constant_override("h_separation", 10)
+	g.add_theme_constant_override("v_separation", 2)
+	for r in GameData.RESOURCES:
+		if r != "gold":
+			g.add_child(cell.call(r, 140))
 	_detail.add_child(g)
-	_detail.add_child(UI.label("%d hero%s · %d town%s · %d mine%s" % [me["heroes"].size(), "" if me["heroes"].size() == 1 else "es",
-		me["towns"].size(), "" if me["towns"].size() == 1 else "s", mines, "" if mines == 1 else "s"], 17, Color(0.85, 0.8, 0.68)))
+	_detail.add_child(UI.label("%d hero%s" % [me["heroes"].size(), "" if me["heroes"].size() == 1 else "es"], 17, Color(0.85, 0.8, 0.68)))
 
 ## The status window's date view: the day, the week and the month, and the week's creature.
 func _date_view() -> void:

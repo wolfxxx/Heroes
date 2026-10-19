@@ -525,11 +525,6 @@ func _open_build() -> void:
 					id = c
 					break
 			h.add_child(_hall_card(id, m))
-		var two := false  # (a long price takes two rows: the whole row of cards keeps its caption bars level)
-		for card in h.get_children():
-			two = two or card.price_rows() > 1
-		for card in h.get_children():
-			card.min_rows = 2 if two else 1
 	m.add_buttons([["Close", ""]])
 	m.set_meta("cancel", "")
 	var r = await m.closed
@@ -547,6 +542,7 @@ func _hall_card(id: String, m: Modal) -> Control:
 	if st[0] in ["Can build", "Need resources"]:  # the price on the card, short amounts in red
 		card.cost = GameData.BUILDINGS[id]["cost"]
 		card.have = player["resources"]
+	card.min_rows = 2  # (room for a two-row price on every card: all cards alike, captions level in every row)
 	card.custom_minimum_size = Vector2(250, 196)
 	var bid: String = id
 	HoverInfo.attach(card, func(): return _building_info(bid), 0.0, true)
@@ -999,12 +995,6 @@ class _BuildCard extends Button:
 		flat = true
 		mouse_entered.connect(queue_redraw)
 		mouse_exited.connect(queue_redraw)
-	func price_rows() -> int:
-		var n := 0
-		for res in GameData.RESOURCES:
-			if cost.get(res, 0) > 0:
-				n += 1
-		return 2 if n > 3 else 1
 	## The caption bar takes the status colour, as on the classic hall plates: green to build, red when blocked or
 	## short of resources, gold once built (its picture dimmed, with a tick); the price under it, in two rows if long.
 	func _draw() -> void:

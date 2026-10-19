@@ -144,7 +144,7 @@ func center_on_world(p: Vector2) -> void:
 func _clamp_cam(p: Vector2) -> Vector2:
 	var size: Vector2 = Vector2(world["size"]) * TILE
 	var view_sz := Vector2(MAP_VIEW_W, MAP_VIEW_H) / cam.zoom
-	var margin := 0.0
+	var margin := 6.0 * TILE  # (as the classic map: the view may run past the edge, so a hero near it can be centred)
 	return Vector2(clampf(p.x, -margin, maxf(-margin, size.x - view_sz.x + margin)),
 		clampf(p.y, -margin, maxf(-margin, size.y - view_sz.y + margin)))
 

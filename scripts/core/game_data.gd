@@ -17,14 +17,14 @@ const PLAYER_COLOR_NAMES := ["Red", "Blue", "Green", "Gold"]
 const FACTIONS := {
 	"haven": {
 		"name": "Haven",
-		"desc": "Knights and holy warriors sworn to the Shattered Crown.",
+		"desc": "Knights and holy warriors of the Crown.",
 		"creatures": ["pikeman", "archer", "griffin", "swordsman", "monk", "cavalier", "angel"],
 		"upgrades": ["halberdier", "marksman", "royal_griffin", "crusader", "zealot", "champion", "archangel"],
 		"terrain": "grass",
 	},
 	"necropolis": {
 		"name": "Necropolis",
-		"desc": "Necromancers commanding legions of the restless dead.",
+		"desc": "Necromancers and legions of the dead.",
 		"creatures": ["skeleton", "zombie", "ghost", "vampire", "lich", "dread_knight", "bone_dragon"],
 		"upgrades": ["skeleton_warrior", "plague_zombie", "wraith", "vampire_lord", "arch_lich", "doom_rider", "ghost_dragon"],
 		"terrain": "dirt",

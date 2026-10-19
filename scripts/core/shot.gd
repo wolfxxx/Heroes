@@ -31,6 +31,12 @@ func _run() -> void:
 	var clicks: PackedStringArray = args.get("click", "").split(";", false)
 	var keys: PackedStringArray = args.get("keys", "").split(";", false)
 	var hovers: PackedStringArray = args.get("hover", "").split(";", false)
+	# the real pointer may rest over the window: park the game's mouse off the screen, so no stray hover (a lit hex,
+	# a tooltip) shows in a shot that does not ask for one
+	await get_tree().process_frame
+	var park := InputEventMouseMotion.new()
+	park.position = Vector2(-400, -400)
+	Input.parse_input_event(park)
 	await get_tree().create_timer(delay).timeout
 	var base: String = args["shot"]
 	for i in count:

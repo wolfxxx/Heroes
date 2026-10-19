@@ -3,7 +3,7 @@ overview, hero, sleep, move, spellbook, next hero, end turn, system; 4x2) and th
 defend; the battle reuses the spellbook and the hourglass).
 python tools/art/button_icons_paint.py paint [adventure|battle]   ->  imagegen/batch20/out/<sheet>.png
 python tools/art/button_icons_paint.py ingest [adventure|battle]  ->  assets/ui/btn_<name>.png (128 px, transparent)
-(the "retreat" sheet paints eight takes of the retreat icon; the best is kept as btn_retreat.png by hand)"""
+(the "retreat" and "retreat2" sheets paint eight takes of the retreat icon; the best is kept as btn_retreat.png by hand)"""
 import os, sys
 import numpy as np
 from PIL import Image
@@ -36,6 +36,14 @@ SHEETS = {"adventure": [
 ], "retreat": [  # (the retreat icon again, not a white flag: that reads as surrender; one of these is kept)
     (f"retreat_{k}", "a knight on a galloping horse riding away to the left, seen from the side, a small cloud of "
      "dust behind the hooves") for k in "abcdefgh"
+], "retreat2": [  # (bolder takes that fill a square button: the first round's rider was thin and wide)
+    (f"retreat2_{k}", "an armoured knight on a rearing, galloping warhorse turning away to the left, drawn large and "
+     "bold so it fills the cell, the horse's mane and the knight's red cape streaming, a compact square composition, "
+     "no ground and no dust") for k in "abcd"
+] + [
+    (f"retreat2_{k}", "the head, neck and front legs of an armoured warhorse galloping away to the left, mane "
+     "flying, a red and gold caparison, three golden motion streaks behind it, drawn large and bold, a compact square "
+     "composition") for k in "efgh"
 ]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "
