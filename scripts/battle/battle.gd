@@ -6,8 +6,9 @@ const ROW_STEP := 68.0
 const X0 := 264.0
 const Y0 := 272.0
 const TIER_H := [120.0, 120.0, 128.0, 150.0, 150.0, 160.0, 185.0, 215.0]  # (tier 0: war machines)
-## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate.
-const FIG_H := [112.0, 104.0, 110.0, 118.0, 124.0, 130.0, 136.0, 144.0]
+## On-screen height of the solid figure per tier (sizes.json, without the cast shadow): higher tiers clearly dominate,
+## yet the biggest stay within about two rows, so a melee of three stacks still reads as three figures.
+const FIG_H := [112.0, 104.0, 110.0, 116.0, 120.0, 122.0, 126.0, 132.0]
 ## Obstacle pictures by battlefield terrain (assets/battle/obstacle_<kind>.png, tools/art/obstacle_paint.py).
 const OBSTACLES := {
 	"grass": ["boulders", "dead_tree", "log", "stump", "thorns", "pillar", "rock_spire"],
@@ -17,7 +18,7 @@ const OBSTACLES := {
 	"swamp": ["swamp_tree", "rotten_log", "thorns", "dead_tree", "skull_pile"],
 }
 ## Widest figure in hexes, wings and capes included: 1-hex and 2-hex units (a stack mustn't swallow its neighbours).
-const VIS_MAX_W := [1.6, 2.5]
+const VIS_MAX_W := [1.4, 2.3]
 
 static var _sizes = null
 
@@ -307,13 +308,16 @@ func _make_unit(st: Dictionary) -> void:
 			n.position = spots.get(st.get("seg", -1), Vector2(1760, 600))
 			var ap := "battle/siege_%s_archer.png" % L.siege_faction
 			if Assets.has(ap):
-				s.texture = Assets.tex(ap)
+				# from the waist up: a cropped copy, not a region (the outline shader inked the hidden legs below the
+				# parapet as a dark smudge)
+				var img := Assets.tex(ap).get_image()
+				img.decompress()
+				img = img.get_region(Rect2i(0, 0, img.get_width(), int(img.get_height() * 0.56)))
+				s.texture = ImageTexture.create_from_image(img)
 				var tsz := Vector2(s.texture.get_size())
-				s.region_enabled = true
-				s.region_rect = Rect2(0, 0, tsz.x, tsz.y * 0.56)  # (from the waist up)
 				s.centered = true
 				s.scale = Vector2.ONE * 0.5
-				s.offset = Vector2(0, -tsz.y * 0.28)
+				s.offset = Vector2(0, -tsz.y * 0.5)
 				s.remove_meta("anchor_x")
 				s.flip_h = true
 				s.material = null
@@ -1226,6 +1230,9 @@ func _anim_death(st: Dictionary) -> void:
 	if n.has_meta("breath"):
 		n.get_meta("breath").kill()
 		s.scale = n.get_meta("base_scale")
+	if st.get("tower", false):  # a tower's crew falls with its tower: gone, no body left on the ruin
+		s.create_tween().tween_property(s, "modulate:a", 0.0, 0.4)
+		return
 	# (a negative z_index would hide the body behind the battlefield background)
 	n.reparent(_corpses)
 	if _pose(st, "dead"):
@@ -1380,10 +1387,13 @@ func _set_wall(i: int, broken: bool) -> void:
 		if broken:
 			s.modulate.a = 0.0
 			s.create_tween().tween_property(s, "modulate:a", 1.0, 0.25)
-	if broken and i == 5:  # the lower tower's crew stood at the window this breach tears out: up to the parapet
+	# a crew stood where this breach tears the stone out: the lower tower's up to its parapet, the upper tower's (on
+	# the gatehouse battlements) up into the tower's window
+	var moves := {5: [6, Vector2(1338, 758)], 2: [0, Vector2(1337, 232)]}
+	if broken and moves.has(i):
 		for st in L.stacks:
-			if st.get("tower", false) and st.get("seg", -1) == 6 and units.has(st["uid"]):
-				units[st["uid"]].position.y = 758.0
+			if st.get("tower", false) and st.get("seg", -1) == moves[i][0] and units.has(st["uid"]):
+				units[st["uid"]].position = moves[i][1]
 	_cracks.queue_redraw()
 
 ## The catapult's boulder: a high arc onto a wall segment; a hit throws up dust, a breach turns it to rubble.
@@ -1628,6 +1638,9 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	if follow and dir != 0:
 		var tip := _LabelTip.new()
 		tip.color = Color(0.85, 0.3, 0.25) if dir < 0 else Color(0.35, 0.5, 1.0)
+		var sh = follow.get_node_or_null("Shadow")
+		if sh:
+			sh.hit_until = Time.get_ticks_msec() + 1200  # (its ring flashes: the label is this stack's, in a crowd too)
 		tip.position = Vector2(box.size.x * 0.5, box.size.y)
 		if r.end.x < origin.x - 8:  # left of the stack: points right
 			tip.side = 1
@@ -1638,6 +1651,9 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 			tip.rotation = PI * 0.5
 			tip.position = Vector2(0, box.size.y * 0.5)
 		box.add_child(tip)
+		# a leader from the pointer to the figure's chest, when the label had to sit off it (higher up or aside)
+		var chest: Vector2 = origin + Vector2(0, -float(follow.get_meta("top", 120.0)) * 0.7)
+		tip.reach = chest - (r.position + tip.position)
 		bg.border_color = tip.color
 		bg.set_border_width_all(2)
 	var tw := box.create_tween().set_parallel(true)
@@ -1699,7 +1715,15 @@ func _label_spot(n: Node2D, origin: Vector2, at: Vector2, dir: int, sz: Vector2)
 class _LabelTip extends Node2D:
 	var color := Color.WHITE
 	var side := 0  # 0: under the label pointing down; 1 / -1: at its right / left edge pointing out
+	var reach := Vector2.ZERO  # (unrotated) from the pointer to the figure it belongs to
 	func _draw() -> void:
+		var to := reach.rotated(-rotation)
+		if to.length() > 40.0:
+			var from := Vector2(0, 12)
+			draw_line(from, to, Color(0, 0, 0, 0.55), 5.0, true)
+			draw_line(from, to, color, 2.5, true)
+			draw_circle(to, 5.0, Color(0, 0, 0, 0.6))
+			draw_circle(to, 3.5, color)
 		draw_colored_polygon(PackedVector2Array([Vector2(-13, -1), Vector2(13, -1), Vector2(0, 14)]), Color(0, 0, 0, 0.6))
 		draw_colored_polygon(PackedVector2Array([Vector2(-10, -1), Vector2(10, -1), Vector2(0, 11)]), color)
 
@@ -1886,12 +1910,13 @@ class _Grid extends Node2D:
 class _Shadow extends Node2D:
 	var big := false
 	var side := 0
+	var hit_until := 0  # (msec) its ring flashes while a damage label of this stack shows
 	var active := false:
 		set(v):
 			active = v
 			queue_redraw()
 	func _process(_d: float) -> void:
-		if active:
+		if active or hit_until > 0:
 			queue_redraw()
 	func _draw() -> void:
 		var w := 84.0 if big else 44.0
@@ -1902,6 +1927,12 @@ class _Shadow extends Node2D:
 		if active:
 			var a := 0.55 + 0.35 * sin(Time.get_ticks_msec() / 160.0)
 			draw_arc(Vector2.ZERO, w + 4, 0, TAU, 40, Color(1, 0.85, 0.3, a), 4.0, true)
+		var left := hit_until - Time.get_ticks_msec()
+		if left > 0:
+			var k := minf(1.0, left / 400.0)
+			draw_arc(Vector2.ZERO, w - 2, 0, TAU, 40, Color(1, 0.96, 0.85, 0.95 * k), 9.0, true)
+		elif hit_until > 0:
+			hit_until = 0
 
 class _Badge extends Node2D:
 	var st: Dictionary
@@ -2099,16 +2130,21 @@ class _Cracks extends Node2D:
 			var band: Array = b.WALL_BANDS[i]
 			var y0: float = maxf(200.0, band[0])
 			var y1: float = band[1]
-			for k in 3:
-				var p := Vector2(1305 + rng.randf() * 70, y0 + rng.randf() * maxf(10.0, (y1 - y0) - 110))
-				var pts := PackedVector2Array([p])
-				for j in 6:
-					p += Vector2(rng.randf_range(-12, 12), rng.randf_range(10, 22))
-					pts.append(p)
-				draw_polyline(pts, Color(0.06, 0.05, 0.05, 0.85), 3.5)
-				draw_polyline(pts, Color(1, 0.95, 0.85, 0.25), 1.0)
-				var f := pts[2] + Vector2(rng.randf_range(-16, 16), 14)
-				draw_line(pts[2], f, Color(0.06, 0.05, 0.05, 0.8), 2.5)
+			for k in 2:  # (an impact: short jagged cracks branching out from a chipped, darker spot)
+				var c := Vector2(1310 + rng.randf() * 60, y0 + 14 + rng.randf() * maxf(10.0, (y1 - y0) - 60))
+				draw_circle(c, 7.0, Color(0.06, 0.05, 0.05, 0.55))
+				draw_circle(c + Vector2(-2, -2), 3.0, Color(1, 0.95, 0.85, 0.18))
+				var rays := 4 + rng.randi() % 2
+				for j in rays:
+					var ang := TAU * (j + rng.randf_range(-0.3, 0.3)) / rays
+					var p := c
+					var pts := PackedVector2Array([p])
+					for q in 3:
+						ang += rng.randf_range(-0.6, 0.6)
+						p += Vector2.from_angle(ang) * rng.randf_range(6, 12)
+						pts.append(p)
+					draw_polyline(pts, Color(0.06, 0.05, 0.05, 0.85), 2.5)
+					draw_polyline(pts, Color(1, 0.95, 0.85, 0.22), 0.8)
 
 ## Where the moat stops a move: a light wash over the painted water (none before the gate: the bridge).
 class _Moat extends Node2D:

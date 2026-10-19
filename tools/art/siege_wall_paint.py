@@ -111,14 +111,18 @@ RUIN_PROMPT = ("This is a castle siege battlefield from a fantasy strategy game.
                "no text.")
 
 
-_GAP = ("the stretch of curtain wall: knock a wide OPEN GAP right through it, the wall walk and its battlements "
-        "completely gone in the middle, so the bare dirt ground of the courtyard behind the wall shows clearly "
-        "THROUGH the gap; only the jagged broken ends of the wall stand on either side; a few fallen blocks lie low "
-        "and scattered on the ground in the gap and in front of it toward the moat, no tall heap")
+_GAP = ("the stretch of curtain wall that runs straight up the CENTRE of the picture, between the gatehouse at the "
+        "bottom and the round tower at the top (and nothing else): knock a wide, deep OPEN BREACH right through it, the wall walk and its "
+        "battlements completely gone in the middle and the wall cut down nearly to the ground, the courtyard behind "
+        "showing THROUGH the gap; jagged, stepped broken ends of the wall stand on either side, their exposed inner "
+        "faces in DEEP DARK SHADOW so the thickness of the wall reads; a low sloping cone of broken blocks and rubble "
+        "spills out through the gap toward the moat, darker in the crevices; dust")
 SEG_WHAT = ["the round corner tower at the top", _GAP,
             "the top of the gatehouse: blow its whole crenellated top and the upper part of its front wall away, "
-            "leaving a big ragged open hole down into the gatehouse through which the dirt ground of the courtyard "
-            "behind is clearly visible; broken blocks fallen onto the bridge and into the moat",
+            "leaving a big ragged open hole down into the gatehouse, its broken inner walls in DEEP DARK SHADOW, through "
+            "which the dirt ground of the courtyard behind is visible; a cone of broken blocks and rubble spills out of "
+            "the hole over the gate arch, burying the top of the gate; broken blocks fallen onto the bridge and into "
+            "the moat",
             "the gatehouse's gate: smash the gate itself open, the heavy doors torn off their hinges and lying broken "
             "and splintered on the drawbridge, the archway now an open dark passage with the courtyard ground "
             "visible through it, the gatehouse's battlements cracked with a few merlons knocked off; the gatehouse "
