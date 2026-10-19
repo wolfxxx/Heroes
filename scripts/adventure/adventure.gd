@@ -16,6 +16,10 @@ var _plan := {}
 var _plan_target := Vector2i(-1, -1)
 var _drag_from := Vector2.ZERO
 var _dragging := false
+var _drag_button := MOUSE_BUTTON_NONE  # the button driving the press/drag (left or middle)
+var _drag_screen := Vector2i.ZERO      # last cursor position on the screen while it is held
+var _press_screen := Vector2i.ZERO     # where on the screen the button went down
+var _drag_synced := false              # a motion event moved the map this frame (the poll only resyncs)
 var _left_down := false      # left button held on the map: a click on release, or a drag once it moves
 var _left_tile := Vector2i(-1, -1)
 var _info_tile := Vector2i(-2, -2)
@@ -82,6 +86,12 @@ func _post_ready() -> void:
 			_select_hero(_first_hero_with_mp())
 		if await _check_game_over():
 			return
+	if not world.get("intro_shown", false) and world.has("scenario") and not Shot.active:
+		# the scenario's briefing, once, as the game begins
+		world["intro_shown"] = true
+		var sc: Dictionary = world["scenario"]
+		await Modal.message(self, sc["name"], "%s\n\nVictory: %s.\nDefeat: %s." % [sc["desc"],
+			GameData.victory_text(sc["victory"]), GameData.loss_text(sc["loss"])]).closed
 	if world["players"][world["current_player"]]["is_ai"]:
 		_run_ai_turns()
 	elif world.get("pending_turn_banner", false):
@@ -137,6 +147,7 @@ func _process(delta: float) -> void:
 		if Input.is_key_pressed(KEY_DOWN) or Input.is_key_pressed(KEY_S) and not Input.is_key_pressed(KEY_CTRL): move.y += 1
 		if DisplayServer.window_is_focused() and not Shot.active and not _dragging:
 			move += _edge_scroll()
+	_poll_drag()
 	if move != Vector2.ZERO:
 		_cam_target = _clamp_cam(_cam_target + move.normalized() * 900.0 * delta / cam.zoom.x)
 	cam.position = cam.position.lerp(_cam_target, minf(1.0, delta * 10.0))
@@ -152,19 +163,54 @@ func _process(delta: float) -> void:
 		HoverInfo.hide_for(self)
 	hud.update_minimap_view(cam.position, Vector2(MAP_VIEW_W, MAP_VIEW_H) / cam.zoom)
 
-## Edge scrolling, measured on the screen: the cursor at (or up to 60 px past) a window edge scrolls that way.
+## Edge scrolling, measured on the screen: the cursor at a window edge, or anywhere past it, scrolls that way
+## (while the window has the focus).
 func _edge_scroll() -> Vector2:
 	var m := DisplayServer.mouse_get_position() - DisplayServer.window_get_position()
 	var ws := Vector2(DisplayServer.window_get_size())
 	var v := Vector2.ZERO
-	var out := 60.0
-	if m.x < -out or m.y < -out or m.x > ws.x + out or m.y > ws.y + out:
-		return v  # far outside: the player is elsewhere (another monitor, another window)
 	if m.x < EDGE: v.x -= 1
 	if m.x > ws.x - EDGE: v.x += 1
 	if m.y < EDGE: v.y -= 1
 	if m.y > ws.y - EDGE: v.y += 1
 	return v
+
+## Map dragging: mouse motion over the map pans it (_unhandled_input); when the cursor goes over the side panel,
+## the bottom bar or out of the window those events stop reaching the map, so the cursor's place on the screen
+## keeps panning it until the button is let go anywhere.
+func _poll_drag() -> void:
+	if _drag_button == MOUSE_BUTTON_NONE:
+		return
+	if not Input.is_mouse_button_pressed(_drag_button):  # (released where the map never heard of it)
+		_drag_button = MOUSE_BUTTON_NONE
+		_left_down = false
+		_dragging = false
+		return
+	var now := DisplayServer.mouse_get_position()
+	if _drag_synced:
+		_drag_synced = false
+		_drag_screen = now
+		return
+	var ws := Vector2(DisplayServer.window_get_size())
+	var vs := get_viewport().get_visible_rect().size
+	var scale := minf(ws.x / vs.x, ws.y / vs.y)  # screen pixels per viewport pixel
+	if scale <= 0.0:  # (no real window: headless runs)
+		return
+	if not _dragging:
+		if Vector2(now - _press_screen).length() / scale <= DRAG_START:
+			return
+		_dragging = true
+		HoverInfo.hide_for(self)
+	var d := Vector2(now - _drag_screen) / scale
+	_drag_screen = now
+	if d != Vector2.ZERO:
+		_cam_target = _clamp_cam(_cam_target - d / cam.zoom)
+		cam.position = _cam_target
+
+func _start_press(button: MouseButton) -> void:
+	_drag_button = button
+	_drag_screen = DisplayServer.mouse_get_position()
+	_press_screen = _drag_screen
 
 func _modal_open() -> bool:
 	var l := get_tree().root.get_node_or_null("ModalLayer")
@@ -184,6 +230,7 @@ func _unhandled_input(e: InputEvent) -> void:
 		if _dragging:
 			_cam_target = _clamp_cam(_cam_target - e.relative / cam.zoom)
 			cam.position = _cam_target
+			_drag_synced = true
 			return
 		var t := _pick(view.tile_at(_event_world(e)), _event_world(e))
 		view.set_hover(t if rules.inside(t) else Vector2i(-1, -1))
@@ -193,7 +240,12 @@ func _unhandled_input(e: InputEvent) -> void:
 			HoverInfo.show_for(self, _tile_info(t), 0.3)
 	elif e is InputEventMouseButton:
 		if e.button_index == MOUSE_BUTTON_MIDDLE:
-			_dragging = e.pressed
+			if e.pressed:
+				_start_press(MOUSE_BUTTON_MIDDLE)
+				_dragging = true
+			else:
+				_dragging = false
+				_drag_button = MOUSE_BUTTON_NONE
 		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_UP:
 			_zoom(1.1)
 		elif e.pressed and e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -202,11 +254,13 @@ func _unhandled_input(e: InputEvent) -> void:
 			if e.pressed:
 				_left_down = true
 				_drag_from = e.position
+				_start_press(MOUSE_BUTTON_LEFT)
 				_left_tile = _pick(view.tile_at(_event_world(e)), _event_world(e))
 			elif _left_down:
 				_left_down = false
 				var was_drag := _dragging
 				_dragging = false
+				_drag_button = MOUSE_BUTTON_NONE
 				_info_tile = Vector2i(-2, -2)
 				if not was_drag:
 					if busy:
@@ -829,17 +883,37 @@ func _check_game_over() -> bool:
 	for p in world["players"]:
 		if p["is_ai"] and p["alive"]:
 			others_alive = true
+	# the scenario's own conditions (a capture, a hoard of gold, the starting hero, a deadline)
+	var sc: Dictionary = world.get("scenario", {})
+	var vic: Dictionary = sc.get("victory", {})
+	var loss: Dictionary = sc.get("loss", {})
+	var lost := ""
 	if not me["alive"]:
+		lost = "Your last hero has fallen and your towns are lost. The Shattered Crown will never be whole again."
+	elif loss.get("type", "") == "hero" and not world["heroes"].has(world.get("start_hero", -1)):
+		lost = "Your champion has fallen, and with them the last hope of the old order."
+	elif loss.get("type", "") == "days" and world["day"] > int(loss.get("days", 112)):
+		lost = "The snows have melted and your enemies' hosts have joined together. Time has run out."
+	if lost != "":
 		world["game_over"] = true
 		Audio.music("defeat")
-		await Modal.message(self, "Defeat", "Your last hero has fallen and your towns are lost. The Shattered Crown will never be whole again.").closed
+		await Modal.message(self, "Defeat", lost).closed
 		GameState.world = {}
 		GameState.change_scene(GameState.SCENE_MENU)
 		return true
+	var won := ""
 	if not others_alive:
+		won = "All your enemies have been vanquished. The lands bow before you, and the Shattered Crown is yours."
+	elif vic.get("type", "") == "capture":
+		for t in world["towns"].values():
+			if t["owner"] == me["index"] and t.get("start_owner", -1) > 0:
+				won = "%s is yours. With the enemy's stronghold taken, the border is secure." % t["name"]
+	elif vic.get("type", "") == "gold" and me["resources"]["gold"] >= int(vic.get("amount", 0)):
+		won = "Your treasury overflows with the gold of the old kings. The realm's lords flock to your banner."
+	if won != "":
 		world["game_over"] = true
 		Audio.music("victory")
-		await Modal.message(self, "Victory!", "All your enemies have been vanquished. The lands bow before you, and the Shattered Crown is yours.").closed
+		await Modal.message(self, "Victory!", won).closed
 		GameState.world = {}
 		GameState.change_scene(GameState.SCENE_MENU)
 		return true

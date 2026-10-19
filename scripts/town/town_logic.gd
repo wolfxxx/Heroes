@@ -59,7 +59,7 @@ static func build_block_reason(town: Dictionary, player: Dictionary, id: String)
 		return "One Capitol per kingdom"
 	if town["built_today"]:
 		return "Already built today"
-	for req in b["requires"]:
+	for req in GameData.requires(town["faction"], id):
 		if not has_building(town, req):
 			return "Requires " + GameData.building_name(town["faction"], req)
 	if not can_afford(player, b["cost"]):

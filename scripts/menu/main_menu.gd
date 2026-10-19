@@ -11,6 +11,14 @@ var _hero_row: HBoxContainer
 var _hero_desc: Label
 var _faction_buttons := {}
 var _option_buttons := {}
+var _scen_buttons := {}
+var _bonus_buttons := {}
+var _scen_title: Label
+var _scen_desc: Label
+var _scen_info: Label
+var _vic_row: HBoxContainer
+var _loss_row: HBoxContainer
+var _random_opts: Control
 var _logo: Control
 var _menu_band: Control
 
@@ -194,58 +202,125 @@ func _build_menu() -> void:
 # ---------------------------------------------------------------------------------------------
 # New game setup
 # ---------------------------------------------------------------------------------------------
+## The classic New Game screen: the chosen scenario's details and the player's choices on the left, the list of
+## scenarios on the right.
 func _build_setup() -> void:
 	_setup_panel = PanelContainer.new()
-	_setup_panel.position = Vector2(310, 262)
-	_setup_panel.custom_minimum_size = Vector2(1300, 0)
+	_setup_panel.position = Vector2(80, 246)
+	_setup_panel.custom_minimum_size = Vector2(1760, 0)
 	_setup_panel.visible = false
 	add_child(_setup_panel)
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 28)
+	_setup_panel.add_child(cols)
+
+	# left: the scenario, its conditions, then faction, hero, starting bonus and difficulty
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 10)
-	_setup_panel.add_child(v)
+	v.custom_minimum_size.x = 1010
+	v.add_theme_constant_override("separation", 7)
+	cols.add_child(v)
+	_scen_title = UI.label("", 34, UI.GOLD, true)
+	v.add_child(_scen_title)
+	_scen_desc = UI.label("", 20)
+	_scen_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_scen_desc.custom_minimum_size = Vector2(1000, 54)
+	v.add_child(_scen_desc)
+	_scen_info = UI.label("", 19, Color(0.85, 0.8, 0.68))
+	v.add_child(_scen_info)
+	var cond := HBoxContainer.new()
+	cond.add_theme_constant_override("separation", 20)
+	v.add_child(cond)
+	_vic_row = HBoxContainer.new()
+	_loss_row = HBoxContainer.new()
+	for r in [_vic_row, _loss_row]:
+		r.add_theme_constant_override("separation", 10)
+		r.custom_minimum_size.x = 495
+		cond.add_child(r)
+	v.add_child(_rule())
 
-	var title := UI.label("New Campaign", 40, UI.GOLD, true)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(title)
-
-	# Faction choice
-	v.add_child(UI.label("Choose your faction", 26, UI.GOLD))
+	v.add_child(UI.label("Choose your faction", 24, UI.GOLD))
 	var frow := HBoxContainer.new()
 	frow.add_theme_constant_override("separation", 20)
 	v.add_child(frow)
 	for f in GameData.FACTIONS:
 		var b := Button.new()
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(620, 118)
-		_card(b, Assets.tex("map/town_%s.png" % f), 150, GameData.FACTIONS[f]["name"], GameData.FACTIONS[f]["desc"])
+		b.custom_minimum_size = Vector2(495, 96)
+		_card(b, Assets.tex("map/town_%s.png" % f), 120, GameData.FACTIONS[f]["name"], GameData.FACTIONS[f]["desc"], 23, 17)
 		b.pressed.connect(_select_faction.bind(f))
 		frow.add_child(b)
 		_faction_buttons[f] = b
 
-	# Hero choice
-	v.add_child(UI.label("Choose your hero", 26, UI.GOLD))
+	v.add_child(UI.label("Choose your hero", 24, UI.GOLD))
 	_hero_row = HBoxContainer.new()
 	_hero_row.add_theme_constant_override("separation", 16)
 	v.add_child(_hero_row)
-	_hero_desc = UI.label("", 20)
+	_hero_desc = UI.label("", 18)
+	_hero_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hero_desc.custom_minimum_size.x = 1000
 	v.add_child(_hero_desc)
 
-	# Options
 	var orow := HBoxContainer.new()
 	orow.add_theme_constant_override("separation", 40)
 	v.add_child(orow)
-	orow.add_child(_option_group("Map size", MAP_SIZES.map(func(m): return m[0]), "map_size",
-		MAP_SIZES.map(func(m): return m[1])))
-	orow.add_child(_option_group("Difficulty", DIFFICULTIES, "difficulty", [0, 1, 2]))
-	orow.add_child(_option_group("Opponents", ["1", "2", "3"], "opponents", [1, 2, 3]))
+	var bv := VBoxContainer.new()
+	bv.add_child(UI.label("Starting bonus", 22, UI.GOLD))
+	var bh := HBoxContainer.new()
+	bh.add_theme_constant_override("separation", 10)
+	bv.add_child(bh)
+	for k in GameData.START_BONUSES:
+		var b := Button.new()
+		b.toggle_mode = true
+		b.custom_minimum_size = Vector2(196, 84)
+		var tex: Texture2D = Assets.res_icon("gold") if k == "gold" else (Assets.tex("icons/artifact_sword_of_valor.png")
+			if k == "artifact" else Assets.res_icon("wood"))
+		_card(b, tex, 44, GameData.START_BONUSES[k][0], GameData.START_BONUSES[k][1], 20, 16)
+		var bk: String = k
+		b.pressed.connect(func():
+			Audio.sfx("click", -6)
+			_settings["bonus"] = bk
+			_refresh_options())
+		bh.add_child(b)
+		_bonus_buttons[k] = b
+	orow.add_child(bv)
+	orow.add_child(_option_group("Difficulty", DIFFICULTIES, "difficulty", [0, 1, 2], 100))
 
+	# right: the scenarios (size, rivals, victory and loss at a glance), the random map's options, the buttons
+	var rv := VBoxContainer.new()
+	rv.custom_minimum_size.x = 680
+	rv.add_theme_constant_override("separation", 6)
+	cols.add_child(rv)
+	var t := UI.label("Select a scenario", 30, UI.GOLD, true)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rv.add_child(t)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	for hc in [["Size", 60], ["Name", 382], ["Rivals", 70], ["Win", 52], ["Lose", 52]]:
+		var hl := UI.label(hc[0], 17, Color(0.8, 0.72, 0.55))
+		hl.custom_minimum_size.x = hc[1]
+		hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if hc[0] != "Name" else HORIZONTAL_ALIGNMENT_LEFT
+		head.add_child(hl)
+	var hm := MarginContainer.new()
+	hm.add_theme_constant_override("margin_left", 12)
+	hm.add_child(head)
+	rv.add_child(hm)
+	for sc in GameData.SCENARIOS:
+		var b := _scenario_row(sc)
+		rv.add_child(b)
+		_scen_buttons[sc["id"]] = b
+	_random_opts = HBoxContainer.new()
+	_random_opts.add_theme_constant_override("separation", 30)
+	_random_opts.add_child(_option_group("Map size", MAP_SIZES.map(func(m): return m[0]), "map_size",
+		MAP_SIZES.map(func(m): return m[1]), 100))
+	_random_opts.add_child(_option_group("Rivals", ["1", "2", "3"], "opponents", [1, 2, 3], 100))
+	rv.add_child(_random_opts)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(spacer)
+	rv.add_child(spacer)
 	var brow := HBoxContainer.new()
 	brow.alignment = BoxContainer.ALIGNMENT_CENTER
 	brow.add_theme_constant_override("separation", 30)
-	v.add_child(brow)
+	rv.add_child(brow)
 	var back := UI.button("Back", _close_setup, 26)
 	back.custom_minimum_size = Vector2(220, 60)
 	brow.add_child(back)
@@ -255,8 +330,127 @@ func _build_setup() -> void:
 
 	if not _settings.has("opponents"):
 		_settings["opponents"] = 1
+	if not _settings.has("bonus"):
+		_settings["bonus"] = "gold"
 	_select_faction(_settings.get("faction", "haven"))
+	_select_scenario(_settings.get("scenario", GameData.SCENARIOS[0]["id"]))
+
+func _rule() -> Control:
+	var r := ColorRect.new()
+	r.color = Color(UI.GOLD_DARK, 0.6)
+	r.custom_minimum_size = Vector2(1000, 2)
+	return r
+
+## One line of the scenario list: a size badge, the name, the number of rivals, and the victory and loss icons.
+func _scenario_row(sc: Dictionary) -> Button:
+	var b := Button.new()
+	b.toggle_mode = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(680, 60)
+	var on := UI.selected_plate()
+	on.set_border_width_all(3)
+	for st in ["pressed", "hover_pressed"]:
+		b.add_theme_stylebox_override(st, on)
+	var h := HBoxContainer.new()
+	h.set_anchors_preset(Control.PRESET_FULL_RECT)
+	h.offset_left = 12
+	h.offset_right = -12
+	h.add_theme_constant_override("separation", 10)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(h)
+	var size_txt: String = "?" if sc.get("random", false) else {36: "S", 48: "M", 64: "L"}.get(int(sc["size"]), "M")
+	var badge := PanelContainer.new()
+	var bs := StyleBoxFlat.new()
+	bs.bg_color = Color(0.16, 0.1, 0.05)
+	bs.border_color = UI.GOLD_DARK
+	bs.set_border_width_all(2)
+	bs.set_corner_radius_all(4)
+	badge.add_theme_stylebox_override("panel", bs)
+	badge.custom_minimum_size = Vector2(60, 44)
+	badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var bl := UI.label(size_txt, 24, UI.GOLD, true)
+	bl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	bl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	badge.add_child(bl)
+	h.add_child(badge)
+	var nl := UI.label(sc["name"], 23, UI.TEXT)
+	nl.custom_minimum_size.x = 382
+	nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	nl.size_flags_vertical = Control.SIZE_FILL
+	h.add_child(nl)
+	var rl := UI.label("1-3" if sc.get("random", false) else str(sc["opponents"]), 22, UI.TEXT)
+	rl.custom_minimum_size.x = 70
+	rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	rl.size_flags_vertical = Control.SIZE_FILL
+	h.add_child(rl)
+	for ic in [_cond_icon(sc["victory"]), _cond_icon(sc["loss"])]:
+		var tr := UI.icon(ic, Vector2(44, 44))
+		tr.custom_minimum_size = Vector2(52, 44)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		h.add_child(tr)
+	for c in h.get_children():
+		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var sid: String = sc["id"]
+	b.pressed.connect(func():
+		Audio.sfx("click", -6)
+		_select_scenario(sid))
+	return b
+
+## The picture for a victory or loss condition.
+func _cond_icon(c: Dictionary) -> Texture2D:
+	match c.get("type", ""):
+		"capture": return Assets.tex("ui/btn_kingdom.png")
+		"gold": return Assets.res_icon("gold")
+		"hero": return Assets.hero_portrait(_settings.get("hero", "sir_aldric"))
+		"days": return Assets.tex("ui/btn_end_turn.png")
+		"standard": return Assets.tex("ui/btn_retreat.png")
+	return Assets.tex("icons/skill_offense.png")
+
+func _select_scenario(id: String) -> void:
+	var sc := GameData.scenario(id)
+	_settings["scenario"] = sc["id"]
+	for k in _scen_buttons:
+		_scen_buttons[k].button_pressed = k == sc["id"]
+	var random: bool = sc.get("random", false)
+	if not random:
+		_settings["map_size"] = sc["size"]
+		_settings["opponents"] = sc["opponents"]
+	_random_opts.visible = random
+	_scen_title.text = sc["name"]
+	_scen_desc.text = sc["desc"]
 	_refresh_options()
+
+## The details pane: size, rivals and the two conditions (the hero icon follows the chosen hero).
+func _refresh_scenario() -> void:
+	if _scen_title == null:
+		return
+	var sc := GameData.scenario(_settings.get("scenario", ""))
+	var size_name := "Medium"
+	for m in MAP_SIZES:
+		if m[1] == _settings.get("map_size", 48):
+			size_name = m[0]
+	var n: int = int(_settings.get("opponents", 1))
+	var ms: int = int(_settings.get("map_size", 48))
+	_scen_info.text = "Map: %s (%d x %d)     Players: you and %d %s" % [size_name, ms, ms, n, "rival" if n == 1 else "rivals"]
+	for pair in [[_vic_row, "Victory", sc["victory"], GameData.victory_text(sc["victory"])],
+			[_loss_row, "Defeat", sc["loss"], GameData.loss_text(sc["loss"])]]:
+		var row: HBoxContainer = pair[0]
+		for c in row.get_children():
+			row.remove_child(c)
+			c.queue_free()
+		row.add_child(UI.icon(_cond_icon(pair[2]), Vector2(44, 44)))
+		var tv := VBoxContainer.new()
+		tv.add_theme_constant_override("separation", 0)
+		tv.add_child(UI.label(pair[1], 17, Color(0.8, 0.72, 0.55)))
+		tv.add_child(UI.label(pair[3], 21, UI.TEXT))
+		row.add_child(tv)
+	if _scen_buttons.has("last_champion"):  # (its loss icon is the chosen hero)
+		var icons: Array = _scen_buttons["last_champion"].get_child(0).get_children().filter(
+			func(c): return c is TextureRect)
+		if icons.size() > 0:
+			icons[-1].texture = Assets.hero_portrait(_settings.get("hero", "sir_aldric"))
 
 ## Selected toggles sit on the bright gold texture: force dark ink text in every pressed/focus state, no focus ring.
 func _ink(b: Button) -> void:
@@ -265,7 +459,7 @@ func _ink(b: Button) -> void:
 
 ## A big choice card (faction, hero): picture + gold title + wrapped text. The selected card keeps light text on a
 ## dark panel and is marked by a bright gold frame and glow (dark ink on the gold toggle texture read poorly).
-func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, title_size := 25) -> void:
+func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, title_size := 25, sub_size := 19) -> void:
 	b.focus_mode = Control.FOCUS_NONE
 	var on := UI.selected_plate()
 	on.set_border_width_all(4)
@@ -299,14 +493,14 @@ func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, 
 	t.add_theme_constant_override("outline_size", 6)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(t)
-	var d := UI.label(sub, 19, UI.TEXT)
+	var d := UI.label(sub, sub_size, UI.TEXT)
 	d.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02, 0.85))
 	d.add_theme_constant_override("outline_size", 4)
 	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(d)
 
-func _option_group(label: String, names: Array, key: String, values: Array) -> Control:
+func _option_group(label: String, names: Array, key: String, values: Array, w := 110) -> Control:
 	var v := VBoxContainer.new()
 	v.add_child(UI.label(label, 22, UI.GOLD))
 	var h := HBoxContainer.new()
@@ -316,7 +510,7 @@ func _option_group(label: String, names: Array, key: String, values: Array) -> C
 		var b := Button.new()
 		b.toggle_mode = true
 		b.text = names[i]
-		b.custom_minimum_size = Vector2(110, 48)
+		b.custom_minimum_size = Vector2(w, 48)
 		_ink(b)
 		var val = values[i]
 		b.pressed.connect(func():
@@ -333,6 +527,9 @@ func _refresh_options() -> void:
 	for key in _option_buttons:
 		for b in _option_buttons[key]:
 			b.button_pressed = b.get_meta("value") == _settings.get(key)
+	for k in _bonus_buttons:
+		_bonus_buttons[k].button_pressed = k == _settings.get("bonus", "")
+	_refresh_scenario()
 
 func _select_faction(f: String) -> void:
 	_settings["faction"] = f
@@ -349,8 +546,8 @@ func _select_faction(f: String) -> void:
 			first = hid
 		var b := Button.new()
 		b.toggle_mode = true
-		b.custom_minimum_size = Vector2(300, 132)
-		_card(b, Assets.hero_portrait(hid), 84, h["name"], h["class"], 20)
+		b.custom_minimum_size = Vector2(238, 104)
+		_card(b, Assets.hero_portrait(hid), 60, h["name"], h["class"], 17, 16)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)
@@ -368,6 +565,7 @@ func _select_hero(hid: String) -> void:
 	_hero_desc.text = "%s — %s.  Specialty: %s.  Attack %d  Defense %d  Power %d  Knowledge %d%s" % [
 		h["name"], h["class"], h["specialty"], h["attack"], h["defense"], h["power"], h["knowledge"],
 		("   Spells: " + ", ".join(spells.map(func(s): return GameData.SPELLS[s]["name"]))) if spells.size() > 0 else ""]
+	_refresh_scenario()
 
 func _open_setup() -> void:
 	_menu_box.get_meta("panel").visible = false
@@ -398,7 +596,8 @@ class _TorchGlow extends Sprite2D:
 		scale = Vector2(sc, sc)
 
 func _start_game() -> void:
-	_settings["seed"] = randi()
+	var sc := GameData.scenario(_settings.get("scenario", ""))
+	_settings["seed"] = randi() if sc.get("random", false) else int(sc["seed"])
 	GameState.new_game_settings = _settings.duplicate()
 	GameState.world = {}
 	GameState.return_scene = GameState.SCENE_ADVENTURE

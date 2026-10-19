@@ -236,7 +236,7 @@ const BUILDINGS := {
 	"mage_guild_4": {"name": "Mage Guild Lv4", "cost": {"gold": 1000, "wood": 5, "ore": 5, "mercury": 6, "sulfur": 6, "crystal": 6, "gems": 6}, "requires": ["mage_guild_3"], "replaces": "mage_guild_3", "desc": "Teaches level 4 spells."},
 	"blacksmith": {"name": "Blacksmith", "cost": {"gold": 1000, "wood": 5}, "requires": [], "desc": "Sells war machines and hones a visiting hero's weapons: +1 Attack."},
 	# faction special buildings ("faction": only that faction's towns can build them)
-	"stables": {"name": "Stables", "faction": "haven", "cost": {"gold": 2000, "wood": 10}, "requires": ["dwelling_6"], "desc": "Heroes who start the day in this town get +400 movement points."},
+	"stables": {"name": "Stables", "faction": "haven", "cost": {"gold": 2000, "wood": 10}, "requires": [], "desc": "Heroes who start the day in this town get +400 movement points."},
 	"brotherhood": {"name": "Brotherhood of the Sword", "faction": "haven", "cost": {"gold": 500, "wood": 5}, "requires": ["tavern"], "desc": "+2 morale for the defenders when the town is besieged."},
 	"necromancy_amplifier": {"name": "Necromancy Amplifier", "faction": "necropolis", "cost": {"gold": 1000}, "requires": ["mage_guild_1"], "desc": "All your heroes raise 10% more Skeletons with Necromancy."},
 	"skeleton_transformer": {"name": "Skeleton Transformer", "faction": "necropolis", "cost": {"gold": 1000}, "requires": ["dwelling_1"], "desc": "Turns a visiting hero's living creatures into Skeletons."},
@@ -256,6 +256,13 @@ const BUILDINGS := {
 	"dwelling_6u": {"name": "Upg. Dwelling VI", "cost": {"gold": 3000, "wood": 10, "ore": 10, "sulfur": 5}, "dwelling_tier": 6, "requires": ["dwelling_6"], "replaces": "dwelling_6"},
 	"dwelling_7u": {"name": "Upg. Dwelling VII", "cost": {"gold": 20000, "ore": 10, "mercury": 10, "gems": 10}, "dwelling_tier": 7, "requires": ["dwelling_7", "mage_guild_3"], "replaces": "dwelling_7"},
 }
+
+## Requirements only one faction has (its specials in the chain, as the Stables before the Haven's cavalry).
+const FACTION_REQUIRES := {"haven": {"dwelling_6": ["stables"]}}
+
+## Everything a building needs in a town of this faction.
+static func requires(faction: String, id: String) -> Array:
+	return BUILDINGS[id]["requires"] + FACTION_REQUIRES.get(faction, {}).get(id, [])
 
 ## Each faction's special buildings (in the Town Hall's second row).
 const SPECIALS := {"haven": ["stables", "brotherhood"], "necropolis": ["necromancy_amplifier", "skeleton_transformer"]}
@@ -278,6 +285,56 @@ const ARTIFACTS := {
 	"clover_of_fortune": {"name": "Clover of Fortune", "slot": "misc", "bonus": {"luck": 1}, "desc": "+1 Luck"},
 	"crown_of_command": {"name": "Crown of Command", "slot": "head", "bonus": {"attack": 2, "defense": 2, "power": 2, "knowledge": 2}, "desc": "+2 to all skills"},
 }
+
+# ---------------------------------------------------------------------------------------------
+# Scenarios
+# ---------------------------------------------------------------------------------------------
+## The New Game list: a fixed map (seed, size, rivals) with its victory and loss conditions; "random" lets the
+## player pick the size and the rivals, a new land each time.
+const SCENARIOS := [
+	{"id": "shattered_crown", "name": "The Shattered Crown", "size": 48, "opponents": 1, "seed": 7301,
+		"desc": "Two lords claim the broken crown of the old kingdom, and the realm will not suffer both. Raise your banners and drive your rival from the land.",
+		"victory": {"type": "conquer"}, "loss": {"type": "standard"}},
+	{"id": "border_skirmish", "name": "Border Skirmish", "size": 36, "opponents": 1, "seed": 4410,
+		"desc": "A rival lord has raised a town just across the border. Seize it before its walls grow tall.",
+		"victory": {"type": "capture"}, "loss": {"type": "standard"}},
+	{"id": "old_kings_gold", "name": "Gold of the Old Kings", "size": 48, "opponents": 2, "seed": 9127,
+		"desc": "The treasure of the old kings lies scattered across these hills. Whoever gathers enough of it can buy the loyalty of the whole realm.",
+		"victory": {"type": "gold", "amount": 60000}, "loss": {"type": "standard"}},
+	{"id": "last_champion", "name": "The Last Champion", "size": 48, "opponents": 2, "seed": 5583,
+		"desc": "Your hero is the last of an ancient order of champions. Two rivals hunt you; should your hero fall, the order dies with them.",
+		"victory": {"type": "conquer"}, "loss": {"type": "hero"}},
+	{"id": "before_the_thaw", "name": "Before the Thaw", "size": 64, "opponents": 3, "seed": 2246,
+		"desc": "Three warlords gather while the passes are frozen. Break them all before the snows melt and their hosts join together.",
+		"victory": {"type": "conquer"}, "loss": {"type": "days", "days": 112}},
+	{"id": "random", "name": "Random Map", "random": true,
+		"desc": "A new land every time: choose its size and how many rivals you face.",
+		"victory": {"type": "conquer"}, "loss": {"type": "standard"}},
+]
+
+static func scenario(id: String) -> Dictionary:
+	for s in SCENARIOS:
+		if s["id"] == id:
+			return s
+	return SCENARIOS[0]
+
+static func victory_text(v: Dictionary) -> String:
+	match v.get("type", "conquer"):
+		"capture": return "Capture an enemy town"
+		"gold": return "Amass %d gold" % int(v.get("amount", 0))
+	return "Defeat all enemies"
+
+static func loss_text(l: Dictionary) -> String:
+	match l.get("type", "standard"):
+		"hero": return "Lose your starting hero"
+		"days": return "Time runs out (month %d ends)" % (int(l.get("days", 112)) / 28)
+	return "Lose all your towns and heroes"
+
+## Starting bonus for the player's first hero (as the classics: gold, an artifact or resources).
+const START_BONUSES := {"gold": ["Gold", "+2500 gold"], "artifact": ["Artifact", "A random artifact"],
+	"resource": ["Resources", "+10 wood and ore"]}
+const BONUS_ARTIFACTS := ["sword_of_valor", "shield_of_dawn", "helm_of_wisdom", "orb_of_power", "boots_of_speed",
+	"ring_of_vitality", "clover_of_fortune"]
 
 # ---------------------------------------------------------------------------------------------
 # Adventure map

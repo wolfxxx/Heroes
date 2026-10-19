@@ -430,7 +430,7 @@ func _building_info(id: String, in_town := false) -> Control:
 		if built and in_town:
 			HoverInfo.line(v, CLICK_HINT.get(TownLayout.slot_of(id), ""), UI.GOLD, 18)
 	if not built:
-		for req in b["requires"]:
+		for req in GameData.requires(town["faction"], id):
 			var ok := TownLogic.has_building(town, req)
 			HoverInfo.line(v, ("Has " if ok else "Requires ") + GameData.building_name(town["faction"], req),
 				Color(0.6, 0.9, 0.55) if ok else Color(1, 0.55, 0.45), 18)
@@ -577,9 +577,10 @@ func _building_detail(id: String) -> void:
 		var dl := UI.label(b["desc"], 21)
 		dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(dl)
-	if b["requires"].size() > 0:
+	var reqs := GameData.requires(town["faction"], id)
+	if reqs.size() > 0:
 		v.add_child(UI.label("Requires", 21, UI.GOLD))
-		for req in b["requires"]:
+		for req in reqs:
 			var ok := TownLogic.has_building(town, req)
 			v.add_child(UI.label(("+  " if ok else "-  ") + GameData.building_name(town["faction"], req), 19,
 				Color(0.6, 0.9, 0.55) if ok else Color(1, 0.55, 0.45)))
@@ -996,48 +997,69 @@ class _BuildCard extends Button:
 		flat = true
 		mouse_entered.connect(queue_redraw)
 		mouse_exited.connect(queue_redraw)
+	## The caption bar takes the status colour, as on the classic hall plates: green to build, red when blocked or
+	## short of resources, gold once built (its picture dimmed, with a tick); the price under it, in two rows if long.
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		draw_rect(r, Color(0.07, 0.05, 0.03))
-		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - 66))
+		var f := UI.font()
+		var items := []
+		for res in GameData.RESOURCES:
+			if cost.get(res, 0) > 0:
+				items.append([res, str(cost[res])])
+		var rows: Array = [items]
+		if items.size() > 3:
+			rows = [items.slice(0, (items.size() + 1) / 2), items.slice((items.size() + 1) / 2)]
+		var strip_h := 26.0 * rows.size()
+		var bottom := 35.0 + strip_h + 5.0
+		var built := status == "Built"
+		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - bottom - 5))
 		if pic:
 			var ts := Vector2(pic.get_size())
 			var sc := maxf(pr.size.x / ts.x, pr.size.y / ts.y)
-			draw_texture_rect_region(pic, pr, Rect2((ts - pr.size / sc) * 0.5, pr.size / sc),
-				Color(1.15, 1.12, 1.05) if is_hovered() else Color.WHITE)
-		var f := UI.font()
-		draw_rect(Rect2(Vector2(5, size.y - 61), Vector2(size.x - 10, 30)), Color(0.12, 0.09, 0.06))
-		draw_string(f, Vector2(5, size.y - 39), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, UI.GOLD)
-		# status: a dark strip with a coloured gem and coloured text (or the price), as on the classic hall plates
-		var sb := Rect2(Vector2(5, size.y - 31), Vector2(size.x - 10, 26))
+			var tint := Color(0.55, 0.53, 0.5) if built else Color.WHITE
+			if is_hovered():
+				tint *= Color(1.15, 1.12, 1.05)
+			draw_texture_rect_region(pic, pr, Rect2((ts - pr.size / sc) * 0.5, pr.size / sc), tint)
+		if built:  # a gold tick in the corner of the picture
+			var c := pr.end - Vector2(24, 22)
+			draw_circle(c, 15, Color(0.1, 0.07, 0.03, 0.85))
+			draw_arc(c, 15, 0, TAU, 24, UI.GOLD, 2.0, true)
+			draw_polyline(PackedVector2Array([c + Vector2(-7, 0), c + Vector2(-2, 6), c + Vector2(8, -6)]), UI.GOLD, 3.5, true)
+		var tb := Rect2(Vector2(5, size.y - bottom), Vector2(size.x - 10, 30))
+		var bar := Color(0.4, 0.11, 0.07)
+		match status:
+			"Can build": bar = Color(0.13, 0.32, 0.1)
+			"Built": bar = Color(0.42, 0.33, 0.1)
+			"Built today": bar = Color(0.24, 0.23, 0.25)
+		draw_rect(tb, bar)
+		draw_rect(Rect2(tb.position, Vector2(tb.size.x, 2)), bar.lightened(0.35))
+		draw_string_outline(f, Vector2(5, tb.position.y + 22), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, 3, Color(0, 0, 0, 0.75))
+		draw_string(f, Vector2(5, tb.position.y + 22), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, Color(1, 0.93, 0.75))
+		# status: a dark strip with a coloured gem and coloured text (or the price)
+		var sb := Rect2(Vector2(5, size.y - 5 - strip_h), Vector2(size.x - 10, strip_h))
 		draw_rect(sb, Color(0.1, 0.075, 0.05))
-		var gem := sb.position + Vector2(14, 13)
+		var gem := sb.position + Vector2(14, strip_h * 0.5)
 		draw_colored_polygon(PackedVector2Array([gem + Vector2(0, -7), gem + Vector2(7, 0), gem + Vector2(0, 7), gem + Vector2(-7, 0)]), status_col)
 		draw_polyline(PackedVector2Array([gem + Vector2(0, -7), gem + Vector2(7, 0), gem + Vector2(0, 7), gem + Vector2(-7, 0), gem + Vector2(0, -7)]), Color(0, 0, 0, 0.7), 1.0)
 		var x0 := sb.position.x + 28
 		var room := sb.end.x - 6 - x0
-		if not cost.is_empty():
-			var items := []
-			for res in GameData.RESOURCES:
-				if cost.get(res, 0) > 0:
-					items.append([res, str(cost[res])])
-			# icon size, font size, gap: tighter until the whole price fits the strip (six resources on a Mage Guild)
-			var fit: Array = [20, 16, 10]
-			var w := 0.0
-			for opt in [[20, 16, 10], [18, 15, 5], [16, 14, 2]]:
-				fit = opt
-				w = 0.0
-				for it in items:
-					w += opt[0] + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, opt[1]).x + opt[2]
-				if w - opt[2] <= room:
-					break
-			var x := x0 + maxf(0.0, (room - w) * 0.5)
-			for it in items:
-				var ic: float = fit[0]
-				draw_texture_rect(Assets.res_icon(it[0]), Rect2(Vector2(x, sb.position.y + 13 - ic * 0.5), Vector2(ic, ic)), false)
-				var ok: bool = have.get(it[0], 0) >= cost[it[0]]
-				draw_string(f, Vector2(x + ic + 3, size.y - 12), it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fit[1], Color(0.95, 0.9, 0.8) if ok else Color(1, 0.48, 0.4))
-				x += ic + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fit[1]).x + fit[2]
+		if not items.is_empty():
+			var ic := 20.0
+			var fs := 17
+			for k in rows.size():
+				var row: Array = rows[k]
+				var w := 0.0
+				for it in row:
+					w += ic + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 12
+				w -= 12
+				var x := x0 + maxf(0.0, (room - w) * 0.5)
+				var cy := sb.position.y + 13 + 26 * k
+				for it in row:
+					draw_texture_rect(Assets.res_icon(it[0]), Rect2(Vector2(x, cy - ic * 0.5), Vector2(ic, ic)), false)
+					var ok: bool = have.get(it[0], 0) >= cost[it[0]]
+					draw_string(f, Vector2(x + ic + 3, cy + 6), it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.95, 0.9, 0.8) if ok else Color(1, 0.48, 0.4))
+					x += ic + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 12
 		else:
 			var txt := status
 			while txt.length() > 4 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x > room:

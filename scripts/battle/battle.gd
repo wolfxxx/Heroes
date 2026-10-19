@@ -1406,9 +1406,24 @@ func _anim_catapult(ev: Dictionary) -> void:
 
 ## A slain stack leaves the turn queue at once (not with the next turn).
 func _drop_from_queue(st: Dictionary) -> void:
+	# the cards after it move up and an empty slot pads the end (the frame keeps its width); if it was the head,
+	# the next card becomes the big one
 	for q in _queue_box.get_children():
-		if q is _QueueIcon and q.st["uid"] == st["uid"]:
-			q.modulate.a = 0.0  # (its slot stays until the queue is rebuilt: the frame doesn't jump)
+		if q is _QueueIcon and q.st["uid"] == st["uid"] and not q.is_queued_for_deletion():
+			var w: float = q.custom_minimum_size.x
+			_queue_box.remove_child(q)
+			q.queue_free()
+			if q.first:
+				for n in _queue_box.get_children():
+					if n is _QueueIcon:
+						n.first = true
+						n.custom_minimum_size = Vector2(110, 110)
+						n.queue_redraw()
+						w = 84.0
+						break
+			var e := Control.new()
+			e.custom_minimum_size = Vector2(w, 84)
+			_queue_box.add_child(e)
 
 func _refresh_badge(st: Dictionary) -> void:
 	var n := _unit(st)

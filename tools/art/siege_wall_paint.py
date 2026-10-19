@@ -108,17 +108,30 @@ RUIN_PROMPT = ("This is a castle siege battlefield from a fantasy strategy game.
                "no text.")
 
 
-_GAP = ("the stretch of curtain wall (knock a wide V-shaped gap right through it, down to the ground, its broken "
-        "ends jagged, the stones heaped in front of it)")
-SEG_WHAT = ["the round corner tower at the top", _GAP, "the crenellated top of the gatehouse and the wall walk beside "
-            "it (knock the whole top off in a wide jagged gap, the merlons and blocks fallen and heaped in front)",
-            "the gatehouse and its gate", _GAP, "the stretch of curtain wall and the round tower",
+_GAP = ("the stretch of curtain wall: knock a wide OPEN GAP right through it, the wall walk and its battlements "
+        "completely gone in the middle, so the bare dirt ground of the courtyard behind the wall shows clearly "
+        "THROUGH the gap; only the jagged broken ends of the wall stand on either side; a few fallen blocks lie low "
+        "and scattered on the ground in the gap and in front of it toward the moat, no tall heap")
+SEG_WHAT = ["the round corner tower at the top", _GAP,
+            "the top of the gatehouse: blow its whole crenellated top and the upper part of its front wall away, "
+            "leaving a big ragged open hole down into the gatehouse through which the dirt ground of the courtyard "
+            "behind is clearly visible; broken blocks fallen onto the bridge and into the moat",
+            "the gatehouse's gate: smash the gate itself open, the heavy doors torn off their hinges and lying broken "
+            "and splintered on the drawbridge, the archway now an open dark passage with the courtyard ground "
+            "visible through it, the gatehouse's battlements cracked with a few merlons knocked off; the gatehouse "
+            "itself still stands",
+            "the conical roof of the lower round tower and the wall just above it: smash the roof in, half of it "
+            "gone, broken rafters sticking up, a gaping open hole into the tower top, slates and blocks fallen "
+            "into the moat",
+            "the lower round tower's body: blast a big ragged OPEN HOLE right through the tower's wall, through "
+            "which the dirt ground behind the tower is clearly visible; its blocks fallen at its foot toward the moat; "
+            "its roof sagging and broken above the hole",
             "the round corner tower at the bottom"]
 
 BREACH_PROMPT = ("This is a crop of a castle siege battlefield from a fantasy strategy game. Paint EXACTLY the same picture, "
                  "same framing, every shape in the same place, but with {what} in the MIDDLE band of the picture smashed by "
-                 "catapult fire: a deep jagged breach broken down to a low stump, cracked and fallen blocks, a heap of rubble "
-                 "spilling forward to the moat, a little dust. Only the middle band changes; the top and bottom edges of the "
+                 "catapult fire, a little dust. It must read at a glance as a hole you can walk through, not a damaged "
+                 "wall. Only the middle band changes; the top and bottom edges of the "
                  "picture, the moat, the grass, the courtyard and the town behind stay exactly as they are. " + vp.STYLE +
                  "\nNo units, no people, no text.")
 BOX = 460  # (square crop around each segment for its breach)

@@ -313,7 +313,27 @@ func _generate(settings: Dictionary) -> Dictionary:
 		if not k in used_heroes:
 			world["tavern"].append(k)
 	world["selected_hero"] = world["players"][0]["heroes"][0]
+	world["start_hero"] = world["selected_hero"]
+	var sc := GameData.scenario(settings.get("scenario", "random"))
+	world["scenario"] = {"id": sc["id"], "name": sc["name"], "desc": sc["desc"], "victory": sc["victory"],
+		"loss": sc["loss"]}
+	world["intro_shown"] = not settings.has("scenario")  # (the briefing only for a game from the New Game screen)
+	for t in town_list:
+		t["start_owner"] = t["owner"]
+	_start_bonus(world["players"][0], world["heroes"][world["start_hero"]], settings.get("bonus", ""))
 	return world
+
+## The starting bonus chosen on the New Game screen.
+func _start_bonus(p: Dictionary, hero: Dictionary, bonus: String) -> void:
+	match bonus:
+		"gold":
+			p["resources"]["gold"] += 2500
+		"resource":
+			p["resources"]["wood"] += 10
+			p["resources"]["ore"] += 10
+		"artifact":
+			var a: String = GameData.BONUS_ARTIFACTS[rng.randi() % GameData.BONUS_ARTIFACTS.size()]
+			hero["artifacts"].append(a)
 
 # ---------------------------------------------------------------------------------------------
 func _start_positions(np: int) -> Array:

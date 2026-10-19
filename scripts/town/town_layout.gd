@@ -39,8 +39,6 @@ static func slot_of(id: String) -> String:
 	return id
 
 static func sprite_id(id: String) -> String:
-	if id == "castle":
-		return "citadel"  # (the Citadel's walls span the town picture; the Castle shows on its card)
 	if id.begins_with("mage_guild"):
 		return "mage_guild_1" if id == "mage_guild_1" else "mage_guild_2"
 	return id
