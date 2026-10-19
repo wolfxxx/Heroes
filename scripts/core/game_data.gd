@@ -153,7 +153,7 @@ const MACHINE_TEXT := {
 }
 
 const ABILITY_TEXT := {
-	"ranged": "Ranged attack", "flying": "Flying", "undead": "Undead",
+	"ranged": "Shooter", "flying": "Flying", "undead": "Undead",
 	"no_retaliation": "No enemy retaliation", "life_drain": "Drains life",
 	"two_retaliations": "Retaliates twice", "jousting": "Jousting bonus",
 	"anti_cavalry": "Immune to jousting", "hates_undead": "Hates undead (+50% dmg)",
@@ -360,6 +360,10 @@ const MINES := {
 }
 
 const XP_LEVELS := [0, 1000, 2000, 3200, 4600, 6200, 8000, 10000, 12200, 14700, 17500, 20600, 24320, 28784, 34140, 40567]
+
+## A damage range as the classic shows it: "2-3", or one number when it is fixed ("50").
+static func dmg_text(lo: int, hi: int) -> String:
+	return str(lo) if lo == hi else "%d-%d" % [lo, hi]
 
 static func creature(id: String) -> Dictionary:
 	return CREATURES.get(id, {})

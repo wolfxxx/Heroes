@@ -88,6 +88,12 @@ func _ready() -> void:
 	L = BattleLogic.new()
 	L.setup(setup_d)
 	_build_scene()
+	if L.siege > 0 and Shot.args.has("broken"):  # (shots of a siege some turns in: --broken=1,3 breaches those segments)
+		for t in str(Shot.args["broken"]).split(","):
+			var i := int(t)
+			if i >= 0 and i < L.walls.size() and L.walls[i]["kind"] != "tower":
+				L.walls[i]["hp"] = 0
+				_set_wall(i, true)
 	_build_ui()
 	Audio.music("battle")
 	Audio.sfx("battle_start", -2)
@@ -775,12 +781,12 @@ func _stack_info(st: Dictionary) -> Control:
 	_grid_row(g, "Defense", _stat_cell(c["defense"], L.defense_stat(st)))
 	var lo: int = c["dmg"][0]
 	var hi: int = c["dmg"][1]
-	var dmg := "%d-%d" % [lo, hi]
+	var dmg := GameData.dmg_text(lo, hi)
 	var dnow := dmg
 	if st["effects"].has("bless"):
-		dnow = "%d-%d" % [hi, hi]
+		dnow = GameData.dmg_text(hi, hi)
 	elif st["effects"].has("curse"):
-		dnow = "%d-%d" % [lo, lo]
+		dnow = GameData.dmg_text(lo, lo)
 	_grid_row(g, "Damage", _stat_cell(dmg, dnow, 1 if st["effects"].has("bless") else -1))
 	_grid_row(g, "Health", _stat_cell(c["hp"], st["hp_top"]))
 	var full: int = L.start_counts.get(st["uid"], st["count"]) * c["hp"]
@@ -888,7 +894,7 @@ func _update_hover() -> void:
 			if L.can_shoot(cur):
 				var r := L.damage_range(cur, t, true)
 				_hover_action = {"type": "shoot", "target": t}
-				txt = "Shoot %s (damage %d-%d, kills %s)%s" % [L._name(t), r[0], r[1], _kills(t, r),
+				txt = "Shoot %s (damage %s, kills %s)%s" % [L._name(t), GameData.dmg_text(r[0], r[1]), _kills(t, r),
 					"  [half damage: range]" if L.stack_distance(cur, t) > 10 else ""]
 			else:
 				var from := _attack_from(cur, t)
@@ -896,7 +902,7 @@ func _update_hover() -> void:
 					var moved: int = _reach.get(from, 0)
 					var r := L.damage_range(cur, t, false, moved)
 					_hover_action = {"type": "melee", "target": t, "from": from}
-					txt = "Attack %s (damage %d-%d, kills %s)" % [L._name(t), r[0], r[1], _kills(t, r)]
+					txt = "Attack %s (damage %s, kills %s)" % [L._name(t), GameData.dmg_text(r[0], r[1]), _kills(t, r)]
 				else:
 					txt = "%s — out of reach" % L._name(t)
 		elif t and t["side"] == cur["side"]:
@@ -1627,7 +1633,7 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	box.scale = Vector2(0.6, 0.6)
 	tw.tween_property(box, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(box, "position:y", box.position.y - (6 if dir != 0 else 40), 1.3).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "modulate:a", 0.0, 0.35).set_delay(0.85)
+	tw.tween_property(box, "modulate:a", 0.0, 0.18).set_delay(1.0)  # (a quick fade: no half-faded smear over the next stack)
 	tw.chain().tween_callback(box.queue_free)
 
 ## Where a damage label for the stack of `n` goes: centred over its head, or higher up the same column when another
@@ -1817,6 +1823,28 @@ class _Grid extends Node2D:
 				draw_polyline(closed, line, width, true)
 	## As the classic: only the hexes the active stack can reach are shaded and outlined (the "movement shadow");
 	## the full grid is an option (G). The castle wall never gets hexes drawn over it.
+	## Each hex edge's neighbour (edges run between hex_poly's corners k and k+1; odd rows sit half a hex right).
+	const EDGE_EVEN := [Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, 0)]
+	const EDGE_ODD := [Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0)]
+	## A firm gold line around the whole area the active stack can reach (its own hexes inside it).
+	func _draw_reach_edge() -> void:
+		if reach.is_empty():
+			return
+		var inside := reach.duplicate()
+		if not active.is_empty():
+			for c in b.L.cells(active):
+				inside[c] = 0
+		for h in inside:
+			var poly: PackedVector2Array = b.hex_poly(b.hex_pos(h), 0.0)
+			var nb: Array = EDGE_ODD if h.y % 2 == 1 else EDGE_EVEN
+			for k in 6:
+				if inside.has(h + nb[k]):
+					continue
+				var p0: Vector2 = poly[k]
+				var p1: Vector2 = poly[(k + 1) % 6]
+				draw_line(p0, p1, Color(0, 0, 0, 0.5), 6.5, true)
+				draw_line(p0, p1, Color(1, 0.86, 0.4, 0.95), 3.5, true)
+
 	func _draw() -> void:
 		for y in BattleLogic.ROWS:
 			for x in BattleLogic.COLS:
@@ -1827,11 +1855,12 @@ class _Grid extends Node2D:
 				var poly: PackedVector2Array = b.hex_poly(c, 2.0)
 				# where the active stack can go: shaded (as the classic game), with a brighter outline
 				if reach.has(h):
-					draw_colored_polygon(poly, Color(0.04, 0.025, 0.0, 0.34))
+					draw_colored_polygon(poly, Color(0.04, 0.025, 0.0, 0.24))
 				var closed := poly.duplicate()
 				closed.append(poly[0])
-				draw_polyline(closed, Color(0, 0, 0, 0.22), 3.0, true)  # dark under-line keeps the grid visible on light ground
-				draw_polyline(closed, Color(1, 0.95, 0.72, 0.6 if reach.has(h) else 0.34), 1.5, true)
+				draw_polyline(closed, Color(0, 0, 0, 0.18), 3.0, true)  # dark under-line keeps the grid visible on light ground
+				draw_polyline(closed, Color(1, 0.95, 0.72, 0.3 if reach.has(h) else 0.34), 1.5, true)
+		_draw_reach_edge()
 		if not active.is_empty() and active.get("alive", false):
 			var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 180.0)
 			_fill(_body(active["hex"]), Color(1, 0.85, 0.3, 0.22 + 0.18 * pulse), Color(1, 0.9, 0.4, 0.75 + 0.25 * pulse), 4.0)

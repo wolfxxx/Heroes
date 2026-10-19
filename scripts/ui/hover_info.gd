@@ -96,7 +96,7 @@ static func creature(cid: String, count := -1, title := "") -> VBoxContainer:
 	g.columns = 4
 	g.add_theme_constant_override("h_separation", 10)
 	g.add_theme_constant_override("v_separation", 2)
-	for row in [["Attack", c["attack"]], ["Defense", c["defense"]], ["Damage", "%d-%d" % c["dmg"]], ["Health", c["hp"]],
+	for row in [["Attack", c["attack"]], ["Defense", c["defense"]], ["Damage", GameData.dmg_text(c["dmg"][0], c["dmg"][1])], ["Health", c["hp"]],
 			["Speed", c["speed"]], ["Growth", "%d/wk" % c["growth"]]] + ([["Shots", c["shots"]]] if c["shots"] > 0 else []):
 		g.add_child(UI.label(row[0], 18, UI.GOLD))
 		g.add_child(UI.label(str(row[1]), 18))

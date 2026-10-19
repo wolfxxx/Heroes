@@ -28,10 +28,15 @@ run --shot=$D/town_recruit.png --scene=res://scenes/town.tscn --delay=3 --setup=
 run --shot=$D/battle.png --scene=res://scenes/battle.tscn --delay=2 --setup=demo --shots=3 --interval=5 --keys=A
 run --shot=$D/battle_upgraded.png --scene=res://scenes/battle.tscn --delay=3 --setup=upgraded
 # a siege: walls, gate, moat and towers; auto combat, the catapult at work a few turns in
-run --shot=$D/bs.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege --seed=5 --shots=2 --interval=12 --keys=A
-mv -f $D/bs_0.png $D/battle_siege.png; mv -f $D/bs_1.png $D/battle_siege_later.png
-run --shot=$D/sh.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege_haven --seed=5 --shots=2 --interval=14 --keys=A
+run --shot=$D/battle_siege.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege --seed=5 --keys=A
+# later in a siege: the upper wall and the gate already breached (--broken), auto combat at the open gaps
+run --shot=$D/bs.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege --seed=5 --broken=1,3 --shots=2 --interval=12 --keys=A
+mv -f $D/bs_1.png $D/battle_siege_later.png; rm -f $D/bs_0.png
+run --shot=$D/sh.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege_haven --seed=5 --broken=3,5 --shots=2 --interval=14 --keys=A
 mv -f $D/sh_1.png $D/battle_siege_haven.png; rm -f $D/sh_0.png
+# a manual siege turn: the Angel waits (W), the Cavaliers' reach is shaded and outlined (none on the wall or moat)
+run --shot=$D/sw.png --scene=res://scenes/battle.tscn --delay=4 --setup=siege --seed=5 --keys=W --shots=2 --interval=5
+mv -f $D/sw_1.png $D/battle_siege_turn.png; rm -f $D/sw_0.png
 # hover twice: the first hover panel of a run can be mispositioned; keep the second
 run --shot=$D/hv.png --scene=res://scenes/battle.tscn --delay=3 --setup=demo --hover="264,410;270,412" --shots=2 --interval=0.5
 mv -f $D/hv_1.png $D/battle_hover.png; rm -f $D/hv_0.png

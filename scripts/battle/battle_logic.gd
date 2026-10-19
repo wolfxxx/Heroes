@@ -161,9 +161,15 @@ func wall_blocks(h: Vector2i, side: int) -> bool:
 		return false
 	return not (walls[i]["kind"] == "gate" and side == 1)
 
+## Moat hexes half under a painted tower (the upper and lower towers stand out over the moat's zigzag): no footing.
+const TOWER_FOOT := [1, 7, 9]
+
+func tower_foot(h: Vector2i) -> bool:
+	return siege > 0 and h.x == MOAT_X and h.y in TOWER_FOOT
+
 ## The moat in front of the wall (not before the gate: the bridge): walking into it ends the move.
 func is_moat(h: Vector2i) -> bool:
-	return siege > 0 and h.x == MOAT_X and h.y != 5
+	return siege > 0 and h.x == MOAT_X and h.y != 5 and not tower_foot(h)
 
 ## Shots from outside at a stack behind an unbroken stretch of wall do half damage.
 func behind_wall(a: Dictionary, d: Dictionary) -> bool:
@@ -281,7 +287,7 @@ func stack_at(h: Vector2i) -> Variant:
 	return null
 
 func is_free(h: Vector2i) -> bool:
-	return in_bounds(h) and not obstacles.has(h) and stack_at(h) == null and wall_seg(h) < 0
+	return in_bounds(h) and not obstacles.has(h) and stack_at(h) == null and wall_seg(h) < 0 and not tower_foot(h)
 
 func is_wide(s: Dictionary) -> bool:
 	return has_ab(s, "two_hex")
@@ -301,7 +307,7 @@ func cells(s: Dictionary, head = null) -> Array:
 ## Can the stack stand with its head on `head` (in bounds, no obstacle, no other stack)?
 func fits(s: Dictionary, head: Vector2i) -> bool:
 	for c in cells(s, head):
-		if not in_bounds(c) or obstacles.has(c) or wall_blocks(c, s["side"]):
+		if not in_bounds(c) or obstacles.has(c) or wall_blocks(c, s["side"]) or tower_foot(c):
 			return false
 		var o = stack_at(c)
 		if o != null and o != s:

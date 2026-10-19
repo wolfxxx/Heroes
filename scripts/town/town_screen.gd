@@ -524,6 +524,11 @@ func _open_build() -> void:
 					id = c
 					break
 			h.add_child(_hall_card(id, m))
+		var two := false  # (a long price takes two rows: the whole row of cards keeps its caption bars level)
+		for card in h.get_children():
+			two = two or card.price_rows() > 1
+		for card in h.get_children():
+			card.min_rows = 2 if two else 1
 	m.add_buttons([["Close", ""]])
 	m.set_meta("cancel", "")
 	var r = await m.closed
@@ -992,11 +997,18 @@ class _BuildCard extends Button:
 	var status_col := Color.GRAY
 	var cost := {}
 	var have := {}
+	var min_rows := 1
 	func _ready() -> void:
 		focus_mode = Control.FOCUS_NONE
 		flat = true
 		mouse_entered.connect(queue_redraw)
 		mouse_exited.connect(queue_redraw)
+	func price_rows() -> int:
+		var n := 0
+		for res in GameData.RESOURCES:
+			if cost.get(res, 0) > 0:
+				n += 1
+		return 2 if n > 3 else 1
 	## The caption bar takes the status colour, as on the classic hall plates: green to build, red when blocked or
 	## short of resources, gold once built (its picture dimmed, with a tick); the price under it, in two rows if long.
 	func _draw() -> void:
@@ -1010,7 +1022,7 @@ class _BuildCard extends Button:
 		var rows: Array = [items]
 		if items.size() > 3:
 			rows = [items.slice(0, (items.size() + 1) / 2), items.slice((items.size() + 1) / 2)]
-		var strip_h := 26.0 * rows.size()
+		var strip_h := 26.0 * maxi(rows.size(), min_rows)
 		var bottom := 35.0 + strip_h + 5.0
 		var built := status == "Built"
 		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - bottom - 5))
@@ -1054,7 +1066,7 @@ class _BuildCard extends Button:
 					w += ic + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 12
 				w -= 12
 				var x := x0 + maxf(0.0, (room - w) * 0.5)
-				var cy := sb.position.y + 13 + 26 * k
+				var cy := sb.position.y + 13 + 26 * k + 13.0 * (maxi(rows.size(), min_rows) - rows.size())
 				for it in row:
 					draw_texture_rect(Assets.res_icon(it[0]), Rect2(Vector2(x, cy - ic * 0.5), Vector2(ic, ic)), false)
 					var ok: bool = have.get(it[0], 0) >= cost[it[0]]
@@ -1066,7 +1078,7 @@ class _BuildCard extends Button:
 				txt = txt.left(txt.length() - 2)
 			if txt != status:
 				txt += "..."
-			draw_string(f, Vector2(x0, size.y - 12), txt, HORIZONTAL_ALIGNMENT_CENTER, room, 17, status_col)
+			draw_string(f, Vector2(x0, sb.position.y + strip_h * 0.5 + 6), txt, HORIZONTAL_ALIGNMENT_CENTER, room, 17, status_col)
 		draw_rect(r, UI.GOLD if is_hovered() else UI.GOLD_DARK, false, 2.0 if is_hovered() else 1.5)
 
 ## Dwelling card: the building as backdrop, the creature standing in front, availability and cost.
@@ -1109,7 +1121,7 @@ class _DwellingCard extends Button:
 		draw_string(f, Vector2(size.x - 214, y0 + 21), avail, HORIZONTAL_ALIGNMENT_RIGHT, 200, 18,
 			UI.GOLD if available > 0 else Color(0.75, 0.7, 0.6))
 		var d: Array = c.get("dmg", [0, 0])
-		var stats := "Att %d   Def %d   Dmg %d-%d   HP %d   Spd %d" % [c.get("attack", 0), c.get("defense", 0), d[0], d[1], c.get("hp", 0), c.get("speed", 0)]
+		var stats := "Att %d   Def %d   Dmg %s   HP %d   Spd %d" % [c.get("attack", 0), c.get("defense", 0), GameData.dmg_text(d[0], d[1]), c.get("hp", 0), c.get("speed", 0)]
 		draw_string(f, Vector2(14, y0 + 47), stats, HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 16, Color(0.82, 0.78, 0.68))
 		var x := 14.0
 		for res in c.get("cost", {}):

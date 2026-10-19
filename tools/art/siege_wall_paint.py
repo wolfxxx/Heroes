@@ -234,7 +234,9 @@ def ingest():
                 src.paste(Image.open(bp).convert("RGB").resize((bb[2] - bb[0], bb[3] - bb[1]), Image.LANCZOS), bb[:2])
             # alpha: where the ruined picture differs from the intact one, feathered, and faded at the band ends
             a = np.abs(np.asarray(src.crop(box), np.int16) - np.asarray(wall.crop(box), np.int16)).sum(2)
-            m = Image.fromarray(np.clip((a - 18) * 6, 0, 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(9))
+            # (a fallen tower or roof needs the wider margin: the soft edge must cover the old outline in the sky)
+            grow = 25 if i in (0, 4, 6) else 9
+            m = Image.fromarray(np.clip((a - 18) * 6, 0, 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(grow))
             m = m.filter(ImageFilter.GaussianBlur(6))
             ma = np.asarray(m, np.float32)
             h = ma.shape[0]
