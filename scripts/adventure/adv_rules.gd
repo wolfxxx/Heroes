@@ -590,8 +590,14 @@ func apply_battle(result: Dictionary) -> Dictionary:
 	var ev := {"title": "", "text": "", "levels": 0, "hero": -1}
 	var att: Dictionary = world["heroes"].get(ctx.get("hero", -1), {})
 	var att_won: bool = result["winner"] == "attacker"
+	var fled: int = result.get("fled", -1)  # (the side whose hero retreated or surrendered: it keeps what it carries)
 	if not att.is_empty():
 		_set_army(att["army"], result["attacker_army"])
+	if result.get("surrendered", false):
+		var payer = att if fled == 0 else world["heroes"].get(ctx.get("defender", -1), {})
+		if not payer.is_empty():
+			var res: Dictionary = world["players"][payer["owner"]]["resources"]
+			res["gold"] = maxi(0, res["gold"] - int(result.get("surrender_gold", 0)))
 	match ctx.get("type", ""):
 		"monster":
 			var o: Dictionary = world["objects"].get(ctx["object"], {})
@@ -609,8 +615,9 @@ func apply_battle(result: Dictionary) -> Dictionary:
 			if not def.is_empty():
 				_set_army(def["army"], result["defender_army"])
 				if att_won:
-					_loot(att, def)
-					_kill_hero(def)
+					if fled != 1:
+						_loot(att, def)
+					_kill_hero(def, fled == 1)
 		"town":
 			var town: Dictionary = world["towns"].get(ctx["town"], {})
 			var def: Dictionary = world["heroes"].get(ctx.get("defender", -1), {})
@@ -620,8 +627,9 @@ func apply_battle(result: Dictionary) -> Dictionary:
 				_set_army(town["garrison"], result["defender_army"])
 			if att_won and not town.is_empty():
 				if not def.is_empty():
-					_loot(att, def)
-					_kill_hero(def)
+					if fled != 1:
+						_loot(att, def)
+					_kill_hero(def, fled == 1)
 				for i in 7:
 					town["garrison"][i] = null
 				capture_town(town, att["owner"])
@@ -636,8 +644,9 @@ func apply_battle(result: Dictionary) -> Dictionary:
 		if not dh.is_empty():
 			ev["hero"] = dh["uid"]
 			ev["levels"] = gain_xp(dh, int(result.get("xp", 0)))
-			_loot(dh, att)
-		_kill_hero(att)
+			if fled != 0:
+				_loot(dh, att)
+		_kill_hero(att, fled == 0)
 	rebuild()
 	check_eliminations()
 	return ev
@@ -656,9 +665,16 @@ func _set_army(dst: Array, src: Array) -> void:
 		var s = src[i] if i < src.size() else null
 		dst[i] = s if s and s["count"] > 0 else null
 
-func _kill_hero(hero: Dictionary) -> void:
+## A hero leaves the map: slain, dismissed, or (`kept`) fled or surrendered, when they wait in the taverns as they
+## left, with their skills and artifacts (and, surrendered, their army) to be hired again.
+func _kill_hero(hero: Dictionary, kept := false) -> void:
 	if not world["heroes"].has(hero["uid"]):
 		return
+	if kept:
+		if not world.has("tavern_keep"):
+			world["tavern_keep"] = {}
+		hero.erase("asleep")
+		world["tavern_keep"][hero["id"]] = hero
 	world["heroes"].erase(hero["uid"])
 	var p: Dictionary = world["players"][hero["owner"]]
 	p["heroes"].erase(hero["uid"])
@@ -729,4 +745,5 @@ func new_day() -> Dictionary:
 					o["count"] = int(ceil(o["count"] * 1.1))
 		var ids := GameData.CREATURES.keys().filter(func(c): return GameData.CREATURES[c]["tier"] > 0)
 		info["week_creature"] = ids[randi() % ids.size()]
+		world["week_creature"] = info["week_creature"]
 	return info

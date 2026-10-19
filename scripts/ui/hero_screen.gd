@@ -9,18 +9,18 @@ const SKILL_LEVEL := ["", "Basic", "Advanced", "Expert"]
 const DOLL := Vector2(450, 600)
 const SOCK := 58.0
 ## Artifact sockets on the paper-doll (fractions of the painting): over the body part they dress, the five misc
-## sockets down the right edge (as the classic hero screen). [where, slot kind, which one of that kind]
+## sockets down the left edge (as the classic hero screen). [where, slot kind, which one of that kind]
 const SOCKETS := {
 	"head": [Vector2(0.5, 0.15), "head", 0], "cape": [Vector2(0.29, 0.25), "cape", 0], "neck": [Vector2(0.5, 0.28), "neck", 0],
 	"torso": [Vector2(0.5, 0.41), "torso", 0], "weapon": [Vector2(0.27, 0.53), "weapon", 0],
 	"shield": [Vector2(0.73, 0.53), "shield", 0], "ring": [Vector2(0.27, 0.69), "ring", 0],
 	"ring2": [Vector2(0.73, 0.69), "ring", 1], "feet": [Vector2(0.5, 0.88), "feet", 0],
-	"misc1": [Vector2(0.92, 0.1), "misc", 0], "misc2": [Vector2(0.92, 0.23), "misc", 1],
-	"misc3": [Vector2(0.92, 0.36), "misc", 2], "misc4": [Vector2(0.92, 0.49), "misc", 3],
-	"misc5": [Vector2(0.92, 0.62), "misc", 4]}
+	"misc1": [Vector2(0.08, 0.1), "misc", 0], "misc2": [Vector2(0.08, 0.23), "misc", 1],
+	"misc3": [Vector2(0.08, 0.36), "misc", 2], "misc4": [Vector2(0.08, 0.49), "misc", 3],
+	"misc5": [Vector2(0.08, 0.62), "misc", 4]}
 const SLOT_NAME := {"head": "Head", "cape": "Shoulders", "neck": "Neck", "torso": "Torso", "weapon": "Right hand",
 	"shield": "Left hand", "ring": "Ring", "feet": "Feet", "misc": "Miscellaneous"}
-## The war machines down the doll's left edge (the spellbook sits at the foot of the right).
+## The war machines down the doll's right edge, the spellbook at its foot (as the classic hero screen).
 const MACHINES := ["ballista", "ammo_cart", "first_aid_tent", "catapult"]
 const BACKPACK := 5
 const STAT_TIP := {"attack": "Attack: added to the Attack of every creature in the army.",
@@ -169,6 +169,7 @@ static func _fill(m: Modal, owner: Node, h: Dictionary) -> void:
 	row.add_child(right)
 	right.add_child(_doll(owner, h, redo))
 	right.add_child(_backpack(m, h, redo))
+	right.add_child(_formation(h, redo))
 	m.add_buttons([["Close", "close"], ["Dismiss Hero", "dismiss"]])
 
 ## A small labelled meter: title, value and a thin bar.
@@ -228,7 +229,7 @@ static func _artifact_tip(a: String, hint := "") -> String:
 	var t := "%s\n%s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
 	return t + ("\n" + hint if hint != "" else "")
 
-## The painted figure with a socket on each body part, the war machines down its left edge, the misc sockets and the
+## The painted figure with a socket on each body part, the misc sockets down its left edge, the war machines and the
 ## spellbook down its right.
 static func _doll(owner: Node, h: Dictionary, redo: Callable) -> Control:
 	var doll := TextureRect.new()
@@ -244,6 +245,7 @@ static func _doll(owner: Node, h: Dictionary, redo: Callable) -> Control:
 		if worn.has(sl):
 			var a: String = worn[sl]
 			so.tex = Assets.artifact_icon(a)
+			so.inner = true
 			var tip := _artifact_tip(a, "Click: take it off into the backpack.")
 			HoverInfo.attach(so, func(): return tip)
 			so.pressed = func():
@@ -257,7 +259,7 @@ static func _doll(owner: Node, h: Dictionary, redo: Callable) -> Control:
 	var have: Array = h.get("machines", [])
 	for i in MACHINES.size():
 		var id: String = MACHINES[i]
-		var so := _sock(doll, Vector2(0.08, 0.1 + 0.13 * i))
+		var so := _sock(doll, Vector2(0.92, 0.1 + 0.13 * i))
 		so.empty = not (id in have or id == "catapult")
 		so.tex = Assets.creature_portrait(id)
 		var c: Dictionary = GameData.CREATURES[id]
@@ -291,14 +293,23 @@ static func _backpack(m: Modal, h: Dictionary, redo: Callable) -> Control:
 	var l := UI.label("Backpack", 18, UI.GOLD)
 	l.custom_minimum_size.x = 84
 	row.add_child(l)
-	var arrow := func(t: String, d: int) -> Button:
-		var b := UI.button(t, func():
-			m.set_meta("bp", off + d)
-			redo.call(), 20)
-		b.custom_minimum_size = Vector2(34, SOCK)
+	var arrow := func(d: int) -> Button:
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(30, SOCK)
+		b.focus_mode = Control.FOCUS_NONE
 		b.disabled = off + d < 0 or off + d > pack.size() - BACKPACK
+		b.pressed.connect(func():
+			m.set_meta("bp", off + d)
+			Audio.sfx("click", -6)
+			redo.call())
+		var t := _Arrow.new()
+		t.dir = d
+		t.live = not b.disabled
+		t.set_anchors_preset(Control.PRESET_FULL_RECT)
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(t)
 		return b
-	row.add_child(arrow.call("<", -1))
+	row.add_child(arrow.call(-1))
 	for i in BACKPACK:
 		var so := _Socket.new()
 		so.custom_minimum_size = Vector2(SOCK, SOCK)
@@ -306,6 +317,7 @@ static func _backpack(m: Modal, h: Dictionary, redo: Callable) -> Control:
 		if not so.empty:
 			var a: String = pack[off + i]
 			so.tex = Assets.artifact_icon(a)
+			so.inner = true
 			var hint := "Click: put it on." if GameState.can_wear(h, a) else "Click: put it on in place of the one worn there."
 			var tip := _artifact_tip(a, hint)
 			HoverInfo.attach(so, func(): return tip)
@@ -314,10 +326,55 @@ static func _backpack(m: Modal, h: Dictionary, redo: Callable) -> Control:
 				Audio.sfx("click")
 				redo.call()
 		row.add_child(so)
-	row.add_child(arrow.call(">", 1))
-	var cnt := UI.label(str(pack.size()) if pack.size() > BACKPACK else "", 16, Color(0.85, 0.8, 0.68))
-	cnt.custom_minimum_size.x = 22
-	row.add_child(cnt)
+	row.add_child(arrow.call(1))
+	var out := VBoxContainer.new()
+	out.add_theme_constant_override("separation", 2)
+	out.add_child(row)
+	if pack.size() > BACKPACK:  # (how far along the scroll is)
+		var cnt := UI.label("%d-%d of %d" % [off + 1, off + BACKPACK, pack.size()], 16, Color(0.85, 0.8, 0.68))
+		cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		out.add_child(cnt)
+	return out
+
+## The army's battle formation (as the classic hero screen): spread along the whole edge, or grouped in the middle.
+static func _formation(h: Dictionary, redo: Callable) -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var l := UI.label("Formation", 18, UI.GOLD)
+	l.custom_minimum_size.x = 84
+	row.add_child(l)
+	var cur: String = h.get("formation", "spread")
+	for e in [["spread", "Spread", "The stacks take the field spread along the whole edge."],
+			["grouped", "Grouped", "The stacks take the field side by side in the middle of the edge."]]:
+		var b := Button.new()
+		b.toggle_mode = true
+		b.button_pressed = cur == e[0]
+		b.focus_mode = Control.FOCUS_NONE
+		b.custom_minimum_size = Vector2(150, 50)
+		b.text = e[1]
+		b.add_theme_font_size_override("font_size", 19)
+		var on := UI.selected_plate(4)
+		b.add_theme_stylebox_override("pressed", on)
+		b.add_theme_stylebox_override("hover_pressed", on)
+		var ink := Color(1.0, 0.88, 0.55)  # (bright on the dark selected plate)
+		b.add_theme_color_override("font_pressed_color", ink)
+		b.add_theme_color_override("font_hover_pressed_color", ink)
+		var ic := _Formation.new()
+		ic.grouped = e[0] == "grouped"
+		ic.col = ink if cur == e[0] else Color(0.9, 0.78, 0.5)
+		ic.position = Vector2(10, 9)
+		ic.size = Vector2(22, 32)
+		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(ic)
+		var tip: String = e[2]
+		HoverInfo.attach(b, func(): return tip)
+		var id: String = e[0]
+		b.pressed.connect(func():
+			h["formation"] = id
+			Audio.sfx("click", -6)
+			redo.call())
+		row.add_child(b)
 	return row
 
 ## A recessed square socket: dark well, bevelled rim, thin gold frame; holds an icon (or nothing).
@@ -326,6 +383,7 @@ class _Socket extends Control:
 	var empty := false
 	var glass := false  # on the paper-doll: a translucent well, so the figure shows through when empty
 	var pressed := Callable()  # (a left click on it)
+	var inner := false  # an artifact icon: drawn without its own frame, filling the socket
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		mouse_entered.connect(queue_redraw)
@@ -337,7 +395,10 @@ class _Socket extends Control:
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		draw_rect(r, Color(0.02, 0.02, 0.025, (0.22 if glass else 0.4) if empty else 0.92))
-		if tex and not empty:
+		if tex and not empty and inner:
+			var ts := tex.get_size()
+			draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86))
+		elif tex and not empty:
 			draw_texture_rect(tex, r.grow(-5), false)
 		elif tex:  # a machine not owned: its picture greyed out in the empty socket
 			draw_texture_rect(tex, r.grow(-5), false, Color(0.3, 0.29, 0.28, 0.75))
@@ -356,3 +417,22 @@ class _Bar extends Control:
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.6))
 		draw_rect(Rect2(Vector2(1, 1), Vector2((size.x - 2) * frac, size.y - 2)), col)
+
+## A backpack scroll arrow: a gold triangle, dimmed when there is nothing more that way.
+class _Arrow extends Control:
+	var dir := 1
+	var live := true
+	func _draw() -> void:
+		var c := size * 0.5
+		var pts := PackedVector2Array([c + Vector2(-6 * dir, -11), c + Vector2(-6 * dir, 11), c + Vector2(7 * dir, 0)])
+		draw_colored_polygon(pts, UI.GOLD if live else Color(0.38, 0.32, 0.24))
+
+## The formation buttons' little picture: three stacks spread apart, or close together.
+class _Formation extends Control:
+	var grouped := false
+	var col := Color.WHITE
+	func _draw() -> void:
+		var gap := 4.0 if grouped else 9.0
+		var y0 := size.y * 0.5 - gap - 4
+		for i in 3:
+			draw_rect(Rect2(Vector2(4, y0 + i * (gap + 4) - 4), Vector2(12, 7)), col)

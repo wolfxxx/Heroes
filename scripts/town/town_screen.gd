@@ -714,8 +714,11 @@ func _open_tavern() -> void:
 		var ic := UI.icon(Assets.hero_portrait(hid), Vector2(340, 170))
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		v.add_child(ic)
-		for t in [d["name"], "%s — %s" % [d["class"], GameData.FACTIONS[d["faction"]]["name"]], "Specialty: %s" % d["specialty"],
-				"Atk %d  Def %d  Pow %d  Kno %d" % [d["attack"], d["defense"], d["power"], d["knowledge"]]]:
+		var kh: Dictionary = world.get("tavern_keep", {}).get(hid, {})  # (one who fled: as they left)
+		var lvl: String = ("Level %d %s" % [kh["level"], d["class"]]) if not kh.is_empty() else d["class"]
+		var src: Dictionary = kh if not kh.is_empty() else d
+		for t in [d["name"], "%s — %s" % [lvl, GameData.FACTIONS[d["faction"]]["name"]], "Specialty: %s" % d["specialty"],
+				"Atk %d  Def %d  Pow %d  Kno %d" % [src["attack"], src["defense"], src["power"], src["knowledge"]]]:
 			var l := UI.label(t, 18)
 			l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -737,7 +740,7 @@ func _open_tavern() -> void:
 		return
 	player["resources"]["gold"] -= 2500
 	world["tavern"].erase(r)
-	var nh := GameState.make_hero(r, town["owner"])
+	var nh := GameState.tavern_hero(r, town["owner"])
 	nh["pos"] = town["pos"]
 	world["heroes"][nh["uid"]] = nh
 	player["heroes"].append(nh["uid"])

@@ -32,6 +32,7 @@ var pending_battle: Dictionary = {}
 var battle_result: Dictionary = {}
 var pending_town: Dictionary = {}   # {"town_uid": int}
 var return_scene := SCENE_ADVENTURE
+var battle_speed := 1.0  # battle: how fast it plays (combat options), applied as the engine's time scale
 var show_grid := false  # battle: the whole hex grid (G), or only where the active stack can go (the default)
 var new_game_settings := {"faction": "haven", "hero": "sir_aldric", "difficulty": 1, "map_size": 48, "seed": 0}
 var _uid := 1000
@@ -112,6 +113,22 @@ func make_hero(hero_id: String, owner: int) -> Dictionary:
 	h["max_movement"] = hero_max_movement(h)
 	h["movement"] = h["max_movement"]
 	h["mana"] = max_mana(h)
+	return h
+
+## A hero hired from a tavern: one who fled or surrendered comes back as they left (see AdvRules._kill_hero), any
+## other fresh.
+func tavern_hero(hero_id: String, owner: int) -> Dictionary:
+	var keep: Dictionary = world.get("tavern_keep", {})
+	if not keep.has(hero_id):
+		return make_hero(hero_id, owner)
+	var h: Dictionary = keep[hero_id]
+	keep.erase(hero_id)
+	h["uid"] = next_uid()
+	h["owner"] = owner
+	h["max_movement"] = hero_max_movement(h)
+	h["movement"] = h["max_movement"]
+	if GameState.army_is_empty(h["army"]):  # (a hero who fled comes with a few troops, as a fresh one)
+		h["army"] = make_hero(hero_id, owner)["army"]
 	return h
 
 func hero_stat(h: Dictionary, stat: String) -> int:

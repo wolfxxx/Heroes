@@ -40,10 +40,13 @@ func _ready() -> void:
 			for h in GameState.world["heroes"].values():  # a seasoned hero: spells, skills and some gear
 				h["spells"] = GameData.SPELLS.keys()
 				h["skills"].merge({"wisdom": 2, "offense": 1, "logistics": 3})
-				h["artifacts"] = ["sword_of_valor", "helm_of_wisdom", "boots_of_speed", "ring_of_vitality",
-					"cape_of_courage", "amulet_of_insight", "orb_of_power"]
-				h["backpack"] = ["crown_of_command", "shield_of_dawn", "clover_of_fortune", "breastplate_of_ironbark",
-					"orb_of_power", "ring_of_vitality"]
+				h["artifacts"] = []
+				h["backpack"] = []
+				for a in ["sword_of_valor", "shield_of_dawn", "helm_of_wisdom", "cape_of_courage", "amulet_of_insight",
+						"breastplate_of_ironbark", "ring_of_vitality", "boots_of_speed", "orb_of_power", "clover_of_fortune",
+						"crown_of_command", "helm_of_wisdom", "sword_of_valor", "ring_of_vitality", "ring_of_vitality",
+						"boots_of_speed", "breastplate_of_ironbark"]:
+					GameState.give_artifact(h, a)  # (as found: worn while a slot is free, then the backpack)
 				h["max_movement"] = GameState.hero_max_movement(h)
 				h["movement"] = h["max_movement"]
 	world = GameState.world
@@ -881,6 +884,7 @@ func _turn_banner() -> void:
 	var info: Dictionary = world.get("pending_week", {})
 	world["pending_week"] = {}
 	Audio.sfx("new_day", -4)
+	hud.flash_date()
 	if info.get("new_week", false):
 		Audio.sfx("new_week")
 		var cid: String = info.get("week_creature", "")

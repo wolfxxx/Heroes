@@ -1,14 +1,20 @@
 extends CanvasLayer
 class_name AdventureHUD
-## Adventure screen HUD: right panel (minimap, heroes, towns, selected hero, buttons) + resource bar.
+## Adventure screen HUD: right panel + resource bar. The panel as the classic one: the minimap; the hero list (portraits
+## with movement and spell point bars) and the town list in two scrolling columns with the buttons between them; and
+## under them the status window, which shows the selected hero, the kingdom or the date (click it to cycle).
 
 const PANEL_X := 1544.0
 const MINI := 316.0
 const PAD := 30.0
-const COL_W := 155.0       # hero and town list columns, side by side
-const COL_GAP := 6
-const SLOT_H := 66.0
-const BTN := Vector2(76, 62)
+const COL_W := 98.0        # hero and town list columns, the buttons between them
+const SLOT_H := 52.0
+const SLOTS := 5           # list slots shown; the arrows scroll the rest
+const ARROW_H := 22.0
+const LIST_Y := MINI + PAD + 12
+const LIST_H := ARROW_H * 2 + SLOTS * SLOT_H + (SLOTS + 1) * 4
+const BTN := Vector2(51, 56)
+const STATUS_Y := LIST_Y + LIST_H + 10
 const TERRAIN_COLORS := [Color(0.30, 0.50, 0.17), Color(0.47, 0.37, 0.22), Color(0.85, 0.75, 0.48), Color(0.9, 0.92, 0.96),
 	Color(0.27, 0.33, 0.22), Color(0.12, 0.30, 0.52), Color(0.62, 0.52, 0.38)]
 
@@ -23,6 +29,10 @@ var _mini_view: Control
 var _hero_list: VBoxContainer
 var _town_list: VBoxContainer
 var _detail: VBoxContainer
+var _hero_off := 0
+var _town_off := 0
+var _view := 0             # status window: 0 the hero, 1 the kingdom, 2 the date
+var _view_dots: Control
 var _res_labels := {}
 var _date_label: Label
 var _status: Label
@@ -31,7 +41,6 @@ var _turn_label: Label
 var _turn_panel: PanelContainer
 var _end_turn_btn: Button
 var _sleep_btn: Button
-var _info_box: VBoxContainer
 
 func setup(a) -> void:
 	adv = a
@@ -82,58 +91,24 @@ func _build_panel() -> void:
 	_mini_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_mini_view)
 
-	# heroes and towns side by side (as the classic adventure panel), the selected hero below, then the buttons
-	# (one column of lists, then the selected hero, flowing down: only filled slots are shown)
-	var v := VBoxContainer.new()
-	v.position = Vector2(PANEL_X + PAD, MINI + PAD + 10)
-	v.size = Vector2(MINI, 0)
-	v.add_theme_constant_override("separation", 6)
-	root.add_child(v)
-	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", COL_GAP)
-	v.add_child(cols)
+	# the hero list (left) and the town list (right), each scrolling, with the buttons between them
+	var x0 := PANEL_X + PAD
 	for k in 2:
-		var cv := VBoxContainer.new()
-		cv.custom_minimum_size = Vector2(COL_W, 0)
-		cv.add_theme_constant_override("separation", 4)
-		cv.add_child(UI.label("Heroes" if k == 0 else "Towns", 21, UI.GOLD, true))
 		var lst := VBoxContainer.new()
+		lst.position = Vector2(x0 + (0.0 if k == 0 else MINI - COL_W), LIST_Y)
+		lst.size = Vector2(COL_W, LIST_H)
 		lst.add_theme_constant_override("separation", 4)
-		cv.add_child(lst)
-		cols.add_child(cv)
+		root.add_child(lst)
 		if k == 0:
 			_hero_list = lst
 		else:
 			_town_list = lst
-	v.add_child(HSeparator.new())
-	_detail = VBoxContainer.new()
-	_detail.add_theme_constant_override("separation", 11)
-	v.add_child(_detail)
-
-	# the status window over the buttons (as the classic panel): the date, and the kingdom at a glance
-	var sp := PanelContainer.new()
-	var sst := StyleBoxFlat.new()
-	sst.bg_color = Color(0.03, 0.02, 0.015, 0.85)
-	sst.border_color = Color(UI.GOLD_DARK, 0.85)
-	sst.set_border_width_all(1)
-	sst.set_corner_radius_all(4)
-	sst.content_margin_left = 10
-	sst.content_margin_right = 10
-	sst.content_margin_top = 4
-	sst.content_margin_bottom = 4
-	sp.add_theme_stylebox_override("panel", sst)
-	sp.position = Vector2(PANEL_X + PAD, 1036 - PAD - 2 * BTN.y - 6 - 10 - 64)
-	sp.size = Vector2(MINI, 64)
-	root.add_child(sp)
-	_info_box = VBoxContainer.new()
-	_info_box.add_theme_constant_override("separation", -2)
-	sp.add_child(_info_box)
-
 	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.position = Vector2(PANEL_X + PAD, 1036 - PAD - 2 * BTN.y - 6)
+	grid.columns = 2
+	var gw := BTN.x * 2 + 4
+	grid.position = Vector2(x0 + (MINI - gw) * 0.5, LIST_Y + (LIST_H - (BTN.y * 4 + 3 * 8)) * 0.5)
 	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 6)
+	grid.add_theme_constant_override("v_separation", 8)
 	root.add_child(grid)
 	for e in [["kingdom", "Kingdom overview (K)", func(): open_kingdom()],
 			["hero", "Hero screen (I)", func(): _with_hero(open_hero_screen)],
@@ -149,6 +124,38 @@ func _build_panel() -> void:
 			_end_turn_btn = b
 		elif e[0] == "sleep":
 			_sleep_btn = b
+
+	# the status window: the selected hero, the kingdom, or the date (a click shows the next)
+	var sp := PanelContainer.new()
+	var sst := StyleBoxFlat.new()
+	sst.bg_color = Color(0.03, 0.02, 0.015, 0.88)
+	sst.border_color = UI.GOLD_DARK
+	sst.set_border_width_all(2)
+	sst.set_corner_radius_all(4)
+	sst.content_margin_left = 10
+	sst.content_margin_right = 10
+	sst.content_margin_top = 8
+	sst.content_margin_bottom = 8
+	sp.add_theme_stylebox_override("panel", sst)
+	sp.position = Vector2(x0, STATUS_Y)
+	sp.size = Vector2(MINI, 1036 - PAD + 8 - STATUS_Y)
+	sp.clip_contents = true
+	sp.tooltip_text = "Click: show the hero, the kingdom or the date"
+	sp.mouse_filter = Control.MOUSE_FILTER_STOP
+	sp.gui_input.connect(func(e):
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			Audio.sfx("click", -6)
+			show_view((_view + 1) % 3))
+	root.add_child(sp)
+	_detail = VBoxContainer.new()
+	_detail.add_theme_constant_override("separation", 9)
+	_detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sp.add_child(_detail)
+	_view_dots = _Dots.new()
+	_view_dots.position = Vector2(x0 + MINI - 52, 1036 - PAD - 8)
+	_view_dots.size = Vector2(44, 12)
+	_view_dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_view_dots)
 
 	_turn_panel = PanelContainer.new()
 	_turn_panel.position = Vector2(520, 20)
@@ -222,105 +229,185 @@ func refresh() -> void:
 	for r in GameData.RESOURCES:
 		_res_labels[r].text = str(me["resources"].get(r, 0))
 	_date_label.text = adv.rules.date_string()
-	for c in _hero_list.get_children():
+	_fill_list(_hero_list, me["heroes"], true)
+	_fill_list(_town_list, me["towns"], false)
+	for c in _detail.get_children():
+		_detail.remove_child(c)
 		c.queue_free()
-	for i in mini(3, me["heroes"].size()):
-		_hero_list.add_child(_hero_card(world["heroes"][me["heroes"][i]]))
-	for c in _town_list.get_children():
+	var hero: Dictionary = adv.selected_hero()
+	_view_dots.set("on", _view)
+	_view_dots.queue_redraw()
+	match _view:
+		0:
+			if hero.is_empty():
+				_kingdom_view(me)
+			else:
+				_hero_view(hero)
+		1:
+			_kingdom_view(me)
+		2:
+			_date_view()
+	if _sleep_btn:
+		_sleep_btn.disabled = hero.is_empty()
+	_mini_view.queue_redraw()
+
+## Shows a status window view (0 the hero, 1 the kingdom, 2 the date).
+func show_view(v: int) -> void:
+	_view = v
+	refresh()
+
+## At the start of a day the status window shows the date for a while (as the classic panel), then the hero again.
+func flash_date() -> void:
+	show_view(2)
+	await get_tree().create_timer(4.0).timeout
+	if _view == 2:
+		show_view(0)
+
+## A list column: the up arrow, five slots from the scroll position (empty ones as recesses), the down arrow.
+func _fill_list(lst: VBoxContainer, ids: Array, heroes: bool) -> void:
+	for c in lst.get_children():
+		lst.remove_child(c)
 		c.queue_free()
-	for i in mini(3, me["towns"].size()):
-		_town_list.add_child(_town_card(world["towns"][me["towns"][i]]))
-	if me["towns"].is_empty():
-		_town_list.add_child(_empty_slot(SLOT_H))
-	# status window: the kingdom at a glance (the date is in the resource bar below)
-	for c in _info_box.get_children():
-		c.queue_free()
-	var inc := 0
+	var off: int = clampi(_hero_off if heroes else _town_off, 0, maxi(0, ids.size() - SLOTS))
+	if heroes:
+		_hero_off = off
+	else:
+		_town_off = off
+	lst.add_child(_arrow(true, off > 0, func(): _scroll(heroes, -1)))
+	for i in SLOTS:
+		var k := off + i
+		if k < ids.size():
+			lst.add_child(_hero_card(world["heroes"][ids[k]]) if heroes else _town_card(world["towns"][ids[k]]))
+		else:
+			lst.add_child(_empty_slot(SLOT_H))
+	lst.add_child(_arrow(false, off + SLOTS < ids.size(), func(): _scroll(heroes, 1)))
+
+func _scroll(heroes: bool, d: int) -> void:
+	if heroes:
+		_hero_off += d
+	else:
+		_town_off += d
+	Audio.sfx("click", -6)
+	refresh()
+
+## A list's scroll arrow: a gold triangle on a small plate, dimmed when there is nothing more that way.
+func _arrow(up: bool, live: bool, cb: Callable) -> Control:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(COL_W, ARROW_H)
+	b.focus_mode = Control.FOCUS_NONE
+	b.disabled = not live
+	b.tooltip_text = "Scroll up" if up else "Scroll down"
+	b.pressed.connect(cb)
+	var t := _Tri.new()
+	t.up = up
+	t.live = live
+	t.set_anchors_preset(Control.PRESET_FULL_RECT)
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(t)
+	return b
+
+## The status window's hero view: portrait, name, movement and spell points, the primary skills, morale, luck and
+## experience, the army and the secondary skills.
+func _hero_view(hero: Dictionary) -> void:
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 10)
+	top.add_child(UI.icon(Assets.hero_portrait(hero["id"]), Vector2(84, 84)))
+	var info := VBoxContainer.new()
+	info.add_theme_constant_override("separation", 0)
+	info.add_child(UI.label(hero["name"], 21, UI.GOLD))
+	info.add_child(UI.label("Level %d %s" % [hero["level"], hero["class"]], 17))
+	info.add_child(UI.label("Move %d / %d" % [hero["movement"], hero["max_movement"]], 17, Color(0.6, 0.9, 0.55)))
+	info.add_child(UI.label("Mana %d / %d" % [hero["mana"], GameState.max_mana(hero)], 17, Color(0.6, 0.75, 1.0)))
+	top.add_child(info)
+	_detail.add_child(top)
+	var g := GridContainer.new()
+	g.columns = 4
+	g.add_theme_constant_override("h_separation", 12)
+	for st in ["attack", "defense", "power", "knowledge"]:
+		var box := HBoxContainer.new()
+		box.add_child(UI.icon(Assets.tex("icons/stat_%s.png" % st), Vector2(32, 32)))
+		box.add_child(UI.label(str(GameState.hero_stat(hero, st)), 21))
+		g.add_child(box)
+	_detail.add_child(g)
+	var ml := HBoxContainer.new()  # morale, luck and experience (as the classic hero panel)
+	ml.add_theme_constant_override("separation", 6)
+	var mo: Array = HeroScreen._morale(hero)
+	var lk := int(hero["skills"].get("luck", 0)) + GameState.hero_stat(hero, "luck")
+	for e in [["skill_leadership", mo[0]], ["skill_luck", lk]]:
+		ml.add_child(UI.icon(Assets.tex("icons/%s.png" % e[0]), Vector2(32, 32)))
+		var val: int = e[1]
+		ml.add_child(UI.label("%+d" % val if val != 0 else "0", 20, Color(0.6, 0.92, 0.5) if val > 0 else (Color(1, 0.55, 0.45) if val < 0 else UI.TEXT)))
+	var nxt := 0
+	for t in GameData.XP_LEVELS:
+		if t > int(hero["xp"]):
+			nxt = t
+			break
+	ml.add_child(UI.label("  Exp %d / %d" % [hero["xp"], nxt] if nxt > 0 else "  Exp %d" % hero["xp"], 17, Color(0.85, 0.8, 0.68)))
+	_detail.add_child(ml)
+	var army := ArmyStrip.new()
+	army.slot_size = Vector2(40, 40)
+	army.editable = false
+	army.bind(hero["army"], {})
+	army.add_theme_constant_override("separation", 3)
+	_detail.add_child(army)
+	var sk := HBoxContainer.new()  # its secondary skills as small framed icons
+	sk.add_theme_constant_override("separation", 3)
+	for id in hero["skills"]:
+		if int(hero["skills"][id]) > 0 and GameData.SKILLS.has(id):
+			sk.add_child(UI.icon(Assets.tex("icons/skill_%s.png" % id), Vector2(40, 40)))
+	if sk.get_child_count() > 0:
+		_detail.add_child(sk)
+
+## The status window's kingdom view: the day's income of every resource, and what the kingdom holds.
+func _kingdom_view(me: Dictionary) -> void:
+	_detail.add_child(UI.label("Kingdom", 22, UI.GOLD, true))
+	var inc := {}
+	for r in GameData.RESOURCES:
+		inc[r] = 0
 	for tid in me["towns"]:
-		inc += TownLogic.daily_income(world["towns"][tid])
-	for o in world["objects"].values():
-		if o["type"] == "mine" and o["owner"] == adv._human() and GameData.MINES[o["mine"]]["resource"] == "gold":
-			inc += GameData.MINES[o["mine"]]["amount"]
+		inc["gold"] += TownLogic.daily_income(world["towns"][tid])
 	var mines := 0
 	for o in world["objects"].values():
 		if o["type"] == "mine" and o["owner"] == adv._human():
 			mines += 1
-	var gl := HBoxContainer.new()
-	gl.add_theme_constant_override("separation", 6)
-	gl.add_child(UI.icon(Assets.tex("icons/res_gold.png"), Vector2(24, 24)))
-	gl.add_child(UI.label("+%d gold a day" % inc, 18, UI.GOLD))
-	_info_box.add_child(gl)
-	_info_box.add_child(UI.label("%d hero%s · %d town%s · %d mine%s" % [me["heroes"].size(), "" if me["heroes"].size() == 1 else "es",
-		me["towns"].size(), "" if me["towns"].size() == 1 else "s", mines, "" if mines == 1 else "s"], 16, Color(0.85, 0.8, 0.68)))
-	for c in _detail.get_children():
-		c.queue_free()
-	var hero: Dictionary = adv.selected_hero()
-	if not hero.is_empty():
-		var top := HBoxContainer.new()
-		top.add_theme_constant_override("separation", 10)
-		var portrait := UI.icon(Assets.hero_portrait(hero["id"]), Vector2(92, 92))
-		top.add_child(portrait)
-		var info := VBoxContainer.new()
-		info.add_theme_constant_override("separation", 0)
-		info.add_child(UI.label(hero["name"], 21, UI.GOLD))
-		info.add_child(UI.label("Level %d %s" % [hero["level"], hero["class"]], 17))
-		info.add_child(UI.label("Move %d / %d" % [hero["movement"], hero["max_movement"]], 17, Color(0.6, 0.9, 0.55)))
-		info.add_child(UI.label("Mana %d / %d" % [hero["mana"], GameState.max_mana(hero)], 17, Color(0.6, 0.75, 1.0)))
-		top.add_child(info)
-		_detail.add_child(top)
-		var g := GridContainer.new()
-		g.columns = 4
-		g.add_theme_constant_override("h_separation", 12)
-		for st in ["attack", "defense", "power", "knowledge"]:
-			var box := HBoxContainer.new()
-			box.add_child(UI.icon(Assets.tex("icons/stat_%s.png" % st), Vector2(32, 32)))
-			box.add_child(UI.label(str(GameState.hero_stat(hero, st)), 21))
-			box.tooltip_text = st.capitalize()
-			g.add_child(box)
-		_detail.add_child(g)
-		# morale, luck and experience (as the classic hero panel)
-		var ml := HBoxContainer.new()
-		ml.add_theme_constant_override("separation", 6)
-		var mo: Array = HeroScreen._morale(hero)
-		var lk := int(hero["skills"].get("luck", 0)) + GameState.hero_stat(hero, "luck")
-		for e in [["skill_leadership", mo[0], "Morale %+d" % mo[0]], ["skill_luck", lk, "Luck %+d" % lk]]:
-			var ic := UI.icon(Assets.tex("icons/%s.png" % e[0]), Vector2(32, 32))
-			ic.tooltip_text = e[2]
-			ic.mouse_filter = Control.MOUSE_FILTER_PASS
-			ml.add_child(ic)
-			var val: int = e[1]
-			ml.add_child(UI.label("%+d" % val if val != 0 else "0", 20, Color(0.6, 0.92, 0.5) if val > 0 else (Color(1, 0.55, 0.45) if val < 0 else UI.TEXT)))
-		var nxt := 0
-		for t in GameData.XP_LEVELS:
-			if t > int(hero["xp"]):
-				nxt = t
-				break
-		var xl := UI.label("  Exp %d / %d" % [hero["xp"], nxt] if nxt > 0 else "  Exp %d" % hero["xp"], 17, Color(0.85, 0.8, 0.68))
-		ml.add_child(xl)
-		_detail.add_child(ml)
-		var army := ArmyStrip.new()
-		army.slot_size = Vector2(41, 41)
-		army.editable = false
-		army.bind(hero["army"], {})
-		army.add_theme_constant_override("separation", 3)
-		_detail.add_child(army)
-		# its secondary skills as small framed icons (hover for name and level)
-		var sk := HBoxContainer.new()
-		sk.add_theme_constant_override("separation", 3)
-		var lv := ["", "Basic", "Advanced", "Expert"]
-		for id in hero["skills"]:
-			var n := int(hero["skills"][id])
-			if n <= 0 or not GameData.SKILLS.has(id):
-				continue
-			var ic := UI.icon(Assets.tex("icons/skill_%s.png" % id), Vector2(41, 41))
-			ic.tooltip_text = "%s %s" % [lv[clampi(n, 0, 3)], GameData.SKILLS[id]["name"]]
-			ic.mouse_filter = Control.MOUSE_FILTER_PASS
-			sk.add_child(ic)
-		if sk.get_child_count() > 0:
-			_detail.add_child(sk)
-	if _sleep_btn:
-		_sleep_btn.disabled = hero.is_empty()
-	_mini_view.queue_redraw()
+			var m: Dictionary = GameData.MINES[o["mine"]]
+			inc[m["resource"]] += m["amount"]
+	_detail.add_child(UI.label("Income a day", 17, Color(0.85, 0.8, 0.68)))
+	var g := GridContainer.new()
+	g.columns = 2
+	g.add_theme_constant_override("h_separation", 22)
+	g.add_theme_constant_override("v_separation", 2)
+	for r in GameData.RESOURCES:
+		var box := HBoxContainer.new()
+		box.add_theme_constant_override("separation", 6)
+		box.add_child(UI.icon(Assets.res_icon(r), Vector2(26, 26)))
+		box.add_child(UI.label("+%d" % inc[r], 18, UI.GOLD if inc[r] > 0 else Color(0.6, 0.56, 0.5)))
+		box.custom_minimum_size.x = 130
+		g.add_child(box)
+	_detail.add_child(g)
+	_detail.add_child(UI.label("%d hero%s · %d town%s · %d mine%s" % [me["heroes"].size(), "" if me["heroes"].size() == 1 else "es",
+		me["towns"].size(), "" if me["towns"].size() == 1 else "s", mines, "" if mines == 1 else "s"], 17, Color(0.85, 0.8, 0.68)))
+
+## The status window's date view: the day, the week and the month, and the week's creature.
+func _date_view() -> void:
+	var d: int = world["day"]
+	_detail.add_child(UI.label("Day %d" % ((d - 1) % 7 + 1), 34, UI.GOLD, true))
+	_detail.add_child(UI.label("Week %d, Month %d" % [((d - 1) / 7) % 4 + 1, (d - 1) / 28 + 1], 22))
+	var cal := _Calendar.new()  # the days of this week and the weeks of this month, today's lit
+	cal.day = d
+	cal.custom_minimum_size = Vector2(MINI - 24, 64)
+	_detail.add_child(cal)
+	_detail.add_child(UI.label("Day %d of the campaign" % d, 17, Color(0.85, 0.8, 0.68)))
+	var cid: String = world.get("week_creature", "")
+	if cid != "" and GameData.CREATURES.has(cid):
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 10)
+		h.add_child(UI.icon(Assets.creature_portrait(cid), Vector2(84, 84)))
+		var l := UI.label("The Week of the\n%s" % GameData.CREATURES[cid]["name"], 19, UI.TEXT)
+		h.add_child(l)
+		_detail.add_child(h)
+	else:
+		_detail.add_child(UI.label("%d day%s to the next week" % [7 - (d - 1) % 7, "" if 7 - (d - 1) % 7 == 1 else "s"], 17))
 
 ## An empty list slot: a shallow recess in the panel, not a black box.
 func _empty_slot(h: float) -> Control:
@@ -347,8 +434,8 @@ func _hero_card(h: Dictionary) -> Control:
 	var on := UI.selected_plate(4)
 	b.add_theme_stylebox_override("pressed", on)
 	b.add_theme_stylebox_override("hover_pressed", on)
-	# the face band of the portrait (the name is in the tooltip and the panel below), then the two bars, thick
-	var bw := 14.0
+	# the face band of the portrait (the name is in the tooltip and the status window), then the two bars
+	var bw := 9.0
 	var p := TextureRect.new()
 	p.texture = Assets.hero_portrait(h["id"])
 	p.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -358,7 +445,7 @@ func _hero_card(h: Dictionary) -> Control:
 	p.size = Vector2(COL_W - 10 - 2 * bw - 8, SLOT_H - 10)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(p)
-	var x := p.position.x + p.size.x + 4
+	var x := p.position.x + p.size.x + 3
 	for bar in [[float(h["movement"]) / maxf(1.0, h["max_movement"]), Color(0.35, 0.82, 0.3)],
 			[float(h["mana"]) / maxf(1.0, GameState.max_mana(h)), Color(0.35, 0.58, 1.0)]]:
 		var c := _bar(bar[0], bar[1], bw)
@@ -366,10 +453,10 @@ func _hero_card(h: Dictionary) -> Control:
 		c.position = Vector2(x, 5)
 		c.size = Vector2(bw, SLOT_H - 10)
 		b.add_child(c)
-		x += bw + 4
+		x += bw + 3
 	if h.get("asleep", false):  # dimmed, with the moon over the portrait
 		p.modulate = Color(0.55, 0.55, 0.65)
-		var z := UI.icon(Assets.tex("ui/btn_sleep.png"), Vector2(30, 30))
+		var z := UI.icon(Assets.tex("ui/btn_sleep.png"), Vector2(24, 24))
 		z.position = Vector2(8, 6)
 		z.size = z.custom_minimum_size
 		z.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -404,7 +491,7 @@ func _town_card(t: Dictionary) -> Control:
 	b.add_child(pic)
 	var band := Label.new()
 	band.text = t["name"]
-	band.add_theme_font_size_override("font_size", 16)
+	band.add_theme_font_size_override("font_size", 13)
 	band.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	band.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var bs := StyleBoxFlat.new()
@@ -412,8 +499,9 @@ func _town_card(t: Dictionary) -> Control:
 	bs.border_color = Color(UI.GOLD_DARK, 0.9)
 	bs.border_width_top = 1
 	band.add_theme_stylebox_override("normal", bs)
-	band.position = Vector2(5, SLOT_H - 30)
-	band.size = Vector2(COL_W - 10, 25)
+	band.position = Vector2(4, SLOT_H - 21)
+	band.size = Vector2(COL_W - 8, 17)
+	band.clip_text = true
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(band)
 	return b
@@ -424,8 +512,8 @@ func _icon_button(id: String, tip: String, cb: Callable) -> Button:
 	b.custom_minimum_size = BTN
 	b.focus_mode = Control.FOCUS_NONE
 	b.tooltip_text = tip
-	var ic := UI.icon(Assets.tex("ui/btn_%s.png" % id), BTN - Vector2(14, 10))
-	ic.position = Vector2(7, 5)
+	var ic := UI.icon(Assets.tex("ui/btn_%s.png" % id), BTN - Vector2(8, 10))
+	ic.position = Vector2(4, 5)
 	ic.size = ic.custom_minimum_size
 	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(ic)
@@ -813,3 +901,43 @@ class _MiniView extends Control:
 	func _draw() -> void:
 		var r := view_rect.intersection(Rect2(Vector2.ZERO, size))
 		draw_rect(r, Color(1, 1, 1, 0.9), false, 1.5)
+
+## The status window's view markers: one dot per view, the shown one lit.
+class _Dots extends Control:
+	var on := 0
+	func _draw() -> void:
+		for i in 3:
+			var c := Vector2(6 + i * 15, size.y * 0.5)
+			draw_circle(c, 4.5, Color(0, 0, 0, 0.7))
+			draw_circle(c, 3.5, UI.GOLD if i == on else Color(0.4, 0.33, 0.22))
+
+## A scroll arrow's triangle.
+class _Tri extends Control:
+	var up := true
+	var live := true
+	func _draw() -> void:
+		var c := size * 0.5
+		var w := 11.0
+		var hgt := 7.0
+		var pts := PackedVector2Array([c + Vector2(-w, hgt), c + Vector2(w, hgt), c + Vector2(0, -hgt)]) if up else \
+			PackedVector2Array([c + Vector2(-w, -hgt), c + Vector2(w, -hgt), c + Vector2(0, hgt)])
+		draw_colored_polygon(pts, UI.GOLD if live else Color(0.38, 0.32, 0.24))
+
+## The date view's calendar: seven day stones (the days gone dim, today gold) over four week bars.
+class _Calendar extends Control:
+	var day := 1
+	func _draw() -> void:
+		var dw := (size.x - 6 * 6) / 7.0
+		var di := (day - 1) % 7
+		for i in 7:
+			var r := Rect2(Vector2(i * (dw + 6), 0), Vector2(dw, 30))
+			draw_rect(r, UI.GOLD if i == di else (Color(0.42, 0.34, 0.22) if i < di else Color(0.12, 0.09, 0.06)))
+			draw_rect(r, UI.GOLD_DARK, false, 1.5)
+			draw_string(UI.font(), r.position + Vector2(0, 22), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, dw, 18,
+				Color(0.1, 0.06, 0.03) if i == di else Color(0.85, 0.8, 0.68))
+		var ww := (size.x - 3 * 6) / 4.0
+		var wi := ((day - 1) / 7) % 4
+		for i in 4:
+			var r := Rect2(Vector2(i * (ww + 6), 42), Vector2(ww, 14))
+			draw_rect(r, UI.GOLD if i == wi else (Color(0.42, 0.34, 0.22) if i < wi else Color(0.12, 0.09, 0.06)))
+			draw_rect(r, UI.GOLD_DARK, false, 1.5)

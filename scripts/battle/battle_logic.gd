@@ -90,17 +90,27 @@ func setup(s: Dictionary) -> void:
 			obstacles[h] = rng.randi_range(1, 8)  # (which picture: battle.gd OBSTACLES by terrain)
 	_new_round()
 
+## A hero's army takes the field in its formation (as the classic hero screen sets it): spread over the whole
+## edge by slot, or grouped, the stacks on rows next to each other in the middle.
 func _deploy(army: Array, side: int) -> void:
+	var h = heroes[side]
+	var grouped: bool = h != null and h.get("formation", "spread") == "grouped"
+	var filled := []
 	for i in mini(7, army.size()):
+		if army[i] != null and army[i]["count"] > 0:
+			filled.append(i)
+	for i in filled:
 		var a = army[i]
-		if a == null or a["count"] <= 0:
-			continue
 		var c: Dictionary = GameData.CREATURES[a["id"]]
 		var wide: bool = "two_hex" in c["abilities"]
+		var x: int = (1 if wide else 0) if side == 0 else COLS - (2 if wide else 1)
+		var hex := Vector2i(x, SLOT_ROWS[i]) + _stagger(i, side)
+		if grouped:
+			hex = Vector2i(x, 5 - (filled.size() - 1) / 2 + filled.find(i))
 		_uid += 1
 		var st := {
 			"uid": _uid, "id": a["id"], "side": side, "slot": i, "count": a["count"], "hp_top": c["hp"],
-			"hex": Vector2i((1 if wide else 0) if side == 0 else COLS - (2 if wide else 1), SLOT_ROWS[i]) + _stagger(i, side), "shots": c["shots"],
+			"hex": hex, "shots": c["shots"],
 			"retaliations": 2 if "two_retaliations" in c["abilities"] else 1, "effects": {},
 			"alive": true, "defending": false, "waited": false, "acted": false,
 		}

@@ -9,6 +9,7 @@ func _ready() -> void:
 			print("FAILED: ", p)
 			bad += 1
 	bad += _artifact_rules()
+	bad += _surrender_rules()
 	print("CHECK DONE, failures: ", bad)
 	get_tree().quit()
 
@@ -41,5 +42,36 @@ func _artifact_rules() -> int:
 	for i in ok.size():
 		if not ok[i]:
 			print("FAILED: artifact rule ", i)
+			bad += 1
+	return bad
+
+## A hero who surrenders pays, keeps army and artifacts, and waits in the tavern to come back as they left.
+func _surrender_rules() -> int:
+	var s := GameState.new_game_settings.duplicate()
+	s["seed"] = 77
+	GameState.world = WorldGen.generate(s)
+	var w := GameState.world
+	var rules := AdvRules.new(w)
+	var p0: Dictionary = w["players"][0]
+	var att: Dictionary = w["heroes"][p0["heroes"][0]]
+	var def := GameState.make_hero("lord_morthis", 1)
+	w["heroes"][def["uid"]] = def
+	w["players"][1]["heroes"].append(def["uid"])
+	GameState.give_artifact(att, "sword_of_valor")
+	var gold: int = p0["resources"]["gold"]
+	var army: Array = att["army"].duplicate(true)
+	rules.apply_battle({"winner": "defender", "attacker_army": army, "defender_army": def["army"], "xp": 100,
+		"retreated": true, "fled": 0, "surrendered": true, "surrender_gold": 500,
+		"context": {"type": "hero", "hero": att["uid"], "defender": def["uid"]}})
+	var ok := [p0["resources"]["gold"] == gold - 500, not w["heroes"].has(att["uid"]),
+		w.get("tavern_keep", {}).has(att["id"]), def["artifacts"].is_empty()]
+	var back := GameState.tavern_hero(att["id"], 0)
+	ok.append(back["artifacts"].has("sword_of_valor") and not GameState.army_is_empty(back["army"]))
+	ok.append(not w.get("tavern_keep", {}).has(att["id"]))
+	GameState.world = {}
+	var bad := 0
+	for i in ok.size():
+		if not ok[i]:
+			print("FAILED: surrender rule ", i)
 			bad += 1
 	return bad

@@ -75,6 +75,8 @@ var _reach := {}
 var _hover := Vector2i(-1, -1)
 var _hover_action := {}
 var _retreated := -1
+var _surrendered := false  # (with _retreated: that side paid to leave with its army)
+var _surrender_gold := 0
 var _ended := false
 var _mouse := Vector2.ZERO
 var _hero_rects := [Rect2(), Rect2()]
@@ -82,7 +84,10 @@ var _info_key := ""   # what the hover panel shows: "s<uid>" a stack, "h<side>" 
 
 func _ready() -> void:
 	HoverInfo.set_floor(BAR_Y - 70)  # (stack panels stay above the log bar)
-	tree_exiting.connect(func(): HoverInfo.set_floor(-1.0))
+	tree_exiting.connect(func():
+		HoverInfo.set_floor(-1.0)
+		Engine.time_scale = 1.0)
+	Engine.time_scale = GameState.battle_speed
 	setup_d = GameState.pending_battle
 	if setup_d.is_empty():
 		setup_d = _demo_setup()
@@ -415,7 +420,9 @@ func _build_ui() -> void:
 	right.position = Vector2(1920 - 12 - 3 * BTN.x - 2 * 6, BAR_Y + 7)
 	right.add_theme_constant_override("separation", 6)
 	root.add_child(right)
-	for e in [["Retreat", "retreat", "Retreat (R): flee with your hero, losing the army", _on_retreat, left],
+	for e in [["Options", "options", "Combat options (O)", _on_options, left],
+			["Surrender", "surrender", "Surrender (U): pay gold to leave the field with your hero and army (only against a hero)", _on_surrender, left],
+			["Retreat", "retreat", "Retreat (R): flee with your hero, losing the army", _on_retreat, left],
 			["Auto: Off", "auto", "Auto combat (A): the computer fights for you until you turn it off", _on_auto, left],
 			["Spells", "spellbook", "Cast a spell (S)", _on_spells, right],
 			["Wait", "end_turn", "Wait (W): act later this round", _on_wait, right],
@@ -435,7 +442,7 @@ func _build_ui() -> void:
 	_btns["Auto: Off"].toggle_mode = true
 	UI.plate_toggle(_btns["Auto: Off"])
 
-	var lx := 12 + 2 * BTN.x + 6 + 14
+	var lx := 12 + 4 * BTN.x + 3 * 6 + 14
 	var lw := right.position.x - 14 - lx
 	var inset := Panel.new()
 	inset.position = Vector2(lx, BAR_Y + 7)
@@ -557,6 +564,7 @@ func _refresh_buttons(human_turn: bool) -> void:
 	_btns["Defend"].disabled = not human_turn
 	_btns["Spells"].disabled = not human_turn or not L.can_cast(side)
 	_btns["Retreat"].disabled = not human_turn or L.heroes[side] == null
+	_btns["Surrender"].disabled = not human_turn or L.heroes[side] == null or L.heroes[1 - side] == null
 	_btns["Auto: Off"].set_pressed_no_signal(_auto)
 
 # ---------------------------------------------------------------------------------------------
@@ -696,6 +704,8 @@ func _unhandled_input(e: InputEvent) -> void:
 	elif e is InputEventKey and e.pressed and not e.echo and not _busy:
 		match e.keycode:
 			KEY_W: _on_wait()
+			KEY_U: _on_surrender()
+			KEY_O: _on_options()
 			KEY_D, KEY_SPACE: _on_defend()
 			KEY_S: _on_spells()
 			KEY_A: _on_auto()
@@ -1001,6 +1011,79 @@ func _on_retreat() -> void:
 	if await Modal.confirm(self, "Retreat", "Retreat from battle? Your army will be lost, but your hero will survive to be hired again.").closed:
 		_retreated = cur["side"]
 		_end_battle(1 - cur["side"])
+
+## What surrendering costs a side: the price of every creature still standing in its army (as the classic game).
+func _surrender_cost(side: int) -> int:
+	var g := 0
+	for st in L.stacks:
+		if st["side"] == side and st["alive"] and not st.get("machine", false) and not st.get("tower", false):
+			g += int(GameData.CREATURES[st["id"]]["cost"].get("gold", 0)) * int(st["count"])
+	return g
+
+## Surrender to an enemy hero: pay for the army and leave the field with the hero and all of it; the hero waits in
+## the taverns, army and all, to be hired again.
+func _on_surrender() -> void:
+	var cur = L.current()
+	if _busy or cur == null or not _human_controls(cur["side"]):
+		return
+	var side: int = cur["side"]
+	if L.heroes[side] == null or L.heroes[1 - side] == null:
+		return
+	var cost := _surrender_cost(side)
+	var have := 0
+	if not GameState.world.is_empty() and L.players[side] >= 0:
+		have = int(GameState.world["players"][L.players[side]]["resources"]["gold"])
+	var foe: String = L.heroes[1 - side]["name"]
+	if have < cost:
+		Audio.sfx("error")
+		await Modal.message(self, "Surrender", "%s asks %d gold to let your army go, and you have only %d." % [foe, cost, have]).closed
+		return
+	if await Modal.confirm(self, "Surrender", "%s will let you leave with your hero and army for %d gold.\nAccept?" % [foe, cost],
+			"Pay %d" % cost, "Fight on").closed:
+		_retreated = side
+		_surrendered = true
+		_surrender_gold = cost
+		_end_battle(1 - side)
+
+## Combat options (as the classic dialog): the hex grid, and how fast the battle plays.
+func _on_options() -> void:
+	if _busy and not _auto:
+		return
+	var m := Modal.custom(self, "Combat Options", 620)
+	var grid := CheckBox.new()
+	grid.text = "Show the whole hex grid (G)"
+	grid.button_pressed = GameState.show_grid
+	grid.add_theme_font_size_override("font_size", 22)
+	m.body.add_child(grid)
+	m.body.add_child(UI.label("Animation speed", 22, UI.GOLD))
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	m.body.add_child(row)
+	var group := ButtonGroup.new()
+	for e in [["Normal", 1.0], ["Fast", 1.5], ["Very fast", 2.0]]:
+		var b := Button.new()
+		b.text = e[0]
+		b.toggle_mode = true
+		b.button_group = group
+		b.button_pressed = is_equal_approx(GameState.battle_speed, e[1])
+		b.custom_minimum_size = Vector2(170, 52)
+		b.add_theme_font_size_override("font_size", 21)
+		UI.plate_toggle(b)
+		var v: float = e[1]
+		b.pressed.connect(func(): GameState.battle_speed = v)
+		row.add_child(b)
+	m.add_buttons([["OK", true]])
+	m.set_meta("default", true)
+	m.set_meta("cancel", true)
+	await m.closed
+	if grid.button_pressed != GameState.show_grid:
+		GameState.show_grid = grid.button_pressed
+		_grid.queue_redraw()
+		for n in _field.get_children():
+			if n is _Moat:
+				n.queue_redraw()
+	Engine.time_scale = GameState.battle_speed
 
 func _on_spells() -> void:
 	var cur = L.current()
@@ -1784,7 +1867,9 @@ func _end_battle(winner: int) -> void:
 		var hh = L.heroes[side]
 		who[side] = hh["name"] if hh else "Neutral creatures"
 	var msg := ""
-	if _retreated >= 0:
+	if _surrendered:
+		msg = "%s surrenders, paying %d gold, and leaves the field with the army." % [who[_retreated], _surrender_gold]
+	elif _retreated >= 0:
 		msg = "%s retreats from the battlefield." % who[_retreated]
 	else:
 		msg = "%s is victorious." % who[winner]
@@ -1794,7 +1879,7 @@ func _end_battle(winner: int) -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		var cas := L.casualties(side)
-		if _retreated == side:
+		if _retreated == side and not _surrendered:
 			for st in L.stacks:
 				if st["side"] == side and st["alive"]:
 					cas[st["id"]] = cas.get(st["id"], 0) + st["count"]
@@ -1821,9 +1906,10 @@ func _end_battle(winner: int) -> void:
 			L.heroes[side]["machines"] = L.machines_left(side)
 	var result := {
 		"winner": "attacker" if winner == 0 else "defender",
-		"attacker_army": L.army_out(0) if _retreated != 0 else [null, null, null, null, null, null, null],
-		"defender_army": L.army_out(1) if _retreated != 1 else [null, null, null, null, null, null, null],
-		"xp": xp, "retreated": _retreated >= 0, "raised": raised,
+		"attacker_army": L.army_out(0) if _retreated != 0 or _surrendered else [null, null, null, null, null, null, null],
+		"defender_army": L.army_out(1) if _retreated != 1 or _surrendered else [null, null, null, null, null, null, null],
+		"xp": xp, "retreated": _retreated >= 0, "raised": raised, "fled": _retreated,
+		"surrendered": _surrendered, "surrender_gold": _surrender_gold,
 	}
 	if GameState.pending_battle.is_empty():
 		GameState.pending_battle = setup_d

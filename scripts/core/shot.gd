@@ -48,6 +48,15 @@ func _run() -> void:
 		if i < keys.size() and keys[i] != "":
 			_key(keys[i])
 			await get_tree().create_timer(0.6).timeout
+		# (the window was now and then grown to nearly the whole screen mid-run, from outside the game: back to the
+		# shot size before each capture, so every shot is 1600x900)
+		if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_WINDOWED:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		if DisplayServer.window_get_size() != Vector2i(1600, 900):
+			print("SHOT window was ", DisplayServer.window_get_size(), ": resized")
+			DisplayServer.window_set_size(Vector2i(1600, 900))
+			for f in 3:
+				await RenderingServer.frame_post_draw
 		await RenderingServer.frame_post_draw
 		var img := get_viewport().get_texture().get_image()
 		var out := base if count == 1 else base.get_basename() + "_%d.png" % i

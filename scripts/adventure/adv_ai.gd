@@ -108,7 +108,7 @@ func hire_hero(player: Dictionary, town: Dictionary) -> Dictionary:
 	var hid: String = cands[randi() % cands.size()]
 	world["tavern"].erase(hid)
 	player["resources"]["gold"] -= 2500
-	var hero := GameState.make_hero(hid, player["index"])
+	var hero := GameState.tavern_hero(hid, player["index"])
 	hero["pos"] = town["pos"]
 	hero["movement"] = 0 if player["is_ai"] == false else hero["movement"]
 	world["heroes"][hero["uid"]] = hero
