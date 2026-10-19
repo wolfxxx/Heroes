@@ -32,6 +32,8 @@ var pending_battle: Dictionary = {}
 var battle_result: Dictionary = {}
 var pending_town: Dictionary = {}   # {"town_uid": int}
 var return_scene := SCENE_ADVENTURE
+## adventure map zoom: a wide view of the world by default (as the classic scale), kept between scenes
+var map_zoom := 0.8
 var battle_speed := 1.0  # battle: how fast it plays (combat options), applied as the engine's time scale
 var show_grid := false  # battle: the whole hex grid (G), or only where the active stack can go (the default)
 var new_game_settings := {"faction": "haven", "hero": "sir_aldric", "difficulty": 1, "map_size": 48, "seed": 0}

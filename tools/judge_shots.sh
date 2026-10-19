@@ -13,6 +13,9 @@ run --shot=$D/adventure_close.png --scene=res://scenes/adventure.tscn --delay=4 
 run --shot=$D/adventure_snow.png --scene=res://scenes/adventure.tscn --delay=4 --setup=rich --reveal --cam=9,17 --zoom=1.3
 # one click on a road tile plans the route (arrows), a second would walk it
 run --shot=$D/adventure_path.png --scene=res://scenes/adventure.tscn --delay=4 --setup=demo --click=810,598
+# the status window cycled by clicks: the kingdom's income, then the date
+run --shot=$D/as.png --scene=res://scenes/adventure.tscn --delay=4 --setup=demo --click="1728,840;1728,840" --shots=2 --interval=0.5
+mv -f $D/as_0.png $D/adventure_kingdom.png; mv -f $D/as_1.png $D/adventure_date.png
 run --shot=$D/hero_screen.png --scene=res://scenes/adventure.tscn --delay=3 --setup=all_spells --click=426,475
 run --shot=$D/town_haven_early.png --scene=res://scenes/town.tscn --delay=3 --setup=demo
 run --shot=$D/town_haven_full.png --scene=res://scenes/town.tscn --delay=3 --setup=rich
@@ -26,6 +29,8 @@ run --shot=$D/town_upgrade.png --scene=res://scenes/town.tscn --delay=3 --setup=
 run --shot=$D/town_blacksmith.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --click=1320,540
 run --shot=$D/town_recruit.png --scene=res://scenes/town.tscn --delay=3 --setup=rich --keys=R
 run --shot=$D/battle.png --scene=res://scenes/battle.tscn --delay=2 --setup=demo --shots=3 --interval=5 --keys=A
+# Surrender: the enemy hero's price for letting the army go (a test battle: no treasury, so it can't be paid)
+run --shot=$D/battle_surrender.png --scene=res://scenes/battle.tscn --delay=3 --setup=demo --click=135,1042
 run --shot=$D/battle_upgraded.png --scene=res://scenes/battle.tscn --delay=3 --setup=upgraded
 # a siege: walls, gate, moat and towers; auto combat, the catapult at work a few turns in
 run --shot=$D/battle_siege.png --scene=res://scenes/battle.tscn --delay=3 --setup=siege --seed=5 --keys=A

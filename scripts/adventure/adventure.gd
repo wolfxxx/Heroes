@@ -60,6 +60,7 @@ func _ready() -> void:
 
 	cam = Camera2D.new()
 	cam.anchor_mode = Camera2D.ANCHOR_MODE_FIXED_TOP_LEFT
+	cam.zoom = Vector2.ONE * GameState.map_zoom
 	add_child(cam)
 	cam.make_current()
 
@@ -341,6 +342,7 @@ func _event_world(e: InputEventMouse) -> Vector2:
 func _zoom(f: float) -> void:
 	var center := cam.position + Vector2(MAP_VIEW_W, MAP_VIEW_H) * 0.5 / cam.zoom
 	cam.zoom = (cam.zoom * f).clamp(Vector2(0.55, 0.55), Vector2(1.4, 1.4))
+	GameState.map_zoom = cam.zoom.x
 	_cam_target = _clamp_cam(center - Vector2(MAP_VIEW_W, MAP_VIEW_H) * 0.5 / cam.zoom)
 	cam.position = _cam_target
 

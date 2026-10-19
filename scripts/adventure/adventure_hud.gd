@@ -152,8 +152,8 @@ func _build_panel() -> void:
 	_detail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sp.add_child(_detail)
 	_view_dots = _Dots.new()
-	_view_dots.position = Vector2(x0 + MINI - 52, 1036 - PAD - 8)
-	_view_dots.size = Vector2(44, 12)
+	_view_dots.position = Vector2(x0 + MINI - 74, 1036 - PAD - 14)
+	_view_dots.size = Vector2(66, 18)
 	_view_dots.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(_view_dots)
 
@@ -350,13 +350,17 @@ func _hero_view(hero: Dictionary) -> void:
 	army.bind(hero["army"], {})
 	army.add_theme_constant_override("separation", 3)
 	_detail.add_child(army)
-	var sk := HBoxContainer.new()  # its secondary skills as small framed icons
-	sk.add_theme_constant_override("separation", 3)
-	for id in hero["skills"]:
-		if int(hero["skills"][id]) > 0 and GameData.SKILLS.has(id):
-			sk.add_child(UI.icon(Assets.tex("icons/skill_%s.png" % id), Vector2(40, 40)))
-	if sk.get_child_count() > 0:
-		_detail.add_child(sk)
+	var sk := HBoxContainer.new()  # its eight secondary skill sockets (the empty ones as recesses)
+	sk.add_theme_constant_override("separation", 2)
+	var ids: Array = hero["skills"].keys().filter(func(k): return int(hero["skills"][k]) > 0 and GameData.SKILLS.has(k))
+	for i in 8:
+		if i < ids.size():
+			sk.add_child(UI.icon(Assets.tex("icons/skill_%s.png" % ids[i]), Vector2(35, 35)))
+		else:
+			var e := _empty_slot(35)
+			e.custom_minimum_size = Vector2(35, 35)
+			sk.add_child(e)
+	_detail.add_child(sk)
 
 ## The status window's kingdom view: the day's income of every resource, and what the kingdom holds.
 func _kingdom_view(me: Dictionary) -> void:
@@ -435,7 +439,7 @@ func _hero_card(h: Dictionary) -> Control:
 	b.add_theme_stylebox_override("pressed", on)
 	b.add_theme_stylebox_override("hover_pressed", on)
 	# the face band of the portrait (the name is in the tooltip and the status window), then the two bars
-	var bw := 9.0
+	var bw := 6.0
 	var p := TextureRect.new()
 	p.texture = Assets.hero_portrait(h["id"])
 	p.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -484,26 +488,11 @@ func _town_card(t: Dictionary) -> Control:
 	pic.texture = _trimmed("map/town_%s.png" % t["faction"])
 	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	pic.position = Vector2(4, 4)
-	pic.size = Vector2(COL_W - 8, SLOT_H - 8)
-	pic.clip_contents = true
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED  # (the whole town, as the classic list: name in the tooltip)
+	pic.position = Vector2(4, 3)
+	pic.size = Vector2(COL_W - 8, SLOT_H - 6)
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(pic)
-	var band := Label.new()
-	band.text = t["name"]
-	band.add_theme_font_size_override("font_size", 13)
-	band.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	band.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	var bs := StyleBoxFlat.new()
-	bs.bg_color = Color(0.05, 0.035, 0.02, 0.85)
-	bs.border_color = Color(UI.GOLD_DARK, 0.9)
-	bs.border_width_top = 1
-	band.add_theme_stylebox_override("normal", bs)
-	band.position = Vector2(4, SLOT_H - 21)
-	band.size = Vector2(COL_W - 8, 17)
-	band.clip_text = true
-	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(band)
 	return b
 
 ## A square panel button with a painted icon (and a tooltip naming it and its key).
@@ -907,9 +896,10 @@ class _Dots extends Control:
 	var on := 0
 	func _draw() -> void:
 		for i in 3:
-			var c := Vector2(6 + i * 15, size.y * 0.5)
-			draw_circle(c, 4.5, Color(0, 0, 0, 0.7))
-			draw_circle(c, 3.5, UI.GOLD if i == on else Color(0.4, 0.33, 0.22))
+			var c := Vector2(9 + i * 22, size.y * 0.5)
+			draw_circle(c, 7.5, Color(0, 0, 0, 0.75))
+			draw_circle(c, 6.0, UI.GOLD if i == on else Color(0.42, 0.34, 0.22))
+			draw_arc(c, 7.0, 0, TAU, 20, UI.GOLD_DARK, 1.2, true)
 
 ## A scroll arrow's triangle.
 class _Tri extends Control:

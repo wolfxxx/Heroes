@@ -18,7 +18,7 @@ const OBSTACLES := {
 	"swamp": ["swamp_tree", "rotten_log", "thorns", "dead_tree", "skull_pile"],
 }
 ## Widest figure in hexes, wings and capes included: 1-hex and 2-hex units (a stack mustn't swallow its neighbours).
-const VIS_MAX_W := [1.4, 2.3]
+const VIS_MAX_W := [1.3, 2.2]
 
 static var _sizes = null
 
@@ -201,6 +201,9 @@ func _build_scene() -> void:
 	_corpses = Node2D.new()  # dead stacks: above the ground and grid, below everything standing
 	_corpses.y_sort_enabled = true
 	_field.add_child(_corpses)
+	var ground := Node2D.new()  # low obstacles (thorns, boulders, a crater): under every figure, never over one
+	ground.y_sort_enabled = true
+	_field.add_child(ground)
 	_sorted = Node2D.new()
 	_sorted.y_sort_enabled = true
 	_field.add_child(_sorted)
@@ -220,7 +223,8 @@ func _build_scene() -> void:
 			s.scale = Vector2.ONE * 0.38
 			s.offset = Vector2(0, -s.texture.get_height() * 0.5 + 6)
 		s.position = hex_pos(h) + Vector2(0, 22)
-		_sorted.add_child(s)
+		var vis_h := Vector2(s.texture.get_size()).y * s.scale.y
+		(ground if vis_h < 90.0 else _sorted).add_child(s)
 		var rr := s.get_rect()
 		_obstacle_rects.append(Rect2(s.position + rr.position * s.scale, rr.size * s.scale).grow(-8))
 	if L.siege > 0:
@@ -436,7 +440,8 @@ func _build_ui() -> void:
 		ic.size = ic.custom_minimum_size
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		b.add_child(ic)
-		b.draw.connect(func(): ic.modulate = Color(0.42, 0.4, 0.38) if b.disabled else Color.WHITE)
+		# (unavailable: faded right back, so it can't pass for a darker style of button)
+		b.draw.connect(func(): ic.modulate = Color(0.5, 0.48, 0.45, 0.4) if b.disabled else Color.WHITE)
 		e[4].add_child(b)
 		_btns[e[0]] = b
 	_btns["Auto: Off"].toggle_mode = true
@@ -1575,17 +1580,14 @@ func _settle_badges() -> void:
 		var home: Vector2 = b.get_meta("home")
 		# (an enemy badge facing it read as one number, "2 6"; one on another stack's figure read as that stack's):
 		# its usual corner, else the other side, else lower down at its feet, else further out; the first that is clear
-		var spots := [home, Vector2(-home.x, home.y), home + Vector2(0, 26), Vector2(-home.x, home.y + 26),
-			Vector2(home.x * 1.45, home.y + 14)]
-		var bodies := _figure_rects(n)
+		# (as the classic plates: always at the front corner of the stack's own hex; only a plate it would touch
+		# moves it, a little lower)
+		var spots := [home, home + Vector2(0, 22)]
 		var hit := func(q: Rect2) -> float:
 			var c := 0.0
 			for o in placed:
 				if q.grow(4).intersects(o):
 					c += 1000.0
-			for o in bodies:
-				if q.intersects(o):
-					c += q.intersection(o).get_area()
 			return c
 		var r := Rect2(n.position + home - Vector2(24, 14), Vector2(48, 28))
 		var best := INF
@@ -1609,19 +1611,6 @@ func _settle_badges() -> void:
 				break
 		placed.append(r)
 		b.position = r.position + Vector2(24, 14) - n.position
-
-## The solid middle of every other living stack's figure (field space), for keeping badges off them.
-func _figure_rects(except: Node2D) -> Array:
-	var out := []
-	for k in units:
-		var o: Node2D = units[k]
-		var st: Dictionary = o.get_node("Badge").st
-		if o == except or not st.get("alive", false):
-			continue
-		var half := HEX_W * (0.7 if L.is_wide(st) else 0.3)
-		var t: float = o.get_meta("top", 120.0)
-		out.append(Rect2(o.position.x - half, o.position.y - t, half * 2, t - 6))
-	return out
 
 func _process(_d: float) -> void:
 	_settle_badges()
