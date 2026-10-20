@@ -2,7 +2,7 @@
 
 Read this first, then `ARCHITECTURE.md` (code map), `ASSETS.md` (every asset path and the art pipeline) and
 `CREDITS.md`. This file is written so that another person or another AI assistant can pick the work up exactly
-where it stopped. Last updated 2026-10-20 (round 42, artifact polish, committed and pushed; judge 42 run), branch `main`, remote
+where it stopped. Last updated 2026-10-20 (round 43, artifact polish, committed and pushed; judge 43 run), branch `main`, remote
 `https://github.com/wolfxxx/Heroes.git` (public repo).
 
 ## 1. The project in one paragraph
@@ -24,6 +24,13 @@ the look and feel of HoMM3, and each round fixes what the judge found.
   it (scores in section 7). Next step of the plan: the AI work (section 8).
 - Found and fixed on the way: the all-computer simulation could overflow Godot's message queue once one computer
   player had beaten the others (the AI turn loop never waited a frame); `_run_ai_turns` now waits one frame per turn.
+- Round 43 (artifact polish after judge 42) committed and pushed, judge 43 run on it: map artifacts without the flat glow plate
+  (a dark contact shadow, a faint soft light, a slow twinkle on major and relic ones) and sized by tier by area (the
+  relic banner was the smallest); a combination's ghost sockets in iron frames with only a purple chain mark (redrawn so
+  it no longer reads as an infinity sign) and the combination itself with a lit rim and corner studs; objects track
+  every tile their building covers (`WorldGen.covered`): wandering monsters and guards never stand beside another
+  building's walls. A monster right at a mine's entrance is that mine's own guard, as in HoMM3 (judges have read it
+  as "pressed between objects"; now listed as intended in `tools/judge_prompt.md`).
 - Round 42 (artifact polish after judge 41) committed and pushed, judge 42 run on it: a combination's linked sockets greyed out with a
   chain mark, iron frames for non-artifact and empty sockets, copper for the treasure tier, dimmed backpack arrows,
   the sulfur pile repainted (it read as a flat yellow disc; `tools/art/map_pile.py`), guards no longer placed beside
@@ -126,13 +133,28 @@ magenta key for pink fringes (recolour them, as was done for the Luck clover).
 | 39 | 9.2 | 9.2 | 9.3 | 9.4 | 8.8 | 9.2 |
 | 40 | 9.2 | 9.2 | 9.4 | 9.5 | 8.9 | 9.2 |
 | 41 | 9.2 | 9.2 | 9.4 | 9.6 | 8.9 | 9.2 |
+| 42 | 9.2 | 9.3 | 9.4 | 9.7 | 8.9 | 9.3 |
 
 Trend: gains have flattened at 9.2 for three rounds. Battle is the weakest area; the next big step most likely comes
 from battle (crowded siege melees, the lightning effect) or from new gameplay (section 8), not more small polish.
 
 ## 8. What's next
 
-### Open findings from judge 41 (artifacts round)
+### Open findings from judge 42 (artifact polish round; overall 9.3)
+1. Siege-gate melee clusters still unreadable (battle_siege_haven, battle_siege_later); badges drift from their stacks.
+2. Lightning: the storm cloud caps the back-row stack; in battle_siege the bolt zig-zags at a slant across other
+   stacks instead of dropping straight onto the target.
+3. Map artifact glow reads as a flat painted plate (worst: the relic's red disc); HoMM3 shows only a ground shadow —
+   use a faint soft glow and a dark contact shadow; the relic banner is the smallest item, scale it up.
+4. Hero screen: a combination's ghost sockets share its purple frame — give them iron frames (only the link mark in
+   purple) and the combination a strong lit rim; the link mark reads a little like an infinity sign.
+5. A few guards still stand pressed between objects (adventure_overview archer between the mound and hut,
+   adventure_close wraith between hut and lake) — the new spacing rule did not catch these (decor or footprints).
+6. Lakes look like decals (flat blue with a blurred brown halo); HoMM3 shores have a crisp sand or rock rim.
+7. Battle figures small for their hexes (battle_turn, battle_upgraded).
+8. Build cards with two-line prices make rows ragged (town_build_rich).
+
+### Open findings from judge 41 (artifacts round, mostly fixed in round 42)
 1. No artifact appears in any judge screenshot, so the map half of the feature was not judged: add a judge shot
    framed on placed artifacts (`tools/judge_shots.sh`).
 2. A combination's linked sockets read as copies of the item: fade/desaturate them much harder and mark them

@@ -445,17 +445,24 @@ class _Socket extends Control:
 				draw_rect(r.grow(-3), Color(0.05, 0.04, 0.06, 0.45))
 				var c := size * 0.5
 				var ch := Color(tier_col, 0.95)
-				draw_set_transform(c + Vector2(-7, 0), -0.6, Vector2(1, 0.62))
-				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, Color(0, 0, 0, 0.7), 6.0, true)
-				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, ch, 3.5, true)
-				draw_set_transform(c + Vector2(7, 0), -0.6, Vector2(1, 0.62))
-				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, Color(0, 0, 0, 0.7), 6.0, true)
-				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, ch, 3.5, true)
+				# (two chain links along a diagonal, one seen edge-on through the other: not an infinity sign)
+				draw_set_transform(c + Vector2(-6, 6), -PI * 0.25, Vector2(1, 0.55))
+				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, Color(0, 0, 0, 0.7), 6.5, true)
+				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, ch, 4.0, true)
+				draw_set_transform(c + Vector2(6, -6), -PI * 0.25, Vector2(1, 0.55))
+				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, Color(0, 0, 0, 0.7), 6.5, true)
+				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, ch, 4.0, true)
+				draw_set_transform(c, PI * 0.25, Vector2(1, 0.3))  # (the middle link, edge-on, joining them)
+				draw_arc(Vector2.ZERO, 9, 0, TAU, 20, Color(0, 0, 0, 0.7), 6.0, true)
+				draw_arc(Vector2.ZERO, 9, 0, TAU, 20, ch.lightened(0.25), 3.5, true)
 				draw_set_transform(Vector2.ZERO)
 			else:
 				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86))
 				if tier_col.a > 0.0 and tex and tier_col.is_equal_approx(GameData.ARTIFACT_TIERS["combo"][1]):
-					draw_rect(r.grow(-4), Color(1, 0.85, 1.0, 0.55), false, 1.5)  # (a combination: a bright inner rim)
+					# (a combination: a lit rim and corner studs, so the socket holding it stands out from its ghosts)
+					draw_rect(r.grow(-3), Color(0.95, 0.8, 1.0, 0.9), false, 2.5)
+					for cn in [Vector2(5, 5), Vector2(size.x - 5, 5), Vector2(5, size.y - 5), size - Vector2(5, 5)]:
+						draw_circle(cn, 3.2, Color(0.98, 0.88, 1.0))
 		elif tex and not empty:
 			draw_texture_rect(tex, r.grow(-5), false)
 		elif tex:  # a machine not owned: its picture greyed out in the empty socket
@@ -467,10 +474,10 @@ class _Socket extends Control:
 		draw_line(Vector2(size.x - 1, 2), Vector2(size.x - 1, size.y - 1), Color(1, 0.9, 0.7, 0.18), 2)
 		var lit := pressed.is_valid() and get_global_rect().has_point(get_global_mouse_position())
 		var frame := Color(0.66, 0.5, 0.25) if empty else (tier_col if tier_col.a > 0.0 else Color(0.86, 0.68, 0.32))
-		if neutral:
+		if neutral or linked:
 			frame = Color(0.42, 0.42, 0.46) if not empty else Color(0.3, 0.3, 0.33)
 		draw_rect(r.grow(1), Color(1, 0.9, 0.5) if lit else frame, false, 3.0 if lit else 2.0)
-		if tier_col.a > 0.0 and not empty and not lit:  # (the tier's colour a little stronger: an inner line)
+		if tier_col.a > 0.0 and not empty and not lit and not linked:  # (the tier's colour a little stronger: an inner line)
 			draw_rect(r.grow(-2), Color(tier_col, 0.55), false, 1.0)
 
 class _Bar extends Control:

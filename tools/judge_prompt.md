@@ -29,5 +29,6 @@ Report (concise, under ~700 words):
    is dark shroud by design; the screenshot harness hides the mouse; a unit standing in front of an obstacle on
    the row behind it correctly overlaps it; in sieges the depth order back-to-front by row is correct; the even
    fade of a front figure over the stack in play is intentional; the drawbridge is part of the painted siege wall;
-   Clover of Fortune is a clover as in Heroes III). Prefer suggestions that stay true to Heroes III's classic look
+   Clover of Fortune is a clover as in Heroes III; a monster standing at the entrance of a mine or building is that
+   building's guard, placed there on purpose as in Heroes III). Prefer suggestions that stay true to Heroes III's classic look
    and mechanics.

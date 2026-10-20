@@ -397,12 +397,17 @@ func _object_node(o: Dictionary) -> Node2D:
 			n.add_child(_sprite("map/campfire.png", Vector2(0, -4), 70))
 		"artifact":
 			# (as the classic map: the artifact itself lies there, on a glow of its tier's colour)
+			var tier: String = GameData.ARTIFACTS[o["artifact"]]["tier"]
 			var glow := _ArtifactGlow.new()
-			glow.col = GameData.ARTIFACT_TIERS[GameData.ARTIFACTS[o["artifact"]]["tier"]][1]
+			glow.col = GameData.ARTIFACT_TIERS[tier][1]
+			glow.strong = tier in ["major", "relic"]
 			n.add_child(glow)
 			var s := Sprite2D.new()  # (tools/art/artifact_map_sprites.py: the item cut out of its painting, with a shadow)
 			s.texture = Assets.tex("map/art_%s.png" % o["artifact"], Vector2i(96, 96))
-			s.scale = Vector2.ONE * (54.0 / s.texture.get_height())
+			# (the better, the bigger; by area, so a tall thin banner is not the smallest item there)
+			var want: float = {"treasure": 46.0, "minor": 50.0, "major": 56.0, "relic": 64.0}.get(tier, 50.0)
+			var ts := Vector2(s.texture.get_size())
+			s.scale = Vector2.ONE * minf(want / sqrt(ts.x * ts.y), 86.0 / ts.y)
 			s.offset = Vector2(0, -s.texture.get_height() * 0.5 + 8)
 			s.position = Vector2(0, -2)
 			outline(s, 1.6)
@@ -669,14 +674,29 @@ func set_hover(t: Vector2i) -> void:
 # ---------------------------------------------------------------------------------------------
 # Inner helper nodes
 # ---------------------------------------------------------------------------------------------
-## The ground under an artifact lying on the map: a soft shadow and a glow in its tier's colour.
+## The ground under an artifact lying on the map: a dark contact shadow, a faint soft light of its tier's colour
+## (no plate: the classic shows just the item) and, for the better ones, a slow twinkle.
 class _ArtifactGlow extends Node2D:
 	var col := Color.WHITE
+	var strong := false
+	var t := randf() * 10.0
+	func _process(d: float) -> void:
+		if strong:
+			t += d
+			queue_redraw()
 	func _draw() -> void:
-		draw_set_transform(Vector2(0, -4), 0, Vector2(1, 0.4))
-		draw_circle(Vector2.ZERO, 26, Color(0, 0, 0, 0.35))
-		for i in 4:
-			draw_circle(Vector2.ZERO, 30 - i * 6, Color(col, 0.1 + i * 0.06))
+		draw_set_transform(Vector2(0, -2), 0, Vector2(1, 0.38))
+		for i in 6:  # (a soft falloff, faint at the middle too)
+			draw_circle(Vector2.ZERO, 34 - i * 4, Color(col, 0.025 + i * 0.008))
+		draw_circle(Vector2.ZERO, 14, Color(0, 0, 0, 0.32))
+		draw_set_transform(Vector2.ZERO)
+		if strong:
+			for k in 2:
+				var a := 0.5 + 0.5 * sin(t * 2.2 + k * 2.6)
+				var p := Vector2(-16 + k * 30, -40 - k * 14)
+				var c := Color(1.0, 0.96, 0.85, 0.75 * a)
+				draw_line(p - Vector2(5, 0), p + Vector2(5, 0), c, 1.5, true)
+				draw_line(p - Vector2(0, 5), p + Vector2(0, 5), c, 1.5, true)
 
 class _RectNode extends Node2D:
 	var rect := Rect2()

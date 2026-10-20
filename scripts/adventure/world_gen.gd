@@ -43,6 +43,7 @@ var h := 0
 var terrain := PackedByteArray()
 var blocked := PackedByteArray()   # 1 = obstacle/footprint, cannot be entered
 var occupied := {}                 # Vector2i -> uid of object on its action tile
+var covered := {}                  # Vector2i -> uid: every tile an object's building covers (footprints too)
 var keep_clear := PackedByteArray() # tiles that must stay free of obstacles (roads, town aprons)
 var decor := []
 var world := {}
@@ -535,11 +536,16 @@ func _place_obj(o: Dictionary, center: Vector2i, rmin: int, rmax: int, reach: Di
 				break
 		if not ok:
 			continue
-		# don't crowd other objects
-		for dy in range(-1, 2):
-			for dx in range(-1, 2):
-				if occupied.has(p + Vector2i(dx, dy)) and not (dx == 0 and dy == 0):
-					ok = false
+		# don't crowd other objects (nor stand a building's walls beside a monster: figures pressed between them)
+		for t in [Vector2i.ZERO] + foot:
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					var q: Vector2i = p + t + Vector2i(dx, dy)
+					if t == Vector2i.ZERO:
+						if (occupied.has(q) or (covered.has(q) and o["type"] == "monster")) and not (dx == 0 and dy == 0):
+							ok = false
+					elif occupied.has(q) and world["objects"].get(occupied[q], {}).get("type", "") == "monster":
+						ok = false  # (a building's walls never right beside a monster)
 		if not ok:
 			continue
 		if min_town_dist > 0:
@@ -560,8 +566,10 @@ func _place_obj(o: Dictionary, center: Vector2i, rmin: int, rmax: int, reach: Di
 			o["amount"] = rng.randi_range(4, 6)
 		world["objects"][o["uid"]] = o
 		occupied[p] = o["uid"]
+		covered[p] = o["uid"]
 		for off in foot:
 			blocked[idx(p + off)] = 1
+			covered[p + off] = o["uid"]
 		if foot.size() > 0:
 			keep_clear[idx(p + Vector2i(0, 1))] = 1
 		if guarded:
@@ -636,13 +644,14 @@ func _guard(o: Dictionary, strength := 1.6) -> void:
 		for dy in range(-1, 2):
 			for dx in range(-1, 2):
 				var r: Vector2i = q + Vector2i(dx, dy)
-				if r != p and occupied.has(r) and occupied[r] != o["uid"]:
+				if r != p and ((occupied.has(r) and occupied[r] != o["uid"]) or (covered.has(r) and covered[r] != o["uid"])):
 					crowded = true
 		if inside(q) and _passable(q) and not occupied.has(q) and terrain[idx(q)] != T_ROAD and not crowded:
 			var m := {"type": "monster", "uid": GameState.next_uid(), "pos": q, "strength_bonus": strength}
 			_fill_monster(m)
 			world["objects"][m["uid"]] = m
 			occupied[q] = m["uid"]
+			covered[q] = m["uid"]
 			return
 
 func _fill_monster(o: Dictionary) -> void:
