@@ -122,7 +122,7 @@ static func _fill(m: Modal, owner: Node, h: Dictionary) -> void:
 	# morale and luck, as in the classic hero screen: what they are now and why
 	var mo := _morale(h)
 	var lk := int(h["skills"].get("luck", 0)) + GameState.hero_stat(h, "luck")
-	for e in [["Morale", mo[0], "skill_leadership", mo[1]], ["Luck", lk, "skill_luck",
+	for e in [["Morale", mo[0], "stat_morale", mo[1]], ["Luck", lk, "skill_luck",
 			"Luck: a chance of double damage on each attack (1 in 24 per point).\nLuck skill %+d, artifacts %+d." % [
 				int(h["skills"].get("luck", 0)), GameState.hero_stat(h, "luck")]]]:
 		var v := VBoxContainer.new()

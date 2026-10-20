@@ -115,14 +115,15 @@ func _build() -> void:
 	_buttons.add_theme_constant_override("separation", 8)
 	add_child(_buttons)
 
-	var bar := HBoxContainer.new()
-	bar.position = Vector2(24, 1080 - 42)
-	bar.add_theme_constant_override("separation", 28)
+	var bar := HBoxContainer.new()  # (the treasury along the foot, as on the adventure map: large enough to read)
+	bar.position = Vector2(24, 1080 - 46)
+	bar.add_theme_constant_override("separation", 40)
 	add_child(bar)
 	for r in GameData.RESOURCES:
 		var box := HBoxContainer.new()
-		box.add_child(UI.icon(Assets.res_icon(r), Vector2(30, 30)))
-		var l := UI.label("0", 21)
+		box.add_theme_constant_override("separation", 4)
+		box.add_child(UI.icon(Assets.res_icon(r), Vector2(36, 36)))
+		var l := UI.label("0", 23, Color(1, 0.95, 0.82))
 		box.add_child(l)
 		_res_labels[r] = l
 		bar.add_child(box)
@@ -145,8 +146,8 @@ func refresh() -> void:
 	pics.add_child(_pic_button(_building_pic(fort), GameData.building_name(town["faction"], fort) if TownLogic.has_building(town, fort) else "Dwellings",
 		"All creature dwellings: recruit (R)", _open_recruit_all))
 	_info.add_child(pics)
-	_info.add_child(UI.label("Income: %d gold a day" % TownLogic.daily_income(town), 20))
-	_info.add_child(UI.label("Already built today" if town["built_today"] else "You may build today", 19, Color(0.8, 0.6, 0.5) if town["built_today"] else Color(0.6, 0.9, 0.55)))
+	_info.add_child(UI.label("Income: %d gold a day" % TownLogic.daily_income(town), 22, Color(1, 0.93, 0.78)))
+	_info.add_child(UI.label("Already built today" if town["built_today"] else "You may build today", 21, Color(0.8, 0.6, 0.5) if town["built_today"] else Color(0.6, 0.9, 0.55)))
 
 	for c in _armies.get_children():
 		c.queue_free()
@@ -1006,9 +1007,28 @@ class _BuildCard extends Button:
 		for res in GameData.RESOURCES:
 			if cost.get(res, 0) > 0:
 				items.append([res, str(cost[res])])
+		# one row of price if it fits at one of the sizes, else two rows at the largest size that fits (the resource
+		# pictures are drawn with a margin: their glyphs ~27 x 19 at 34)
+		var room := size.x - 10.0 - 12.0
+		var row_w := func(row: Array, ic: float, fs: int) -> float:
+			var w := -10.0
+			for it in row:
+				w += ic + 1 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 10
+			return w
 		var rows: Array = [items]
-		if items.size() > 3:
+		var ic := 34.0
+		var fs := 21
+		var fitted := false
+		for sz in [[34.0, 21], [30.0, 19], [28.0, 18]]:
+			if row_w.call(items, sz[0], sz[1]) <= room:
+				ic = sz[0]; fs = sz[1]; fitted = true
+				break
+		if not fitted:
 			rows = [items.slice(0, (items.size() + 1) / 2), items.slice((items.size() + 1) / 2)]
+			for sz in [[34.0, 21], [30.0, 19], [28.0, 18]]:
+				ic = sz[0]; fs = sz[1]
+				if row_w.call(rows[0], ic, fs) <= room and row_w.call(rows[1], ic, fs) <= room:
+					break
 		const ROW_H := 28.0  # (two tight price rows: the picture keeps most of its height)
 		var strip_h := ROW_H * maxi(rows.size(), min_rows) + 4.0
 		var built := status == "Built"
@@ -1041,17 +1061,7 @@ class _BuildCard extends Button:
 		var sb := Rect2(Vector2(5, size.y - 5 - strip_h), Vector2(size.x - 10, strip_h))
 		draw_rect(sb, Color(0.1, 0.075, 0.05))
 		var x0 := sb.position.x + 6
-		var room := sb.end.x - 6 - x0
 		if not items.is_empty():
-			var ic := 34.0  # (the resource pictures are drawn with a margin: their glyphs ~27 x 19)
-			var fs := 21
-			for row in rows:  # (a long price, four to a row, a size smaller so it fits the card)
-				var w := -10.0
-				for it in row:
-					w += ic + 1 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 10
-				if w > room:
-					ic = 30.0
-					fs = 19
 			for k in rows.size():
 				var row: Array = rows[k]
 				var w := 0.0

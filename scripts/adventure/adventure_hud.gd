@@ -325,24 +325,24 @@ func _hero_view(hero: Dictionary) -> void:
 	g.add_theme_constant_override("h_separation", 12)
 	for st in ["attack", "defense", "power", "knowledge"]:
 		var box := HBoxContainer.new()
-		box.add_child(UI.icon(Assets.tex("icons/stat_%s.png" % st), Vector2(32, 32)))
-		box.add_child(UI.label(str(GameState.hero_stat(hero, st)), 21))
+		box.add_child(UI.icon(Assets.tex("icons/stat_%s.png" % st), Vector2(38, 38)))
+		box.add_child(UI.label(str(GameState.hero_stat(hero, st)), 23))
 		g.add_child(box)
 	_detail.add_child(g)
 	var ml := HBoxContainer.new()  # morale, luck and experience (as the classic hero panel)
 	ml.add_theme_constant_override("separation", 6)
 	var mo: Array = HeroScreen._morale(hero)
 	var lk := int(hero["skills"].get("luck", 0)) + GameState.hero_stat(hero, "luck")
-	for e in [["skill_leadership", mo[0]], ["skill_luck", lk]]:
-		ml.add_child(UI.icon(Assets.tex("icons/%s.png" % e[0]), Vector2(32, 32)))
+	for e in [["stat_morale", mo[0]], ["skill_luck", lk]]:  # (Morale its own horn, not the Leadership banner)
+		ml.add_child(UI.icon(Assets.tex("icons/%s.png" % e[0]), Vector2(36, 36)))
 		var val: int = e[1]
-		ml.add_child(UI.label("%+d" % val if val != 0 else "0", 20, Color(0.6, 0.92, 0.5) if val > 0 else (Color(1, 0.55, 0.45) if val < 0 else UI.TEXT)))
+		ml.add_child(UI.label("%+d" % val if val != 0 else "0", 22, Color(0.6, 0.92, 0.5) if val > 0 else (Color(1, 0.55, 0.45) if val < 0 else UI.TEXT)))
 	var nxt := 0
 	for t in GameData.XP_LEVELS:
 		if t > int(hero["xp"]):
 			nxt = t
 			break
-	ml.add_child(UI.label("  Exp %d / %d" % [hero["xp"], nxt] if nxt > 0 else "  Exp %d" % hero["xp"], 17, Color(0.85, 0.8, 0.68)))
+	ml.add_child(UI.label("  Exp %d / %d" % [hero["xp"], nxt] if nxt > 0 else "  Exp %d" % hero["xp"], 18, Color(0.85, 0.8, 0.68)))
 	_detail.add_child(ml)
 	var army := ArmyStrip.new()
 	army.slot_size = Vector2(40, 40)

@@ -6,7 +6,8 @@ python tools/art/button_icons_paint.py ingest [adventure|battle]  ->  assets/ui/
 (the "retreat", "retreat2", "retreat3" and "retreat4" sheets paint eight takes of the retreat icon; the best is kept as btn_retreat.png by hand;
 "conditions" paints takes of the scenario win and loss icons, kept as ui/cond_win.png and ui/cond_lose.png, and the Offense skill,
 kept as icons/skill_offense.png; "conditions2" the gold, hero and capture conditions, kept as ui/cond_gold.png, ui/cond_hero.png
-and ui/cond_capture.png; "skills" the secondary skills -> icons/skill_<name>.png)"""
+and ui/cond_capture.png; "skills" the secondary skills -> icons/skill_<name>.png;
+"stats" the primary stats and morale -> icons/stat_<name>.png, the chosen takes renamed by hand)"""
 import os, sys
 import numpy as np
 from PIL import Image
@@ -86,6 +87,18 @@ SHEETS = {"adventure": [
     ("necromancy", "a pale skull wreathed in swirling green ghostly flame, drawn large and bold"),
     ("sorcery", "a glowing violet crystal orb on a gold claw stand, magic sparks around it, drawn large and bold"),
     ("wisdom", "an open ancient tome with a lit candle beside it and a feather quill, drawn large and bold"),
+], "stats": [  # (the four primary stats and morale, in the style of the new skill icons)
+    (f"attack_{k}", "a gleaming steel longsword held point up, with a gold crossguard and a red leather grip, drawn "
+     "large and bold") for k in "ab"
+] + [
+    ("defense", "a round wooden shield with a steel rim and boss, painted deep blue with a gold lion, drawn large and bold"),
+    ("power", "a carved wooden wizard's staff topped with a blazing blue and violet magic flame, drawn large and bold"),
+    ("knowledge", "a stack of three old leather-bound books with a glowing blue rune on the top cover, drawn large and bold"),
+] + [
+    (f"morale_{k}", "a golden war horn with a red cord and tassel, sounding with small golden notes of sound, drawn "
+     "large and bold") for k in "ab"
+] + [
+    ("knowledge_b", "a rolled parchment scroll and an open book with glowing blue runes floating above, drawn large and bold"),
 ]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "
@@ -108,8 +121,8 @@ def paint(sheet):
     os.makedirs(f"{BATCH}/out", exist_ok=True)
     Image.new("RGB", (W, H), (255, 0, 255)).save(f"{BATCH}/in/buttons.png")
     style = Image.new("RGB", (4 * 140, 140), (40, 32, 24))
-    for i, st in enumerate(["attack", "defense", "power", "knowledge"]):
-        ic = Image.open(f"assets/icons/stat_{st}.png").convert("RGBA").resize((128, 128), Image.LANCZOS)
+    for i, st in enumerate(["skill_offense", "skill_armorer", "skill_wisdom", "skill_luck"]):  # (the newer, painted set)
+        ic = Image.open(f"assets/icons/{st}.png").convert("RGBA").resize((128, 128), Image.LANCZOS)
         style.paste(ic, (i * 140 + 6, 6), ic)
     style.save(f"{BATCH}/in/style.png")
     client = genai.Client(vertexai=True, project=vp.PROJECT, location=vp.LOCATION)
@@ -137,7 +150,7 @@ def ingest(sheet):
         obj = obj.resize((max(1, round(obj.width * s)), max(1, round(obj.height * s))), Image.LANCZOS)
         out = Image.new("RGBA", (SIZE, SIZE))
         out.alpha_composite(obj, ((SIZE - obj.width) // 2, (SIZE - obj.height) // 2))
-        dst = f"assets/icons/skill_{name}.png" if sheet == "skills" else f"assets/ui/btn_{name}.png"
+        dst = {"skills": f"assets/icons/skill_{name}.png", "stats": f"assets/icons/stat_{name}.png"}.get(sheet, f"assets/ui/btn_{name}.png")
         out.save(dst)
         print(f"  {dst}")
 

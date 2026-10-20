@@ -61,6 +61,7 @@ func setup(w: Dictionary) -> void:
 	add_child(_fog)
 
 	_build_decor()
+	_build_border()
 	rebuild_objects()
 
 # ---------------------------------------------------------------------------------------------
@@ -304,6 +305,50 @@ func _build_decor() -> void:
 			_ground.add_child(s)
 		else:
 			_sorted.add_child(s)
+
+## Past the map's edge, as the classic map's mountain border: a range of the map's own mountains standing around it
+## on the rocky ridge and the map's outermost row, over the void (above the fog layer: nothing out there is
+## unexplored).
+func _build_border() -> void:
+	var size: Vector2i = world["size"]
+	var border := Node2D.new()
+	border.y_sort_enabled = true
+	border.z_index = 51
+	add_child(border)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = size.x * 7919 + size.y
+	var snowy := func(t: Vector2i) -> bool:
+		var c := Vector2i(clampi(t.x, 0, size.x - 1), clampi(t.y, 0, size.y - 1))
+		return world["terrain"][c.y * size.x + c.x] == WorldGen.T_SNOW
+	# (a range, not a row: sizes vary, now and then a smaller peak beside the first and a few boulders in the gaps; the
+	# along-edge step `ax` sets which way they spread)
+	var put := func(foot: Vector2, m: float, near: Vector2i, ax: Vector2) -> void:
+		var mount := func(f: Vector2, mm: float) -> void:
+			var k := ("mountain_snow_%d" % rng.randi_range(1, 2)) if snowy.call(near) else ("mountain_%d" % rng.randi_range(1, 3))
+			border.add_child(_sprite("map/%s.png" % k, f, 256.0, rng.randf() < 0.5, 0.0, mm))
+		m *= rng.randf_range(0.8, 1.22)
+		mount.call(foot, m)
+		if rng.randf() < 0.4:
+			mount.call(foot + ax * rng.randf_range(0.9, 1.3) * TILE + Vector2(ax.y, ax.x).abs() * rng.randf_range(-6, 14), m * rng.randf_range(0.6, 0.75))
+		if rng.randf() < 0.5:
+			var r := _sprite("map/rock_%d.png" % rng.randi_range(1, 3), foot - ax * rng.randf_range(1.3, 1.7) * TILE + Vector2(ax.y, ax.x).abs() * 10.0,
+				90.0, rng.randf() < 0.5, 0.0, rng.randf_range(0.7, 1.0))
+			border.add_child(r)
+	# (standing on the map's outermost row, which the generator fills with rocks and trees anyway: the view runs only two
+	# tiles past the edge, a range further out showed as slivers)
+	var x := -2.0
+	while x < size.x + 2.0:  # along the top and the bottom
+		put.call(Vector2(x * TILE, 0.15 * TILE + rng.randf_range(-10, 6)), rng.randf_range(0.6, 0.7), Vector2i(int(x), 0), Vector2.RIGHT)
+		x += rng.randf_range(2.4, 4.0)
+	x = -2.0
+	while x < size.x + 2.0:
+		put.call(Vector2(x * TILE, (size.y + 1.3) * TILE + rng.randf_range(-6, 8)), rng.randf_range(0.58, 0.68), Vector2i(int(x), size.y - 1), Vector2.RIGHT)
+		x += rng.randf_range(2.4, 4.0)
+	var y := 1.0
+	while y < size.y + 1.0:  # down the sides
+		put.call(Vector2(-1.2 * TILE + rng.randf_range(-8, 4), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(0, int(y)), Vector2.DOWN)
+		put.call(Vector2((size.x + 1.2) * TILE + rng.randf_range(-4, 8), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(size.x - 1, int(y)), Vector2.DOWN)
+		y += rng.randf_range(1.4, 2.4)
 
 func rebuild_objects() -> void:
 	for n in _object_nodes.values():
