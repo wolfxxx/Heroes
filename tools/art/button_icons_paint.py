@@ -106,6 +106,15 @@ SHEETS = {"adventure": [
      "drawn large and bold") for k in "def"
 ] + [
     (f"knowledge_{k}", "a glowing blue crystal brain-shaped gem in a gold setting, drawn large and bold") for k in "gh"
+], "misc_stats": [  # (a creature's health and damage, experience: their own pictures, none borrowed from the stats)
+    (f"health_{k}", "a glossy red heart with a gold rim, drawn large and bold") for k in "ab"
+] + [
+    (f"damage_{k}", "a steel arrowhead and a sword point crossed over a bright red impact burst, drawn large and bold")
+    for k in "ab"
+] + [
+    (f"xp_{k}", "a gold star medal with a blue ribbon, drawn large and bold") for k in "ab"
+] + [
+    (f"speed_{k}", "a winged golden horseshoe with motion streaks, drawn large and bold") for k in "ab"
 ]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "
@@ -158,7 +167,7 @@ def ingest(sheet):
         out = Image.new("RGBA", (SIZE, SIZE))
         out.alpha_composite(obj, ((SIZE - obj.width) // 2, (SIZE - obj.height) // 2))
         dst = {"skills": f"assets/icons/skill_{name}.png", "stats": f"assets/icons/stat_{name}.png",
-               "knowledge": f"assets/icons/stat_{name}.png"}.get(sheet, f"assets/ui/btn_{name}.png")
+               "knowledge": f"assets/icons/stat_{name}.png", "misc_stats": f"assets/icons/stat_{name}.png"}.get(sheet, f"assets/ui/btn_{name}.png")
         out.save(dst)
         print(f"  {dst}")
 

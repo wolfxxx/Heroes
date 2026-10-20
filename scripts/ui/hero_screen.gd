@@ -263,7 +263,7 @@ static func _doll(owner: Node, h: Dictionary, redo: Callable) -> Control:
 			GameData.MACHINE_TEXT[id]]
 		HoverInfo.attach(so, func(): return tip)
 	var bk := _sock(doll, Vector2(0.92, 0.88))
-	bk.tex = Assets.tex("icons/stat_knowledge.png")
+	bk.tex = Assets.tex("ui/btn_spellbook.png")  # (the spellbook, not the Knowledge picture)
 	var n: int = h["spells"].size()
 	var btip := ("Spellbook: %d spell%s known. Click to open." % [n, "" if n == 1 else "s"]) if n > 0 else "Spellbook: no spells known."
 	HoverInfo.attach(bk, func(): return btip)

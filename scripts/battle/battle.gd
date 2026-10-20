@@ -2169,7 +2169,9 @@ class _Shadow extends Node2D:
 		var left := hit_until - Time.get_ticks_msec()
 		if left > 0:
 			var k := minf(1.0, left / 400.0)
-			draw_arc(Vector2.ZERO, w - 2, 0, TAU, 40, Color(1, 0.96, 0.85, 0.95 * k), 9.0, true)
+			# (struck: its own side's colour flaring, not white, which read as the gold ring of the stack in play)
+			var hc := Color(1.0, 0.42, 0.32) if side == 0 else Color(0.5, 0.72, 1.0)
+			draw_arc(Vector2.ZERO, w - 2, 0, TAU, 40, Color(hc, 0.95 * k), 9.0, true)
 		elif hit_until > 0:
 			hit_until = 0
 
@@ -2438,7 +2440,14 @@ class _Burst extends Node2D:
 	func _draw() -> void:
 		var a := 1.0 - t
 		if bolt and t < 0.5:
-			var p := Vector2(380.0 * slant, -620)
+			# (from a storm cloud just under the turn queue: from higher up it seemed to come out of the queue's frame)
+			var top_y := minf(-120.0, 205.0 - global_position.y)
+			var p := Vector2(380.0 * slant * (-top_y / 620.0), top_y)
+			var a0 := 1.0 - t * 2.0
+			for c in [[-34.0, 6.0, 30.0], [0.0, -4.0, 38.0], [34.0, 6.0, 30.0], [-14.0, 12.0, 28.0], [16.0, 12.0, 28.0]]:
+				draw_set_transform(p + Vector2(c[0], c[1]), 0, Vector2(1, 0.6))
+				draw_circle(Vector2.ZERO, c[2], Color(0.22, 0.24, 0.3, 0.85 * a0))
+			draw_set_transform(Vector2.ZERO)
 			var pts := PackedVector2Array([p])
 			for i in 8:
 				p = p.lerp(Vector2.ZERO, 1.0 / (8 - i)) + Vector2(randf_range(-22, 22), randf_range(-14, 14)) * (1.0 if i < 7 else 0.0)

@@ -132,7 +132,7 @@ static func upgrade_dialog(owner_node: Node, st: Dictionary, up: String, player:
 	var m := Modal.custom(owner_node, "Upgrade %d %s" % [n, a["plural"] if n != 1 else a["name"]], 980)
 	var h := HBoxContainer.new()
 	h.alignment = BoxContainer.ALIGNMENT_CENTER
-	h.add_theme_constant_override("separation", 26)
+	h.add_theme_constant_override("separation", 44)  # (the two columns fill the dialog: no bare wood at its sides)
 	m.body.add_child(h)
 	var rows := [["Attack", "attack"], ["Defense", "defense"], ["Damage", "dmg"], ["Health", "hp"], ["Speed", "speed"],
 		["Shots", "shots"]]
@@ -143,16 +143,17 @@ static func upgrade_dialog(owner_node: Node, st: Dictionary, up: String, player:
 		var title := UI.label(c["plural"] if n != 1 else c["name"], 24, UI.GOLD, true)
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		col.add_child(title)
-		col.add_child(UI.icon(Assets.creature_portrait(GameData.base_of(st["id"]) if k == 0 else up), Vector2(230, 230)))
+		col.add_child(UI.icon(Assets.creature_portrait(GameData.base_of(st["id"]) if k == 0 else up), Vector2(290, 290)))
 		var g := GridContainer.new()
 		g.columns = 2
-		g.add_theme_constant_override("h_separation", 22)
+		g.add_theme_constant_override("h_separation", 40)
+		g.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		for r in rows:
-			g.add_child(UI.label(r[0], 20, UI.GOLD))
+			g.add_child(UI.label(r[0], 22, UI.GOLD))
 			var v = c[r[1]]
 			var txt := ("%d - %d" % v) if r[1] == "dmg" else (str(v) if v != 0 else "-")
 			var better: bool = k == 1 and (str(v) != str(a[r[1]]))
-			g.add_child(UI.label(txt, 20, Color(0.6, 0.95, 0.5) if better else UI.TEXT))
+			g.add_child(UI.label(txt, 22, Color(0.6, 0.95, 0.5) if better else UI.TEXT))
 		col.add_child(g)
 		h.add_child(col)
 		if k == 0:

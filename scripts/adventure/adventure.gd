@@ -779,7 +779,7 @@ func _show_event(hero: Dictionary, ev: Dictionary, human: bool) -> void:
 		if human:
 			var r = await Modal.choice(self, ev["title"], ev["text"], [
 				["%d Gold" % c["gold"], "gold", Assets.res_icon("gold")],
-				["%d Experience" % c["xp"], "xp", Assets.tex("icons/stat_knowledge.png")]]).closed
+				["%d Experience" % c["xp"], "xp", Assets.tex("icons/stat_xp.png")]]).closed
 			var lv := rules.resolve_chest(hero, str(r), c["gold"], c["xp"])
 			if lv > 0:
 				await _handle_level_ups(hero)

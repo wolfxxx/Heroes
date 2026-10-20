@@ -840,7 +840,7 @@ static func recruit_dialog(owner_node: Node, cid: String, available: int, player
 	stats.add_theme_constant_override("h_separation", 18)
 	v.add_child(stats)
 	for row_d in [["stat_attack", "Attack", str(c["attack"])], ["stat_defense", "Defense", str(c["defense"])],
-			["stat_power", "Damage", "%d - %d" % c["dmg"]], ["stat_knowledge", "Health", str(c["hp"])]]:
+			["stat_damage", "Damage", "%d - %d" % c["dmg"]], ["stat_health", "Health", str(c["hp"])]]:
 		stats.add_child(UI.icon(Assets.tex("icons/%s.png" % row_d[0]), Vector2(30, 30)))
 		stats.add_child(UI.label("%s %s" % [row_d[1], row_d[2]], 19))
 	v.add_child(UI.label("Speed %d%s" % [c["speed"], ("   Shots %d" % c["shots"]) if c["shots"] > 0 else ""], 19))

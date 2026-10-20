@@ -343,17 +343,17 @@ func _build_border() -> void:
 	# tiles past the edge, a range further out showed as slivers)
 	var x := -2.0
 	while x < size.x + 2.0:  # along the top and the bottom
-		put.call(Vector2(x * TILE, 0.15 * TILE + rng.randf_range(-10, 6)), rng.randf_range(0.6, 0.7), Vector2i(int(x), 0), Vector2.RIGHT)
-		x += rng.randf_range(3.6, 5.6)  # (fewer, larger peaks, bare rock between)
+		put.call(Vector2(x * TILE, 0.15 * TILE + rng.randf_range(-26, 10)), rng.randf_range(0.6, 0.7), Vector2i(int(x), 0), Vector2.RIGHT)
+		x += rng.randf_range(2.6, 7.0)  # (fewer, larger peaks, bare rock between, never evenly spaced)
 	x = -2.0
 	while x < size.x + 2.0:
 		put.call(Vector2(x * TILE, (size.y + 1.3) * TILE + rng.randf_range(-6, 8)), rng.randf_range(0.58, 0.68), Vector2i(int(x), size.y - 1), Vector2.RIGHT)
-		x += rng.randf_range(3.6, 5.6)  # (fewer, larger peaks, bare rock between)
+		x += rng.randf_range(2.6, 7.0)  # (fewer, larger peaks, bare rock between, never evenly spaced)
 	var y := 1.0
 	while y < size.y + 1.0:  # down the sides
-		put.call(Vector2(-1.2 * TILE + rng.randf_range(-8, 4), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(0, int(y)), Vector2.DOWN)
-		put.call(Vector2((size.x + 1.2) * TILE + rng.randf_range(-4, 8), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(size.x - 1, int(y)), Vector2.DOWN)
-		y += rng.randf_range(2.6, 3.8)
+		put.call(Vector2(-1.2 * TILE + rng.randf_range(-22, 6), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(0, int(y)), Vector2.DOWN)
+		put.call(Vector2((size.x + 1.2) * TILE + rng.randf_range(-6, 22), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(size.x - 1, int(y)), Vector2.DOWN)
+		y += rng.randf_range(2.0, 4.6)
 
 func rebuild_objects() -> void:
 	for n in _object_nodes.values():
