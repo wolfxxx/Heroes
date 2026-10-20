@@ -1395,7 +1395,10 @@ func _anim_death(st: Dictionary) -> void:
 		var home: Vector2 = s.get_meta("home", Vector2.ZERO)
 		s.position = home + Vector2(0, -16)
 		var tw0 := s.create_tween().set_parallel(true)
-		tw0.tween_property(s, "modulate", Color(0.52, 0.48, 0.47), 0.5)  # (dark and grey: never read as a living stack)
+		tw0.tween_property(s, "modulate", Color(0.5, 0.5, 0.5), 0.5)  # (dark: never read as a living stack)
+		var cm := s.material as ShaderMaterial
+		if cm:  # (and grey, low in contrast: the classic's dull heaps)
+			cm.set_shader_parameter("saturation", 0.25)
 		tw0.tween_property(s, "position", home, 0.22).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 		var dust := _Dust.new()
 		dust.position = n.position + Vector2(0, -4)

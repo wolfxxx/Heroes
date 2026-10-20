@@ -2,7 +2,7 @@
 
 Read this first, then `ARCHITECTURE.md` (code map), `ASSETS.md` (every asset path and the art pipeline) and
 `CREDITS.md`. This file is written so that another person or another AI assistant can pick the work up exactly
-where it stopped. Last updated 2026-10-20 (round 45, judge 44 fixes and battle-AI step 2, committed and pushed; judge 45 run), branch `main`, remote
+where it stopped. Last updated 2026-10-20 (round 46, judge 45 repairs, committed and pushed; judge 46 run), branch `main`, remote
 `https://github.com/wolfxxx/Heroes.git` (public repo).
 
 ## 1. The project in one paragraph
@@ -24,6 +24,12 @@ the look and feel of HoMM3, and each round fixes what the judge found.
   it (scores in section 7). Next step of the plan: the AI work (section 8).
 - Found and fixed on the way: the all-computer simulation could overflow Godot's message queue once one computer
   player had beaten the others (the AI turn loop never waited a frame); `_run_ai_turns` now waits one frame per turn.
+- Round 46 committed and pushed, judge 46 run on it: the adventure_artifacts regression fixed (artifacts skip only tiles right under a
+  tree, and the stumps, logs and flowers right beside each are removed instead, so all five show again); corpses
+  grey and low in contrast (the outline shader's saturation at 0.25 on death); the hero screen's Formation toggle dims
+  the option not chosen. The judge 45 "fade did not trigger" finding was checked with a debug print on that siege
+  frame: battle timing varies from run to run, so the judge's frame (Vampires buried behind the Angel) does not recur
+  in a new run — in the re-run the Vampires stand clear, lit by their halo. The rule was left as it is.
 - Round 45 committed and pushed, judge 45 run on it: judge 44 fixes — a big figure just behind the stack whose turn it is fades too
   (`_see_through`, the 6th info field), fades a little lighter (0.55); corpses darker and greyer; a spell's log line
   shows with its banner (`_flush_log` in `_anim_spell`); the combination's greyed copy brighter; the showcase
@@ -155,11 +161,24 @@ magenta key for pink fringes (recolour them, as was done for the Luck clover).
 | 42 | 9.2 | 9.3 | 9.4 | 9.7 | 8.9 | 9.3 |
 | 43 | 9.2 | 9.4 | 9.4 | 9.7 | 8.9 | 9.3 |
 | 44 | 9.2 | 9.4 | 9.4 | 9.7 | 8.9 | 9.3 |
+| 45 | 9.2 | 9.3 | 9.4 | 9.7 | 9.0 | 9.3 |
 
 Trend: gains have flattened at 9.2 for three rounds. Battle is the weakest area; the next big step most likely comes
 from battle (crowded siege melees, the lightning effect) or from new gameplay (section 8), not more small polish.
 
 ## 8. What's next
+
+### Open findings from judge 45 (overall 9.3; battle up to 9.0, adventure down to 9.3)
+Landed: spell log line with its banner, darker corpses, recognisable greyed combination copy.
+1. The "big figure behind the stack in play fades" rule did NOT trigger in battle_siege_later (the judge
+   pixel-diffed: the Angel behind the active Vampires is unchanged). Debug `_see_through` on that exact frame.
+2. Regression: adventure_artifacts shows only 2 of its 5 artifacts — the tree/stump clearance in
+   `_shot_artifacts` pushed three out of view; place them on clear grass near the hero instead.
+3. Corpses are darker but warm sepia and upright (the Bone Dragon corpse still reads as a figure): desaturate
+   much more and lower the contrast.
+4. Lightning cloud over the top-row Skeletons; the bolt passes three stacks (reads as a chain hit).
+5. Siege-gate knot (Angel, Ghosts, Vampires; Bone Dragon fused with the Cavaliers).
+6. Hero-screen Formation toggle: the selected option is unclear.
 
 ### Open findings from judge 44 (first battle-AI round; overall 9.3)
 The AI's choices read as sensible on screen (holding back, hitting the Angel after it retaliated, focusing targets).
@@ -299,6 +318,8 @@ Suggested order: **artifacts → AI → hot-seat multiplayer → war-machine wre
 - Godot shaders: no `return` inside `fragment()`. In a canvas shader, `COLOR` already holds the sampled and
   modulated texture — multiplying by `COLOR` again squares the colour.
 - GDScript treats "inferred from Variant" as an error here: type such variables explicitly (`var t: String = ...`).
+- Battle shots are not reproducible frame for frame (animation and AI timing vary between runs): a judge's finding
+  about one stack's position in an auto-battle shot may not recur; check the rule, not just the frame.
 - The judge sees still frames at deterministic times: an effect that is mid-fade at that moment looks broken every
   round. Prefer states that read well at any moment (labels vanish instead of fading).
 - A shot can be spoiled by the real OS cursor over the window; the harness ignores off-window motion and parks the

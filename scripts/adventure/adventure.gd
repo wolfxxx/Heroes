@@ -150,18 +150,22 @@ static func _shot_artifacts(w: Dictionary) -> void:
 				var i := q.y * size.x + q.x
 				if w["blocked"][i] != 0 or w["terrain"][i] in [WorldGen.T_WATER, WorldGen.T_ROAD]:
 					continue
-				var near_tree := false  # (a tree's long shadow or a stump beside it read as a stain under the item)
+				var under_tree := false  # (a tree right behind it: its trunk and shadow over the item)
 				for d in w["decor"]:
 					var dt := Vector2i(d["p"] / WorldGen.TILE)
 					var k: String = d["k"]
-					if absi(dt.x - q.x) <= 1 and dt.y - q.y >= -1 and dt.y - q.y <= 2 \
-							and (k.begins_with("tree") or k.contains("stump") or k.begins_with("snow_pine")):
-						near_tree = true
-				if near_tree:
+					if absi(dt.x - q.x) <= 1 and dt.y - q.y >= 0 and dt.y - q.y <= 1 and (k.begins_with("tree") or k.begins_with("snow_pine")):
+						under_tree = true
+				if under_tree:
 					continue
 				var o := {"type": "artifact", "artifact": picks.pop_front(), "uid": GameState.next_uid(), "pos": q}
 				w["objects"][o["uid"]] = o
-				w["decor"] = w["decor"].filter(func(d): return Vector2i(d["p"] / WorldGen.TILE) != q)  # (flowers on it)
+				# (no flowers, stumps or logs on it or right beside it: they read as a stain or crowded the item)
+				w["decor"] = w["decor"].filter(func(d):
+					var dt := Vector2i(d["p"] / WorldGen.TILE)
+					var k: String = d["k"]
+					return not (absi(dt.x - q.x) <= 1 and absi(dt.y - q.y) <= 1 and not k.begins_with("tree")
+						and not k.begins_with("mountain") and not k.begins_with("snow_pine")))
 				for ddy in range(-1, 2):
 					for ddx in range(-1, 2):
 						taken[q + Vector2i(ddx, ddy)] = true

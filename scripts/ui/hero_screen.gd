@@ -393,6 +393,8 @@ static func _formation(h: Dictionary, redo: Callable) -> Control:
 		var on := UI.selected_plate(4)
 		b.add_theme_stylebox_override("pressed", on)
 		b.add_theme_stylebox_override("hover_pressed", on)
+		if cur != e[0]:  # (the other choice plainly off: dimmed, as the classic's unpressed buttons)
+			b.modulate = Color(0.62, 0.6, 0.58)
 		var ink := Color(1.0, 0.88, 0.55)  # (bright on the dark selected plate)
 		b.add_theme_color_override("font_pressed_color", ink)
 		b.add_theme_color_override("font_hover_pressed_color", ink)
