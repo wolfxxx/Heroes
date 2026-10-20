@@ -54,7 +54,9 @@ func _run() -> void:
 		if i < keys.size() and keys[i] != "":
 			_key(keys[i])
 			await get_tree().create_timer(0.6).timeout
-		if hovers.is_empty() and clicks.is_empty():  # (parked again: a scene loaded since may have read the real pointer)
+		# (parked again: a scene loaded since, or the real pointer moving over the window, may have lit a hover; not
+		# when the shot asks for a hover or a right-click panel, which the pointer holds open)
+		if hovers.is_empty() and not Array(clicks).any(func(c): return c.begins_with("r")):
 			Input.parse_input_event(park)
 			await get_tree().process_frame
 		# (the window was now and then grown to nearly the whole screen mid-run, from outside the game: back to the

@@ -441,8 +441,8 @@ func _cond_icon(c: Dictionary) -> Texture2D:
 		"gold": return Assets.res_icon("gold")
 		"hero": return Assets.hero_portrait(_settings.get("hero", "sir_aldric"))
 		"days": return Assets.tex("ui/btn_end_turn.png")
-		"standard": return Assets.tex("ui/btn_retreat.png")
-	return Assets.tex("icons/skill_offense.png")
+		"standard": return Assets.tex("ui/cond_lose.png")
+	return Assets.tex("ui/cond_win.png")
 
 func _select_scenario(id: String) -> void:
 	var sc := GameData.scenario(id)
@@ -488,7 +488,7 @@ func _refresh_preview() -> void:
 				var c: Color = AdventureHUD.TERRAIN_COLORS[terr[i]]
 				img.set_pixel(x, y, c.darkened(0.35) if blk[i] else c)
 				counts[terr[i]] = counts.get(terr[i], 0) + 1
-		img.resize(size.x * 4, size.y * 4, Image.INTERPOLATE_BILINEAR)
+		img.resize(size.x * 4, size.y * 4, Image.INTERPOLATE_NEAREST)  # (crisp map cells, smoothed only by the final scaling)
 		var mines := 0
 		for o in wd["objects"].values():
 			if o["type"] == "mine":

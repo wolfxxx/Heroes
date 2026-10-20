@@ -3,7 +3,9 @@ overview, hero, sleep, move, spellbook, next hero, end turn, system; 4x2) and th
 defend; the battle reuses the spellbook and the hourglass).
 python tools/art/button_icons_paint.py paint [adventure|battle]   ->  imagegen/batch20/out/<sheet>.png
 python tools/art/button_icons_paint.py ingest [adventure|battle]  ->  assets/ui/btn_<name>.png (128 px, transparent)
-(the "retreat", "retreat2", "retreat3" and "retreat4" sheets paint eight takes of the retreat icon; the best is kept as btn_retreat.png by hand)"""
+(the "retreat", "retreat2", "retreat3" and "retreat4" sheets paint eight takes of the retreat icon; the best is kept as btn_retreat.png by hand;
+"conditions" paints takes of the scenario win and loss icons, kept as ui/cond_win.png and ui/cond_lose.png, and the Offense skill,
+kept as icons/skill_offense.png)"""
 import os, sys
 import numpy as np
 from PIL import Image
@@ -56,6 +58,15 @@ SHEETS = {"adventure": [
     (f"retreat4_{k}", "a knight in bright polished silver plate armour on a white horse, galloping away to the left, "
      "seen from the side, with a big bold golden arrow curving back to the left over them, light and bright colours "
      "so it stands out on dark wood, drawn large so it fills the cell, a compact square composition") for k in "abcdefgh"
+], "conditions": [  # (scenario win / loss pictures and the Offense skill, each its own icon: none reuses a button's)
+    (f"win_{k}", "a golden laurel wreath around an upright steel sword, drawn large and bold, a compact square "
+     "composition") for k in "abc"
+] + [
+    (f"lose_{k}", "a ruined stone castle tower, cracked and broken at the top, with a torn red banner hanging from it, "
+     "drawn large and bold, a compact square composition") for k in "abc"
+] + [
+    (f"offense_{k}", "a steel sword swinging down with a bright red curved slash trail behind its blade, drawn large "
+     "and bold, a compact square composition") for k in "ab"
 ]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "

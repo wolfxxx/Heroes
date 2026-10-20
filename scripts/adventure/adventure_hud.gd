@@ -398,9 +398,12 @@ func _kingdom_view(me: Dictionary) -> void:
 	g.add_theme_constant_override("h_separation", 10)
 	g.add_theme_constant_override("v_separation", 2)
 	for r in GameData.RESOURCES:
-		if r != "gold":
+		if r != "gold" and inc[r] > 0:  # (only what the kingdom earns: no rows of +0)
 			g.add_child(cell.call(r, 140))
-	_detail.add_child(g)
+	if g.get_child_count() > 0:
+		_detail.add_child(g)
+	else:
+		_detail.add_child(UI.label("No mines held", 18, Color(0.75, 0.7, 0.6)))
 	# the week ahead: the gold it brings and the creatures the dwellings breed
 	var grow := 0
 	var dw := 0

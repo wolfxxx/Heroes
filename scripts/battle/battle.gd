@@ -1631,13 +1631,18 @@ func _settle_badges() -> void:
 			continue
 		var home: Vector2 = b.get_meta("home")
 		# (as the classic plates: with another stack on the hex in front, the plate moves in under its own figure, so
-		# two facing stacks' plates never sit side by side between them)
+		# two facing stacks' plates never sit side by side between them; a stack on a front diagonal stands there too)
 		var st: Dictionary = b.st
 		if st.has("hex") and not st.get("tower", false):
-			var front: Vector2i = st["hex"] + Vector2i(1 if st["side"] == 0 else -1, 0)
-			var o = L.stack_at(front)
-			if o != null and o != st:
-				home = Vector2(home.x - 24.0 * signf(home.x), home.y + 16.0)
+			var fx := 1.0 if st["side"] == 0 else -1.0
+			var hp := hex_pos(st["hex"])
+			for h in BattleLogic.neighbors(st["hex"]):
+				if (hex_pos(h).x - hp.x) * fx <= 0.0:
+					continue
+				var o = L.stack_at(h)
+				if o != null and o != st:
+					home = Vector2(home.x - 40.0 * signf(home.x), home.y + 16.0)
+					break
 		# (an enemy badge facing it read as one number, "2 6"; one on another stack's figure read as that stack's):
 		# its usual corner, else the other side, else lower down at its feet, else further out; the first that is clear
 		# (as the classic plates: always at the front corner of the stack's own hex; only a plate it would touch
@@ -1694,12 +1699,24 @@ func _follow_rings() -> void:
 
 ## Where a figure in front rises well over a stack standing behind it (the row above), it turns see-through around
 ## that stack's feet: the one behind keeps its ring, legs and badge readable instead of seeming to stand on the other.
+## The stack in play (the active one, the one under the pointer, one being struck) shows whole: a figure in front of
+## it turns see-through over all of its body.
 func _see_through() -> void:
+	var focus := {}
+	var cur = L.current()
+	if cur != null:
+		focus[cur["uid"]] = true
+	var hs = L.stack_at(_hover) if _hover.x >= 0 else null
+	if hs != null:
+		focus[hs["uid"]] = true
+	var now := Time.get_ticks_msec()
 	var info := []
 	for k in units:
 		var n: Node2D = units[k]
 		if n.get_node("Badge").st.get("alive", false):
-			info.append([n, n.global_position, float(n.get_meta("top", 120.0)), HEX_W * (0.95 if L.is_wide(n.get_node("Badge").st) else 0.5)])
+			if _ring(n).hit_until > now:
+				focus[k] = true
+			info.append([n, n.global_position, float(n.get_meta("top", 120.0)), HEX_W * (0.95 if L.is_wide(n.get_node("Badge").st) else 0.5), focus.has(k)])
 	for k in units:
 		var n: Node2D = units[k]
 		var holes := PackedVector4Array()
@@ -1711,7 +1728,10 @@ func _see_through() -> void:
 				if bk == f or dy < 20.0 or f[2] - dy < 36.0 or absf(f[1].x - bk[1].x) > (f[3] + bk[3]) * 0.75:
 					continue
 				if holes.size() < 4:
-					holes.append(Vector4(bk[1].x, bk[1].y - 26.0, bk[3] * 0.95, 52.0))
+					if bk[4]:  # (the whole figure, feet to head)
+						holes.append(Vector4(bk[1].x, bk[1].y - bk[2] * 0.5 + 10.0, bk[3] * 1.5, bk[2] + 50.0))
+					else:
+						holes.append(Vector4(bk[1].x, bk[1].y - 26.0, bk[3] * 0.95, 52.0))
 		var m := n.get_node("Sprite").material as ShaderMaterial
 		var key := str(holes)
 		if m == null or n.get_meta("holes_key", "") == key:
@@ -1809,7 +1829,7 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	box.scale = Vector2(0.6, 0.6)
 	tw.tween_property(box, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(box, "position:y", box.position.y - (6 if dir != 0 else 40), 1.3).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "modulate:a", 0.0, 0.18).set_delay(1.0)  # (a quick fade: no half-faded smear over the next stack)
+	tw.tween_property(box, "modulate:a", 0.0, 0.1).set_delay(1.1)  # (a quick fade: no half-faded smear over the next stack)
 	tw.chain().tween_callback(box.queue_free)
 
 ## Where a damage label for the stack of `n` goes: centred over its head, or higher up the same column when another

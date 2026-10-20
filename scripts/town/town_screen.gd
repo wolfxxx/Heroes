@@ -511,7 +511,7 @@ func _hall_rows() -> Array:
 func _open_build() -> void:
 	var m := Modal.custom(self, "Build in %s" % town["name"], 1400)
 	var rows := VBoxContainer.new()
-	rows.add_theme_constant_override("separation", 8)
+	rows.add_theme_constant_override("separation", 5)
 	m.body.add_child(rows)
 	for row in _hall_rows():
 		var h := HBoxContainer.new()
@@ -543,7 +543,7 @@ func _hall_card(id: String, m: Modal) -> Control:
 		card.cost = GameData.BUILDINGS[id]["cost"]
 		card.have = player["resources"]
 	card.min_rows = 2  # (room for a two-row price on every card: all cards alike, captions level in every row)
-	card.custom_minimum_size = Vector2(250, 196)
+	card.custom_minimum_size = Vector2(250, 222)
 	var bid: String = id
 	HoverInfo.attach(card, func(): return _building_info(bid), 0.0, true)
 	card.pressed.connect(func(): m.close(bid))
@@ -1009,7 +1009,7 @@ class _BuildCard extends Button:
 		var rows: Array = [items]
 		if items.size() > 3:
 			rows = [items.slice(0, (items.size() + 1) / 2), items.slice((items.size() + 1) / 2)]
-		const ROW_H := 21.0  # (two tight price rows: the picture keeps its height)
+		const ROW_H := 24.0  # (two tight price rows: the picture keeps its height)
 		var strip_h := ROW_H * maxi(rows.size(), min_rows) + 4.0
 		var built := status == "Built"
 		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - strip_h - 15))
@@ -1043,8 +1043,8 @@ class _BuildCard extends Button:
 		var x0 := sb.position.x + 6
 		var room := sb.end.x - 6 - x0
 		if not items.is_empty():
-			var ic := 22.0
-			var fs := 17
+			var ic := 26.0
+			var fs := 18
 			for k in rows.size():
 				var row: Array = rows[k]
 				var w := 0.0
