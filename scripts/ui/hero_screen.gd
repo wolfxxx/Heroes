@@ -183,7 +183,7 @@ static func _meter(title: String, value: String, frac: float, col: Color) -> Con
 	var bar := _Bar.new()
 	bar.frac = frac
 	bar.col = col
-	bar.custom_minimum_size = Vector2(170, 11)
+	bar.custom_minimum_size = Vector2(170, 16)
 	v.add_child(bar)
 	return v
 
@@ -410,10 +410,17 @@ class _Socket extends Control:
 class _Bar extends Control:
 	var frac := 0.0
 	var col := Color.WHITE
+	## A bronze-framed trough: dark inside, the fill with a lighter top edge.
 	func _draw() -> void:
-		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.6))
-		draw_rect(Rect2(Vector2(1, 1), Vector2((size.x - 2) * frac, size.y - 2)), col)
-		draw_rect(Rect2(Vector2.ZERO, size), UI.GOLD_DARK, false, 1.0)
+		var r := Rect2(Vector2.ZERO, size)
+		draw_rect(r, Color(0.32, 0.22, 0.1))
+		draw_rect(r.grow(-1), Color(0.72, 0.55, 0.28))
+		var inner := r.grow(-3)
+		draw_rect(inner, Color(0.04, 0.03, 0.02))
+		var fill := Rect2(inner.position, Vector2(inner.size.x * frac, inner.size.y))
+		draw_rect(fill, col)
+		draw_rect(Rect2(fill.position, Vector2(fill.size.x, 2)), col.lightened(0.4))
+		draw_rect(Rect2(fill.position + Vector2(0, fill.size.y - 2), Vector2(fill.size.x, 2)), col.darkened(0.35))
 
 ## A backpack scroll arrow: a gold triangle, dimmed when there is nothing more that way.
 class _Arrow extends Control:

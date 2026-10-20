@@ -347,13 +347,54 @@ func _make_unit(st: Dictionary) -> void:
 				s.visible = false
 			n.set_meta("top", 60.0)
 		return
-	# idle breathing
+	n.set_meta("full_scale", s.scale)
+	_breathe(n, s.scale)
+
+## Idle breathing about the scale `base` (the scale the poses and a death return to).
+func _breathe(n: Node2D, base: Vector2) -> void:
+	var s: Sprite2D = n.get_node("Sprite")
 	var tw := s.create_tween().set_loops()
-	var base := s.scale
 	tw.tween_property(s, "scale", base * Vector2(1.0, 1.025), 0.9 + randf() * 0.4).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(s, "scale", base, 0.9 + randf() * 0.4).set_trans(Tween.TRANS_SINE)
 	n.set_meta("breath", tw)
 	n.set_meta("base_scale", base)
+
+## A figure whose wings spread past its hexes draws a little smaller while another stack stands next to it (its
+## wings no longer swallow the neighbour); full size again in the open.
+func _crowd() -> void:
+	for k in units:
+		var n: Node2D = units[k]
+		var st: Dictionary = n.get_node("Badge").st
+		if not n.has_meta("full_scale") or not st.get("alive", false) or st.get("machine", false):
+			continue
+		var full: Vector2 = n.get_meta("full_scale")
+		var vis := fig_vis_w(st["id"]) * full.x
+		var span := HEX_W * (2.0 if L.is_wide(st) else 1.0)
+		if vis <= span:
+			continue
+		var kk := 1.0
+		for c in L.cells(st):
+			for h in BattleLogic.neighbors(c):
+				var o = L.stack_at(h)
+				if o != null and o != st and not o.get("machine", false):
+					kk = clampf(span * 0.95 / vis, 0.88, 1.0)
+					break
+		if is_equal_approx(kk, float(n.get_meta("crowd", 1.0))):
+			continue
+		var was: float = n.get_meta("crowd", 1.0)
+		n.set_meta("crowd", kk)
+		var br = n.get_meta("breath", null)
+		if not (br is Tween and br.is_valid()):
+			continue
+		var running: bool = br.is_running()
+		br.kill()
+		var s: Sprite2D = n.get_node("Sprite")
+		_breathe(n, full * kk)
+		if running:
+			s.scale = full * kk
+		else:
+			s.scale *= kk / was  # (a narrowed pose is showing: it changes size too, and returns to the new size)
+			n.get_meta("breath").pause()
 
 func _unit(st: Dictionary) -> Node2D:
 	return units.get(st["uid"])
@@ -898,7 +939,7 @@ func _update_hover() -> void:
 	_grid.hover = _hover
 	_hover_action = {}
 	var cur = L.current()
-	if _busy or cur == null or not _human_controls(cur["side"]):
+	if _busy or cur == null or not _human_controls(cur["side"]) or _modal_open():
 		_grid.hover = Vector2i(-1, -1)
 		_grid.attack_from = Vector2i(-1, -1)
 		_grid.queue_redraw()
@@ -1589,6 +1630,14 @@ func _settle_badges() -> void:
 		if not b.visible or not b.st.get("alive", false):
 			continue
 		var home: Vector2 = b.get_meta("home")
+		# (as the classic plates: with another stack on the hex in front, the plate moves in under its own figure, so
+		# two facing stacks' plates never sit side by side between them)
+		var st: Dictionary = b.st
+		if st.has("hex") and not st.get("tower", false):
+			var front: Vector2i = st["hex"] + Vector2i(1 if st["side"] == 0 else -1, 0)
+			var o = L.stack_at(front)
+			if o != null and o != st:
+				home = Vector2(home.x - 24.0 * signf(home.x), home.y + 16.0)
 		# (an enemy badge facing it read as one number, "2 6"; one on another stack's figure read as that stack's):
 		# its usual corner, else the other side, else lower down at its feet, else further out; the first that is clear
 		# (as the classic plates: always at the front corner of the stack's own hex; only a plate it would touch
@@ -1625,6 +1674,9 @@ func _settle_badges() -> void:
 
 func _process(_d: float) -> void:
 	_follow_rings()
+	if _grid and _grid.hover.x >= 0 and _modal_open():  # (a window is up: no hex lit under it)
+		_update_hover()
+	_crowd()
 	_settle_badges()
 	_see_through()
 

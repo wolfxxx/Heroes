@@ -3,7 +3,7 @@ overview, hero, sleep, move, spellbook, next hero, end turn, system; 4x2) and th
 defend; the battle reuses the spellbook and the hourglass).
 python tools/art/button_icons_paint.py paint [adventure|battle]   ->  imagegen/batch20/out/<sheet>.png
 python tools/art/button_icons_paint.py ingest [adventure|battle]  ->  assets/ui/btn_<name>.png (128 px, transparent)
-(the "retreat", "retreat2" and "retreat3" sheets paint eight takes of the retreat icon; the best is kept as btn_retreat.png by hand)"""
+(the "retreat", "retreat2", "retreat3" and "retreat4" sheets paint eight takes of the retreat icon; the best is kept as btn_retreat.png by hand)"""
 import os, sys
 import numpy as np
 from PIL import Image
@@ -52,6 +52,10 @@ SHEETS = {"adventure": [
     (f"retreat3_{k}", "a knight galloping away to the left on his horse, seen from the side, with a big bold golden "
      "arrow curving back to the left over them, drawn large so it fills the cell, a compact square composition")
     for k in "efgh"
+], "retreat4": [  # (the arrow read well, but a brown rider blurred into the wooden bar: a bright steel one)
+    (f"retreat4_{k}", "a knight in bright polished silver plate armour on a white horse, galloping away to the left, "
+     "seen from the side, with a big bold golden arrow curving back to the left over them, light and bright colours "
+     "so it stands out on dark wood, drawn large so it fills the cell, a compact square composition") for k in "abcdefgh"
 ]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "

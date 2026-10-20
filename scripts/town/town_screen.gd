@@ -996,7 +996,8 @@ class _BuildCard extends Button:
 		mouse_entered.connect(queue_redraw)
 		mouse_exited.connect(queue_redraw)
 	## The caption bar takes the status colour, as on the classic hall plates: green to build, red when blocked or
-	## short of resources, gold once built (its picture dimmed, with a tick); the price under it, in two rows if long.
+	## short of resources, gold once built (its picture dimmed, with a tick); it lies across the foot of the picture
+	## (the whole building shows, roofs and spires too); the price under it, in two rows if long.
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		draw_rect(r, Color(0.07, 0.05, 0.03))
@@ -1008,46 +1009,42 @@ class _BuildCard extends Button:
 		var rows: Array = [items]
 		if items.size() > 3:
 			rows = [items.slice(0, (items.size() + 1) / 2), items.slice((items.size() + 1) / 2)]
-		const ROW_H := 19.0  # (two tight price rows: the picture keeps its height)
+		const ROW_H := 21.0  # (two tight price rows: the picture keeps its height)
 		var strip_h := ROW_H * maxi(rows.size(), min_rows) + 4.0
-		var bottom := 35.0 + strip_h + 5.0
 		var built := status == "Built"
-		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - bottom - 5))
+		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - strip_h - 15))
 		if pic:
 			var ts := Vector2(pic.get_size())
 			var sc := maxf(pr.size.x / ts.x, pr.size.y / ts.y)
 			var tint := Color(0.55, 0.53, 0.5) if built else Color.WHITE
 			if is_hovered():
 				tint *= Color(1.15, 1.12, 1.05)
-			# (cropped from the ground up: the roofs and spires stay, a strip of the ground goes)
+			# (nearly the whole picture; what little is cropped goes from the ground, the roofs and spires stay)
 			var src := pr.size / sc
 			draw_texture_rect_region(pic, pr, Rect2(Vector2((ts.x - src.x) * 0.5, (ts.y - src.y) * 0.2), src), tint)
+		var tb := Rect2(Vector2(5, pr.end.y - 30), Vector2(size.x - 10, 30))
 		if built:  # a gold tick in the corner of the picture
-			var c := pr.end - Vector2(24, 22)
+			var c := Vector2(pr.end.x - 24, tb.position.y - 20)
 			draw_circle(c, 15, Color(0.1, 0.07, 0.03, 0.85))
 			draw_arc(c, 15, 0, TAU, 24, UI.GOLD, 2.0, true)
 			draw_polyline(PackedVector2Array([c + Vector2(-7, 0), c + Vector2(-2, 6), c + Vector2(8, -6)]), UI.GOLD, 3.5, true)
-		var tb := Rect2(Vector2(5, size.y - bottom), Vector2(size.x - 10, 30))
 		var bar := Color(0.4, 0.11, 0.07)
 		match status:
 			"Can build": bar = Color(0.13, 0.32, 0.1)
 			"Built": bar = Color(0.42, 0.33, 0.1)
 			"Built today": bar = Color(0.24, 0.23, 0.25)
-		draw_rect(tb, bar)
+		draw_rect(tb, Color(bar, 0.93))
 		draw_rect(Rect2(tb.position, Vector2(tb.size.x, 2)), bar.lightened(0.35))
 		draw_string_outline(f, Vector2(5, tb.position.y + 22), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, 3, Color(0, 0, 0, 0.75))
 		draw_string(f, Vector2(5, tb.position.y + 22), title, HORIZONTAL_ALIGNMENT_CENTER, size.x - 10, 19, Color(1, 0.93, 0.75))
-		# status: a dark strip with a coloured gem and coloured text (or the price)
+		# status: a dark strip with coloured text, or the price (the caption's colour already tells the state)
 		var sb := Rect2(Vector2(5, size.y - 5 - strip_h), Vector2(size.x - 10, strip_h))
 		draw_rect(sb, Color(0.1, 0.075, 0.05))
-		var gem := sb.position + Vector2(14, strip_h * 0.5)
-		draw_colored_polygon(PackedVector2Array([gem + Vector2(0, -7), gem + Vector2(7, 0), gem + Vector2(0, 7), gem + Vector2(-7, 0)]), status_col)
-		draw_polyline(PackedVector2Array([gem + Vector2(0, -7), gem + Vector2(7, 0), gem + Vector2(0, 7), gem + Vector2(-7, 0), gem + Vector2(0, -7)]), Color(0, 0, 0, 0.7), 1.0)
-		var x0 := sb.position.x + 28
+		var x0 := sb.position.x + 6
 		var room := sb.end.x - 6 - x0
 		if not items.is_empty():
-			var ic := 18.0
-			var fs := 16
+			var ic := 22.0
+			var fs := 17
 			for k in rows.size():
 				var row: Array = rows[k]
 				var w := 0.0

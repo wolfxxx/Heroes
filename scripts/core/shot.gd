@@ -54,6 +54,9 @@ func _run() -> void:
 		if i < keys.size() and keys[i] != "":
 			_key(keys[i])
 			await get_tree().create_timer(0.6).timeout
+		if hovers.is_empty() and clicks.is_empty():  # (parked again: a scene loaded since may have read the real pointer)
+			Input.parse_input_event(park)
+			await get_tree().process_frame
 		# (the window was now and then grown to nearly the whole screen mid-run, from outside the game: back to the
 		# shot size before each capture, so every shot is 1600x900)
 		if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_WINDOWED:

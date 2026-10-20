@@ -1,9 +1,9 @@
 shader_type canvas_item;
 // Fog of war overlay: fog_map is one texel per tile, 1 = explored. The edge is a smooth field over the 4x4 tiles
 // around each pixel (the compact bump kernel of terrain.gdshader), so it is round instead of stair-stepped, then made
-// ragged with gradient noise (value noise showed tile-sized squares). Past the map's edge: a bronze frame with a gold
-// line and a dark void beyond it (the view may run past the edge to centre a hero), never the bare background with
-// stray tree shadows; a soft shadow falls inward along the edge.
+// ragged with gradient noise (value noise showed tile-sized squares). Past the map's edge: a ragged band of boulders
+// (the classic map's rocky edge) and a dark slate void beyond it, told apart from the black shroud (the view may run
+// a little past the edge), never the bare background with stray tree shadows; a soft shadow falls inward along the edge.
 uniform sampler2D fog_map : filter_nearest;
 uniform vec2 map_size = vec2(48.0, 48.0);
 uniform float tile_px = 64.0;
@@ -39,10 +39,38 @@ void fragment() {
 	float inside = min(min(world.x, world.y), min(mpx.x - world.x, mpx.y - world.y));
 	if (inside < 0.0) {
 		float d = length(max(out_v, vec2(0.0)));
-		vec3 c = vec3(0.035, 0.028, 0.022) + vec3(0.02, 0.016, 0.01) * (fbm(world / tile_px * 1.3) + 0.5);
-		if (d < 14.0) {
-			c = mix(vec3(0.46, 0.33, 0.16), vec3(0.12, 0.085, 0.05), d / 14.0);
-			c = mix(c, vec3(0.9, 0.72, 0.36), smoothstep(1.2, 0.0, abs(d - 3.5)));
+		vec2 q = world / tile_px * 1.3;
+		// the void: a dark slate, bluer and lighter than the shroud, with a faint grain
+		vec3 c = vec3(0.07, 0.075, 0.095) + vec3(0.03, 0.03, 0.035) * (fbm(q) + 0.5);
+		float band = 48.0 + 26.0 * fbm(world / tile_px * 0.6);  // a ragged band of rocks along the edge
+		if (d < band) {
+			// boulders: voronoi cells shaded as domes lit from the upper left, dark cracks between them
+			vec2 rp = world / 30.0;
+			vec2 ri = floor(rp);
+			float d1 = 9.0, d2 = 9.0; vec2 cc = vec2(0.0); vec2 cid = vec2(0.0);
+			for (int y = -1; y <= 1; y++) {
+				for (int x = -1; x <= 1; x++) {
+					vec2 g = ri + vec2(float(x), float(y));
+					vec2 o = vec2(fract(sin(dot(g, vec2(12.9898, 78.233))) * 43758.5453),
+						fract(sin(dot(g, vec2(39.3468, 11.135))) * 24634.6345));
+					vec2 r = g + o - rp;
+					float dd = dot(r, r);
+					if (dd < d1) { d2 = d1; d1 = dd; cc = r; cid = g; }
+					else if (dd < d2) { d2 = dd; }
+				}
+			}
+			float gap = sqrt(d2) - sqrt(d1);
+			float crack = smoothstep(0.0, 0.08, gap);
+			float rim = smoothstep(0.0, 0.35, gap);  // rounded shoulders darken toward the cracks
+			float lit = clamp(0.5 + dot(normalize(-cc + vec2(0.0001)), vec2(-0.6, -0.7)) * 0.6 * min(1.0, sqrt(d1) * 2.2), 0.0, 1.0);
+			float tone = fract(sin(dot(cid, vec2(7.13, 3.71))) * 9137.1);
+			vec3 rock = mix(vec3(0.30, 0.27, 0.23), vec3(0.46, 0.41, 0.34), tone) * (0.45 + 0.95 * lit) * mix(0.6, 1.0, rim);
+			rock *= 0.85 + 0.3 * (fbm(world / 9.0) + 0.5) * 0.5;
+			rock = mix(vec3(0.05, 0.04, 0.035), rock, crack);
+			float fade = smoothstep(band, band - 10.0, d);  // the outer rocks sink into the void
+			rock *= mix(0.35, 1.0, smoothstep(band, 4.0, d));
+			c = mix(c, rock, fade);
+			c = mix(c, vec3(0.04, 0.03, 0.02), smoothstep(3.0, 0.0, d) * 0.8);  // a dark seam at the map's edge
 		}
 		COLOR = vec4(c, 1.0);
 	} else {

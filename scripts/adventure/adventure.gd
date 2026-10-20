@@ -144,7 +144,7 @@ func center_on_world(p: Vector2) -> void:
 func _clamp_cam(p: Vector2) -> Vector2:
 	var size: Vector2 = Vector2(world["size"]) * TILE
 	var view_sz := Vector2(MAP_VIEW_W, MAP_VIEW_H) / cam.zoom
-	var margin := 9.0 * TILE  # (as the classic map: the view may run past the edge, so a hero near it can be centred)
+	var margin := 2.0 * TILE  # (as the classic map: the view runs a little past the edge, onto its rocky border)
 	return Vector2(clampf(p.x, -margin, maxf(-margin, size.x - view_sz.x + margin)),
 		clampf(p.y, -margin, maxf(-margin, size.y - view_sz.y + margin)))
 
@@ -174,7 +174,7 @@ func _process(delta: float) -> void:
 			HoverInfo.hide_for(self)
 			hud.set_status("")
 			view.set_hover(Vector2i(-1, -1))
-	elif _info_tile != Vector2i(-2, -2) and (busy or mpos.x > MAP_VIEW_W or mpos.y > MAP_VIEW_H):
+	elif _info_tile != Vector2i(-2, -2) and (busy or mpos.x > MAP_VIEW_W or mpos.y > MAP_VIEW_H or mpos.x < 0 or mpos.y < 0):
 		_info_tile = Vector2i(-2, -2)
 		HoverInfo.hide_for(self)
 	hud.update_minimap_view(cam.position, Vector2(MAP_VIEW_W, MAP_VIEW_H) / cam.zoom)
@@ -247,6 +247,12 @@ func _unhandled_input(e: InputEvent) -> void:
 			_cam_target = _clamp_cam(_cam_target - e.relative / cam.zoom)
 			cam.position = _cam_target
 			_drag_synced = true
+			return
+		if e.position.x < 0 or e.position.y < 0:  # (a cursor off the window reads nothing)
+			view.set_hover(Vector2i(-1, -1))
+			hud.set_status("")
+			HoverInfo.hide_for(self)
+			_info_tile = Vector2i(-2, -2)
 			return
 		var t := _pick(view.tile_at(_event_world(e)), _event_world(e))
 		view.set_hover(t if rules.inside(t) else Vector2i(-1, -1))

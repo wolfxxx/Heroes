@@ -20,7 +20,8 @@ var _vic_row: HBoxContainer
 var _loss_row: HBoxContainer
 var _random_opts: Control
 var _preview: TextureRect   # the chosen scenario's map in miniature (as the classic scenario screen)
-var _preview_info: Label
+var _preview_info: Label    # the land, then the towns and mines (the line under it)
+var _preview_info2: Label
 var _preview_box: Control
 var _preview_cache := {}    # "scenario/faction" -> [texture, text]
 var _logo: Control
@@ -320,7 +321,7 @@ func _build_setup() -> void:
 	rv.add_child(_random_opts)
 	var pm := MarginContainer.new()
 	pm.add_theme_constant_override("margin_left", 12)
-	pm.add_theme_constant_override("margin_top", 6)
+	pm.add_theme_constant_override("margin_top", 2)
 	var pb := HBoxContainer.new()
 	pb.add_theme_constant_override("separation", 18)
 	pm.add_child(pb)
@@ -332,15 +333,21 @@ func _build_setup() -> void:
 	fr.add_theme_stylebox_override("panel", fs)
 	pb.add_child(fr)
 	_preview = TextureRect.new()
-	_preview.custom_minimum_size = Vector2(140, 140)
+	_preview.custom_minimum_size = Vector2(172, 172)
 	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	fr.add_child(_preview)
-	_preview_info = UI.label("", 18, Color(0.85, 0.8, 0.68))
+	var pv := VBoxContainer.new()  # beside the map: a heading and the two lines together
+	pv.add_theme_constant_override("separation", 4)
+	pv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pb.add_child(pv)
+	pv.add_child(UI.label("The land", 20, UI.GOLD))
+	_preview_info = UI.label("", 20, UI.TEXT)
 	_preview_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_preview_info.custom_minimum_size.x = 480
-	_preview_info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	pb.add_child(_preview_info)
+	_preview_info.custom_minimum_size.x = 420
+	pv.add_child(_preview_info)
+	_preview_info2 = UI.label("", 20, UI.TEXT)
+	pv.add_child(_preview_info2)
 	_preview_box = pm
 	rv.add_child(pm)
 	var spacer := Control.new()
@@ -506,11 +513,12 @@ func _refresh_preview() -> void:
 			txt += ", with %s" % " and ".join(PackedStringArray(words.slice(1, 3)))
 		if counts.get(WorldGen.T_WATER, 0) > size.x * size.y * 0.04:
 			txt += "; lakes"
-		txt += ".
-%d towns, %d mines." % [wd["towns"].size(), mines]
-		_preview_cache[key] = [ImageTexture.create_from_image(img), txt]
+		txt += "."
+		var txt2 := "%d towns, %d mines." % [wd["towns"].size(), mines]
+		_preview_cache[key] = [ImageTexture.create_from_image(img), txt, txt2]
 	_preview.texture = _preview_cache[key][0]
 	_preview_info.text = _preview_cache[key][1]
+	_preview_info2.text = _preview_cache[key][2]
 
 ## The details pane: size, rivals and the two conditions (the hero icon follows the chosen hero).
 func _refresh_scenario() -> void:
