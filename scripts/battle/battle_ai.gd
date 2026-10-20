@@ -24,12 +24,29 @@ static func decide(L: BattleLogic, s: Dictionary) -> Dictionary:
 		for e in enemies:
 			var v := _value_of_damage(L, e, _avg(L.damage_range(s, e, true)))
 			if L.cdata(e)["shots"] > 0:
-				v *= 1.25  # silence enemy shooters first
+				v *= SHOOT_SHOOTERS  # silence enemy shooters first
+			v *= 1.0 + THREAT_TARGET * _danger(L, e, s["side"])
 			if v > bv:
 				bv = v
 				best = e
 		return {"type": "shoot", "target": best}
 	var reach := L.reachable(s)
+	# a shooter held in melee: step away to a spot no enemy is next to (and, best, out of their reach), to shoot
+	# again next turn, unless striking here is worth more (it strikes at half in melee)
+	if STEP_AWAY and s["shots"] > 0 and not L.is_wide(s) and not reach.is_empty():
+		var thr := _threats(L, s, reach)
+		var free := []
+		for h in reach:
+			var touching := false
+			for n in BattleLogic.neighbors(h):
+				var o = L.stack_at(n)
+				if o != null and o["side"] != s["side"] and not o.get("tower", false):
+					touching = true
+			if not touching:
+				free.append(h)
+		if not free.is_empty():
+			free.sort_custom(func(a, b): return thr.get(a, 0.0) < thr.get(b, 0.0))
+			return {"type": "move", "hex": free[0]}
 	var best_act := {}
 	var best_score := -1e9
 	for e in enemies:
@@ -97,7 +114,20 @@ static func decide(L: BattleLogic, s: Dictionary) -> Dictionary:
 		return {"type": "defend"}
 	return {"type": "move", "hex": best_h}
 
+## How much harm an enemy stack can do: its value as a share of the whole enemy army (0..1).
+static func _danger(L: BattleLogic, e: Dictionary, my_side: int) -> float:
+	var total := 0.0
+	for o in L.alive_stacks(e["side"]):
+		if not o.get("machine", false):
+			total += L.cdata(o)["ai_value"] * o["count"]
+	return L.cdata(e)["ai_value"] * e["count"] / maxf(1.0, total)
+
 ## Tuning, measured with tools/ai_tournament.gd against the frozen baseline.
+const SHOOT_SHOOTERS := 1.25
+const THREAT_TARGET := 1.0
+const STEP_AWAY := false
+const SPELL_MIN := 40.0
+const BUFF := 0.5
 const SHOOTER_BLOCK := 1.4
 const RETALIATION := 1.0
 const HOLD := true
@@ -190,7 +220,7 @@ static func decide_spell(L: BattleLogic, side: int) -> Dictionary:
 						continue
 					var v := 0.0
 					if sp in ["bless", "haste", "shield", "stone_skin"] and not a["effects"].has(sp):
-						v = L.cdata(a)["ai_value"] * a["count"] * (0.15 if sp in ["bless", "haste"] else 0.08)
+						v = L.cdata(a)["ai_value"] * a["count"] * (0.15 if sp in ["bless", "haste"] else 0.08) * BUFF
 					elif sp in ["cure", "resurrection"]:
 						var lost: int = L.start_counts.get(a["uid"], a["count"]) - a["count"]
 						if lost > 0 or sp == "cure":
@@ -218,4 +248,4 @@ static func decide_spell(L: BattleLogic, side: int) -> Dictionary:
 				if v > bv:
 					bv = v
 					best = {"spell": sp, "hex": Vector2i(7, 5)}
-	return best if bv > 40.0 else {}
+	return best if bv > SPELL_MIN else {}

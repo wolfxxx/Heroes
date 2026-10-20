@@ -150,6 +150,15 @@ static func _shot_artifacts(w: Dictionary) -> void:
 				var i := q.y * size.x + q.x
 				if w["blocked"][i] != 0 or w["terrain"][i] in [WorldGen.T_WATER, WorldGen.T_ROAD]:
 					continue
+				var near_tree := false  # (a tree's long shadow or a stump beside it read as a stain under the item)
+				for d in w["decor"]:
+					var dt := Vector2i(d["p"] / WorldGen.TILE)
+					var k: String = d["k"]
+					if absi(dt.x - q.x) <= 1 and dt.y - q.y >= -1 and dt.y - q.y <= 2 \
+							and (k.begins_with("tree") or k.contains("stump") or k.begins_with("snow_pine")):
+						near_tree = true
+				if near_tree:
+					continue
 				var o := {"type": "artifact", "artifact": picks.pop_front(), "uid": GameState.next_uid(), "pos": q}
 				w["objects"][o["uid"]] = o
 				w["decor"] = w["decor"].filter(func(d): return Vector2i(d["p"] / WorldGen.TILE) != q)  # (flowers on it)

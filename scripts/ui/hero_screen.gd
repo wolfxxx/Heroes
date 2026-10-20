@@ -441,8 +441,8 @@ class _Socket extends Control:
 		if tex and not empty and inner:
 			var ts := tex.get_size()
 			if linked:  # (taken by the combination worn elsewhere: a greyed copy of it, as the classic, and a chain)
-				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86), Color(0.55, 0.53, 0.6, 0.5))
-				draw_rect(r.grow(-3), Color(0.05, 0.04, 0.06, 0.35))
+				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86), Color(0.68, 0.66, 0.74, 0.8))
+				draw_rect(r.grow(-3), Color(0.12, 0.11, 0.14, 0.3))
 				_chain(size * 0.5 + Vector2(0, size.y * 0.24), Color(tier_col, 0.95))
 			else:
 				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86))

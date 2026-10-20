@@ -1395,7 +1395,7 @@ func _anim_death(st: Dictionary) -> void:
 		var home: Vector2 = s.get_meta("home", Vector2.ZERO)
 		s.position = home + Vector2(0, -16)
 		var tw0 := s.create_tween().set_parallel(true)
-		tw0.tween_property(s, "modulate", Color(0.78, 0.74, 0.72), 0.5)
+		tw0.tween_property(s, "modulate", Color(0.52, 0.48, 0.47), 0.5)  # (dark and grey: never read as a living stack)
 		tw0.tween_property(s, "position", home, 0.22).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 		var dust := _Dust.new()
 		dust.position = n.position + Vector2(0, -4)
@@ -1423,6 +1423,7 @@ func _anim_spell(ev: Dictionary) -> void:
 	Audio.sfx(sfx_map.get(sp, "spell_cast"))
 	if sp != "death_cloud" and L.heroes[ev["side"]] != null:
 		_spell_banner(GameData.SPELLS[sp]["name"], ev["side"])
+		_flush_log(ev)  # (its log line with its banner, not only when it lands)
 	var targets: Array = ev["targets"]
 	var centers := []
 	var area: bool = sp == "death_cloud" or (GameData.SPELLS.has(sp) and GameData.SPELLS[sp]["target"] == "area")
@@ -1752,7 +1753,8 @@ func _see_through() -> void:
 		if n.get_node("Badge").st.get("alive", false):
 			if _ring(n).hit_until > now:
 				focus[k] = true
-			info.append([n, n.global_position, float(n.get_meta("top", 120.0)), HEX_W * (0.95 if L.is_wide(n.get_node("Badge").st) else 0.5), focus.has(k)])
+			info.append([n, n.global_position, float(n.get_meta("top", 120.0)), HEX_W * (0.95 if L.is_wide(n.get_node("Badge").st) else 0.5), focus.has(k),
+				cur != null and cur["uid"] == k])
 	for k in units:
 		var n: Node2D = units[k]
 		var holes := PackedVector4Array()
@@ -1762,12 +1764,18 @@ func _see_through() -> void:
 				continue
 			for bk in info:
 				var dy: float = f[1].y - bk[1].y
+				# (a much bigger figure just behind the stack whose turn it is: its wings and body fill the space
+				# around that stack's figure, which drowned in them; it fades too)
+				if bk != f and bk[5] and not f[4] and -dy >= 20.0 and -dy < bk[2] * 0.9 and f[2] > bk[2] * 1.15 \
+						and absf(f[1].x - bk[1].x) < (f[3] + bk[3]) * 0.6:
+					fade = 0.55
+					continue
 				if bk == f or dy < 20.0 or f[2] - dy < 36.0 or absf(f[1].x - bk[1].x) > (f[3] + bk[3]) * 0.75:
 					continue
 				if bk[4] and not f[4]:
 					# (it covers a good part of the stack in play: well up its body and across its middle)
 					if f[2] - dy >= 0.3 * bk[2] and absf(f[1].x - bk[1].x) < (f[3] + bk[3]) * 0.7:
-						fade = 0.45
+						fade = 0.55
 				elif holes.size() < 4:
 					holes.append(Vector4(bk[1].x, bk[1].y - 26.0, bk[3] * 0.95, 52.0))
 		var m := n.get_node("Sprite").material as ShaderMaterial

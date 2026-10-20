@@ -2,7 +2,7 @@
 
 Read this first, then `ARCHITECTURE.md` (code map), `ASSETS.md` (every asset path and the art pipeline) and
 `CREDITS.md`. This file is written so that another person or another AI assistant can pick the work up exactly
-where it stopped. Last updated 2026-10-20 (round 44, tournament harness and first battle-AI changes, committed and pushed; judge 44 run), branch `main`, remote
+where it stopped. Last updated 2026-10-20 (round 45, judge 44 fixes and battle-AI step 2, committed and pushed; judge 45 run), branch `main`, remote
 `https://github.com/wolfxxx/Heroes.git` (public repo).
 
 ## 1. The project in one paragraph
@@ -24,6 +24,14 @@ the look and feel of HoMM3, and each round fixes what the judge found.
   it (scores in section 7). Next step of the plan: the AI work (section 8).
 - Found and fixed on the way: the all-computer simulation could overflow Godot's message queue once one computer
   player had beaten the others (the AI turn loop never waited a frame); `_run_ai_turns` now waits one frame per turn.
+- Round 45 committed and pushed, judge 45 run on it: judge 44 fixes — a big figure just behind the stack whose turn it is fades too
+  (`_see_through`, the 6th info field), fades a little lighter (0.55); corpses darker and greyer; a spell's log line
+  shows with its banner (`_flush_log` in `_anim_spell`); the combination's greyed copy brighter; the showcase
+  artifacts keep clear of trees and stumps. Battle AI step 2, measured with the tournament: shooters weigh a target by
+  its share of the enemy army (`THREAT_TARGET` 1.0), buff spells valued at half (`BUFF` 0.5: over-valuing them lost
+  army), the step-away of a blocked shooter built but left off (`STEP_AWAY`, neutral). Result vs the frozen baseline:
+  53% wins, +1.9 points of army kept (+-1.0), up from +1.4. The siege-gate knot in battle_siege_later is only partly
+  better (the Angel behind the Vampires now fades; the Vampires in the moat are still small and half hidden).
 - Round 44 (AI work begins) committed and pushed, judge 44 run on it: `tools/ai_tournament.gd` plays the current battle AI against a
   frozen copy (`tools/ai/battle_ai_baseline.gd`, class `BattleAIBaseline`) on equal-value army pairings, each fought
   twice with the AIs swapping sides on the same dice (identical AIs split exactly 50%); it prints win rate and a
@@ -146,11 +154,26 @@ magenta key for pink fringes (recolour them, as was done for the Luck clover).
 | 41 | 9.2 | 9.2 | 9.4 | 9.6 | 8.9 | 9.2 |
 | 42 | 9.2 | 9.3 | 9.4 | 9.7 | 8.9 | 9.3 |
 | 43 | 9.2 | 9.4 | 9.4 | 9.7 | 8.9 | 9.3 |
+| 44 | 9.2 | 9.4 | 9.4 | 9.7 | 8.9 | 9.3 |
 
 Trend: gains have flattened at 9.2 for three rounds. Battle is the weakest area; the next big step most likely comes
 from battle (crowded siege melees, the lightning effect) or from new gameplay (section 8), not more small polish.
 
 ## 8. What's next
+
+### Open findings from judge 44 (first battle-AI round; overall 9.3)
+The AI's choices read as sensible on screen (holding back, hitting the Angel after it retaliated, focusing targets).
+1. battle_siege_later: the stack in play (Vampires) is buried under the Angel's wings and the Ghosts in a four-stack
+   knot; the front-figure fade did not fire for it.
+2. Corpses read as living units (battle_2, battle_1): darken/desaturate them more and keep them under the rings.
+3. adventure_artifacts: the relic's pale light reads as a dark stain under the banner (drop it or make it warm
+   white); a tree stump butts against the cape.
+4. hero_screen: the greyed copy in a combination's taken sockets is too dark (~15%): lift it to 40-50%.
+5. battle_siege_haven: the living Bone Dragon is drawn semi-transparent while it is not in front of the stack in
+   play; its badge sits detached.
+6. A spell banner is on screen with no log line yet (battle_0, battle_siege): log the cast when it is announced.
+7. town_build_rich: a two-line price shifts that row's caption baseline.
+8. adventure_overview: the map reads busier with wandering monsters than HoMM3's typical density.
 
 ### Open findings from judge 43 (second artifact polish round; overall 9.3, adventure 9.4)
 1. Siege-gate pile-ups (battle_siege_haven, battle_siege_later) — unchanged, the main battle problem.
