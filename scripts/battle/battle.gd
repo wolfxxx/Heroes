@@ -363,7 +363,8 @@ func _breathe(n: Node2D, base: Vector2) -> void:
 	n.set_meta("base_scale", base)
 
 ## A figure whose wings spread past its hexes draws a little smaller while another stack stands next to it (its
-## wings no longer swallow the neighbour); full size again in the open.
+## wings no longer swallow the neighbour), and any figure in a melee of three or more stacks a little smaller; full
+## size again in the open.
 func _crowd() -> void:
 	for k in units:
 		var n: Node2D = units[k]
@@ -373,15 +374,17 @@ func _crowd() -> void:
 		var full: Vector2 = n.get_meta("full_scale")
 		var vis := fig_vis_w(st["id"]) * full.x
 		var span := HEX_W * (2.0 if L.is_wide(st) else 1.0)
-		if vis <= span:
-			continue
 		var kk := 1.0
+		var near := {}
 		for c in L.cells(st):
 			for h in BattleLogic.neighbors(c):
 				var o = L.stack_at(h)
 				if o != null and o != st and not o.get("machine", false):
-					kk = clampf(span * 0.95 / vis, 0.88, 1.0)
-					break
+					near[o["uid"]] = true
+		if not near.is_empty() and vis > span:
+			kk = clampf(span * 0.95 / vis, 0.88, 1.0)
+		if near.size() >= 2:  # (in a melee of three or more: every figure a little smaller, each keeps to its hexes)
+			kk = minf(kk, 0.9)
 		if is_equal_approx(kk, float(n.get_meta("crowd", 1.0))):
 			continue
 		var was: float = n.get_meta("crowd", 1.0)
@@ -2245,15 +2248,31 @@ class _QueueIcon extends Control:
 			g.position.y -= k * 3
 			draw_rect(g, Color(col.darkened(0.35), 0.16))
 		var t2: Texture2D = tex if tex else Assets.creature(st["id"])
-		var src := head_crop(st["id"] if tex == null else "tower_%d" % tex.get_instance_id(), t2)
+		var whole: bool = st.get("machine", false) or tex != null
+		var band := 30.0 if first else 26.0
 		if st["side"] == 1:
 			draw_set_transform(Vector2(size.x, 0), 0.0, Vector2(-1, 1))
-		draw_texture_rect_region(t2, inner, src)
+		if whole:
+			# a war machine or a tower's archer: the whole figure fitted above the band (a head crop of a ballista
+			# was bare beams; a tent and a cart could not be told apart)
+			var key := "whole_%d" % t2.get_instance_id()
+			if not _crops.has(key):
+				var img := t2.get_image()
+				if img and img.is_compressed():
+					img.decompress()
+				_crops[key] = Rect2(_solid_rect(img)) if img else Rect2(Vector2.ZERO, t2.get_size())
+			var src: Rect2 = _crops[key]
+			var area := Rect2(inner.position, Vector2(inner.size.x, inner.size.y - band + 2))
+			var sc := minf(area.size.x / src.size.x, area.size.y / src.size.y)
+			var dsz := src.size * sc
+			draw_texture_rect_region(t2, Rect2(area.position + Vector2((area.size.x - dsz.x) * 0.5, area.size.y - dsz.y), dsz), src)
+		else:
+			draw_texture_rect_region(t2, inner, head_crop(st["id"], t2))
 		draw_set_transform(Vector2.ZERO)
-		var txt := "" if st.get("machine", false) else str(st["count"])
+		# (a machine and a tower named in the band: they have no count)
+		var txt: String = ("Tower" if tex != null else {"first_aid_tent": "Tent", "ammo_cart": "Cart"}.get(st["id"], GameData.CREATURES[st["id"]]["name"])) if whole else str(st["count"])
 		var f := UI.title_font()
-		var fs := 28 if first else 23
-		var band := 30.0 if first else 26.0
+		var fs := (28 if first else 23) if not whole else (19 if first else 16)
 		draw_rect(Rect2(Vector2(4, size.y - band - 3), Vector2(size.x - 8, band)), Color(col.darkened(0.5), 0.9))
 		draw_rect(r, col, false, 4.0)
 		if first:  # whose turn: a bright gold frame around the side colour

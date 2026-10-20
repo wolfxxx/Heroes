@@ -315,6 +315,8 @@ func _build_border() -> void:
 	border.y_sort_enabled = true
 	border.z_index = 51
 	add_child(border)
+	var rock_mat := ShaderMaterial.new()  # (rock, not grass, at their feet)
+	rock_mat.shader = load("res://scripts/adventure/border_rock.gdshader")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = size.x * 7919 + size.y
 	var snowy := func(t: Vector2i) -> bool:
@@ -325,7 +327,9 @@ func _build_border() -> void:
 	var put := func(foot: Vector2, m: float, near: Vector2i, ax: Vector2) -> void:
 		var mount := func(f: Vector2, mm: float) -> void:
 			var k := ("mountain_snow_%d" % rng.randi_range(1, 2)) if snowy.call(near) else ("mountain_%d" % rng.randi_range(1, 3))
-			border.add_child(_sprite("map/%s.png" % k, f, 256.0, rng.randf() < 0.5, 0.0, mm))
+			var sp := _sprite("map/%s.png" % k, f, 256.0, rng.randf() < 0.5, 0.0, mm)
+			sp.material = rock_mat
+			border.add_child(sp)
 		m *= rng.randf_range(0.8, 1.22)
 		mount.call(foot, m)
 		if rng.randf() < 0.4:
@@ -339,11 +343,11 @@ func _build_border() -> void:
 	var x := -2.0
 	while x < size.x + 2.0:  # along the top and the bottom
 		put.call(Vector2(x * TILE, 0.15 * TILE + rng.randf_range(-10, 6)), rng.randf_range(0.6, 0.7), Vector2i(int(x), 0), Vector2.RIGHT)
-		x += rng.randf_range(2.4, 4.0)
+		x += rng.randf_range(2.0, 4.4)
 	x = -2.0
 	while x < size.x + 2.0:
 		put.call(Vector2(x * TILE, (size.y + 1.3) * TILE + rng.randf_range(-6, 8)), rng.randf_range(0.58, 0.68), Vector2i(int(x), size.y - 1), Vector2.RIGHT)
-		x += rng.randf_range(2.4, 4.0)
+		x += rng.randf_range(2.0, 4.4)
 	var y := 1.0
 	while y < size.y + 1.0:  # down the sides
 		put.call(Vector2(-1.2 * TILE + rng.randf_range(-8, 4), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(0, int(y)), Vector2.DOWN)

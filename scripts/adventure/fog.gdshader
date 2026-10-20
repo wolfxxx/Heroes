@@ -2,7 +2,7 @@ shader_type canvas_item;
 // Fog of war overlay: fog_map is one texel per tile, 1 = explored. The edge is a smooth field over the 4x4 tiles
 // around each pixel (the compact bump kernel of terrain.gdshader), so it is round instead of stair-stepped, then made
 // ragged with gradient noise (value noise showed tile-sized squares). Past the map's edge: a ridge of boulders and tall
-// crags one to three tiles deep, its outline following the rocks (the classic map's rocky edge), casting its shadow
+// crags two to three tiles deep, its outline following the rocks (the classic map's rocky edge), casting its shadow
 // onto the map and the dark slate void beyond it, told apart from the black shroud (the view may run a little past the
 // edge), never the bare background with stray tree shadows.
 uniform sampler2D fog_map : filter_nearest;
@@ -93,8 +93,8 @@ void fragment() {
 	vec2 mpx = map_size * tile_px;
 	vec2 out_v = max(-world, world - mpx);  // >0 past an edge
 	float inside = min(min(world.x, world.y), min(mpx.x - world.x, mpx.y - world.y));
-	// how far the ridge runs out past the edge: one to three tiles, wandering slowly, its outline following the boulders
-	float band = clamp(44.0 + 110.0 * (fbm(world / 210.0) + 0.45) + 16.0 * fbm(world / 27.0), 36.0, 170.0);
+	// how far the ridge runs out past the edge: about two to three tiles, wandering slowly, its outline following the boulders
+	float band = clamp(110.0 + 70.0 * (fbm(world / 210.0) + 0.45) + 16.0 * fbm(world / 27.0), 100.0, 190.0);  // (deep enough that the void shows only in a few bays)
 	float enc = 4.0 + 34.0 * clamp(fbm(world / 110.0) + 0.5 + 0.4 * fbm(world / 31.0), 0.0, 1.0);  // and how far its boulders reach in onto the map (wandering)
 	vec2 h0 = vec2(0.0);
 	if (inside < 90.0) {  // (the rocks only near the edge: the rest of the map skips them)

@@ -342,7 +342,7 @@ func _hero_view(hero: Dictionary) -> void:
 		if t > int(hero["xp"]):
 			nxt = t
 			break
-	ml.add_child(UI.label("  Exp %d / %d" % [hero["xp"], nxt] if nxt > 0 else "  Exp %d" % hero["xp"], 18, Color(0.85, 0.8, 0.68)))
+	ml.add_child(UI.label("  Exp %d / %d" % [hero["xp"], nxt] if nxt > 0 else "  Exp %d" % hero["xp"], 19, Color(0.9, 0.85, 0.72)))
 	_detail.add_child(ml)
 	var army := ArmyStrip.new()
 	army.slot_size = Vector2(40, 40)
@@ -377,7 +377,7 @@ func _kingdom_view(me: Dictionary) -> void:
 			inc[m["resource"]] += m["amount"]
 			mines[m["resource"]] = mines.get(m["resource"], 0) + 1
 	var dim := Color(0.6, 0.56, 0.5)
-	_detail.add_child(UI.label("Income per day", 18, Color(0.9, 0.85, 0.72)))
+	_detail.add_child(UI.label("Income per day", 20, Color(0.9, 0.85, 0.72)))
 	# gold across the top (towns and mines), the six others in pairs under it, each with the mines that bring it
 	var cell := func(r: String, w: float) -> HBoxContainer:
 		var box := HBoxContainer.new()
@@ -403,7 +403,7 @@ func _kingdom_view(me: Dictionary) -> void:
 	if g.get_child_count() > 0:
 		_detail.add_child(g)
 	else:
-		_detail.add_child(UI.label("No mines held yet", 18, UI.TEXT))
+		_detail.add_child(UI.label("No mines held yet", 20, UI.TEXT))
 	# the week ahead: the gold it brings and the creatures the dwellings breed
 	var grow := 0
 	var dw := 0
@@ -416,7 +416,7 @@ func _kingdom_view(me: Dictionary) -> void:
 	var gap := Control.new()  # (the week ahead set apart from the day's income)
 	gap.custom_minimum_size.y = 12
 	_detail.add_child(gap)
-	_detail.add_child(UI.label("Each week", 18, Color(0.9, 0.85, 0.72)))
+	_detail.add_child(UI.label("Each week", 20, Color(0.9, 0.85, 0.72)))
 	var wk := HBoxContainer.new()
 	wk.add_theme_constant_override("separation", 6)
 	wk.add_child(UI.icon(Assets.res_icon("gold"), Vector2(32, 32)))
@@ -424,7 +424,7 @@ func _kingdom_view(me: Dictionary) -> void:
 	wk.add_child(UI.label("  +%d creatures" % grow, 20, UI.TEXT))
 	_detail.add_child(wk)
 	_detail.add_child(UI.label("%d dwelling%s, %d hero%s" % [dw, "" if dw == 1 else "s", me["heroes"].size(),
-		"" if me["heroes"].size() == 1 else "es"], 19, Color(0.9, 0.85, 0.72)))
+		"" if me["heroes"].size() == 1 else "es"], 21, Color(0.9, 0.85, 0.72)))
 
 ## The status window's date view: the day, the week and the month, and the week's creature.
 func _date_view() -> void:
@@ -433,9 +433,9 @@ func _date_view() -> void:
 	_detail.add_child(UI.label("Week %d, Month %d" % [((d - 1) / 7) % 4 + 1, (d - 1) / 28 + 1], 22))
 	var cal := _Calendar.new()  # the days of this week and the weeks of this month, today's lit
 	cal.day = d
-	cal.custom_minimum_size = Vector2(MINI - 24, 64)
+	cal.custom_minimum_size = Vector2(MINI - 24, 76)
 	_detail.add_child(cal)
-	_detail.add_child(UI.label("Day %d of the campaign" % d, 17, Color(0.85, 0.8, 0.68)))
+	_detail.add_child(UI.label("Day %d of the campaign" % d, 20, Color(0.9, 0.85, 0.72)))
 	var cid: String = world.get("week_creature", "")
 	if cid != "" and GameData.CREATURES.has(cid):
 		var h := HBoxContainer.new()
@@ -445,7 +445,7 @@ func _date_view() -> void:
 		h.add_child(l)
 		_detail.add_child(h)
 	else:
-		_detail.add_child(UI.label("%d day%s to the next week" % [7 - (d - 1) % 7, "" if 7 - (d - 1) % 7 == 1 else "s"], 17))
+		_detail.add_child(UI.label("%d day%s to the next week" % [7 - (d - 1) % 7, "" if 7 - (d - 1) % 7 == 1 else "s"], 20))
 
 ## An empty list slot: a shallow recess in the panel, not a black box.
 func _empty_slot(h: float) -> Control:
@@ -954,14 +954,14 @@ class _Calendar extends Control:
 		var dw := (size.x - 6 * 6) / 7.0
 		var di := (day - 1) % 7
 		for i in 7:
-			var r := Rect2(Vector2(i * (dw + 6), 0), Vector2(dw, 30))
+			var r := Rect2(Vector2(i * (dw + 6), 0), Vector2(dw, 38))
 			draw_rect(r, UI.GOLD if i == di else (Color(0.42, 0.34, 0.22) if i < di else Color(0.12, 0.09, 0.06)))
 			draw_rect(r, UI.GOLD_DARK, false, 1.5)
-			draw_string(UI.font(), r.position + Vector2(0, 22), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, dw, 18,
+			draw_string(UI.font(), r.position + Vector2(0, 28), str(i + 1), HORIZONTAL_ALIGNMENT_CENTER, dw, 22,
 				Color(0.1, 0.06, 0.03) if i == di else Color(0.85, 0.8, 0.68))
 		var ww := (size.x - 3 * 6) / 4.0
 		var wi := ((day - 1) / 7) % 4
 		for i in 4:
-			var r := Rect2(Vector2(i * (ww + 6), 42), Vector2(ww, 14))
+			var r := Rect2(Vector2(i * (ww + 6), 50), Vector2(ww, 18))
 			draw_rect(r, UI.GOLD if i == wi else (Color(0.42, 0.34, 0.22) if i < wi else Color(0.12, 0.09, 0.06)))
 			draw_rect(r, UI.GOLD_DARK, false, 1.5)

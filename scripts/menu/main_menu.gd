@@ -585,6 +585,7 @@ func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, 
 	t.add_theme_color_override("font_outline_color", Color(0.06, 0.035, 0.01, 1.0))
 	# (legible on the light wood of an unselected card too; thinner on small names, a thick one made them muddy)
 	t.add_theme_constant_override("outline_size", clampi(title_size / 3, 4, 8))
+	t.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(t)
 	var d := UI.label(sub, sub_size, UI.TEXT)
@@ -642,7 +643,7 @@ func _select_faction(f: String) -> void:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(238, 104)
-		_card(b, Assets.hero_portrait(hid), 52, h["name"], h["class"], 17, 17)
+		_card(b, Assets.hero_portrait(hid), 72, h["name"], h["class"], 18, 18)  # (a long name takes two lines)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)

@@ -115,13 +115,21 @@ func _build() -> void:
 	_buttons.add_theme_constant_override("separation", 8)
 	add_child(_buttons)
 
-	var bar := HBoxContainer.new()  # (the treasury along the foot, as on the adventure map: large enough to read)
+	# the treasury along the whole foot, as on the adventure map: even cells, the date at the right
+	var bar := HBoxContainer.new()
 	bar.position = Vector2(24, 1080 - 46)
-	bar.add_theme_constant_override("separation", 40)
+	bar.add_theme_constant_override("separation", 0)
 	add_child(bar)
+	var d: int = world.get("day", 1)
+	var date := UI.label("Month %d, Week %d, Day %d" % [(d - 1) / 28 + 1, ((d - 1) / 7) % 4 + 1, (d - 1) % 7 + 1], 23, UI.GOLD)
+	date.position = Vector2(1920 - 56 - 360, 1080 - 44)
+	date.size = Vector2(360, 36)
+	date.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(date)
 	for r in GameData.RESOURCES:
 		var box := HBoxContainer.new()
 		box.add_theme_constant_override("separation", 4)
+		box.custom_minimum_size.x = 190 if r == "gold" else 170
 		box.add_child(UI.icon(Assets.res_icon(r), Vector2(36, 36)))
 		var l := UI.label("0", 23, Color(1, 0.95, 0.82))
 		box.add_child(l)
@@ -526,6 +534,14 @@ func _open_build() -> void:
 					id = c
 					break
 			h.add_child(_hall_card(id, m))
+	# (room for a two-row price on every card only when one of them has a long price: all cards alike, captions
+	# level in every row, and no empty band under the others)
+	var cards := []
+	for h in rows.get_children():
+		cards.append_array(h.get_children())
+	var two := cards.any(func(c): return c.cost.values().filter(func(v): return v > 0).size() > 4)
+	for c in cards:
+		c.min_rows = 2 if two else 1
 	m.add_buttons([["Close", ""]])
 	m.set_meta("cancel", "")
 	var r = await m.closed
@@ -543,7 +559,6 @@ func _hall_card(id: String, m: Modal) -> Control:
 	if st[0] in ["Can build", "Need resources"]:  # the price on the card, short amounts in red
 		card.cost = GameData.BUILDINGS[id]["cost"]
 		card.have = player["resources"]
-	card.min_rows = 2  # (room for a two-row price on every card: all cards alike, captions level in every row)
 	card.custom_minimum_size = Vector2(250, 222)
 	var bid: String = id
 	HoverInfo.attach(card, func(): return _building_info(bid), 0.0, true)
