@@ -260,7 +260,7 @@ func _build_setup() -> void:
 	_hero_row = HBoxContainer.new()
 	_hero_row.add_theme_constant_override("separation", 16)
 	v.add_child(_hero_row)
-	_hero_desc = UI.label("", 18)
+	_hero_desc = UI.label("", 20)
 	_hero_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_hero_desc.custom_minimum_size.x = 1000
 	v.add_child(_hero_desc)

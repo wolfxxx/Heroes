@@ -96,9 +96,9 @@ void fragment() {
 	float inside = min(min(world.x, world.y), min(mpx.x - world.x, mpx.y - world.y));
 	// how far the ridge runs out past the edge: about two to three tiles, wandering slowly, its outline following the boulders
 	float band = clamp(110.0 + 70.0 * (fbm(world / 210.0) + 0.45) + 16.0 * fbm(world / 27.0), 100.0, 190.0);  // (deep enough that the void shows only in a few bays)
-	float enc = 2.0 + 64.0 * pow(clamp(fbm(world / 150.0) + 0.45 + 0.45 * fbm(world / 37.0), 0.0, 1.0), 1.6);  // and how far its boulders reach in onto the map (wandering)
+	float enc = 2.0 + 120.0 * pow(clamp(fbm(world / 230.0) * 1.4 + 0.4 + 0.4 * fbm(world / 41.0), 0.0, 1.0), 2.0);  // (a sliver here, two tiles of rock there)  // and how far its boulders reach in onto the map (wandering)
 	vec2 h0 = vec2(0.0);
-	if (inside < 110.0) {  // (the rocks only near the edge: the rest of the map skips them)
+	if (inside < 170.0) {  // (the rocks only near the edge: the rest of the map skips them)
 		h0 = rock_h(world);
 	}
 	if (inside < 0.0) {

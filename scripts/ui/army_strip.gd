@@ -157,7 +157,8 @@ static func upgrade_dialog(owner_node: Node, st: Dictionary, up: String, player:
 		col.add_child(g)
 		h.add_child(col)
 		if k == 0:
-			var arrow := UI.label("»", 110, Color(1.0, 0.86, 0.4), true)
+			var arrow := _Arrow.new()  # (a bold gold arrow at the portraits' height: a » glyph was a small mark)
+			arrow.custom_minimum_size = Vector2(110, 120)
 			arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			h.add_child(arrow)
 	var cost := TownLogic.upgrade_cost(st["id"], up, n)
@@ -241,3 +242,13 @@ class _Slot extends Control:
 		var sel = strip.group.get("sel")
 		var selected: bool = sel != null and sel[0] == strip and sel[1] == index
 		draw_rect(r, UI.GOLD if selected else UI.GOLD_DARK, false, 3.0 if selected else 2.0)
+
+## The upgrade dialog's arrow from the stack as it is to the stack upgraded.
+class _Arrow extends Control:
+	func _draw() -> void:
+		var c := size * 0.5 + Vector2(0, -60)
+		var pts := PackedVector2Array([c + Vector2(-48, -16), c + Vector2(8, -16), c + Vector2(8, -38), c + Vector2(50, 0),
+			c + Vector2(8, 38), c + Vector2(8, 16), c + Vector2(-48, 16)])
+		draw_colored_polygon(pts, Color(1.0, 0.82, 0.32))
+		pts.append(pts[0])
+		draw_polyline(pts, Color(0.35, 0.2, 0.05), 3.0, true)

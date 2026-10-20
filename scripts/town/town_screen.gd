@@ -117,12 +117,12 @@ func _build() -> void:
 
 	# the treasury along the whole foot, as on the adventure map: even cells, the date at the right
 	var bar := HBoxContainer.new()
-	bar.position = Vector2(24, 1080 - 56)
+	bar.position = Vector2(30, 1080 - 66)
 	bar.add_theme_constant_override("separation", 0)
 	add_child(bar)
 	var d: int = world.get("day", 1)
 	var date := UI.label("Month %d, Week %d, Day %d" % [(d - 1) / 28 + 1, ((d - 1) / 7) % 4 + 1, (d - 1) % 7 + 1], 23, UI.GOLD)
-	date.position = Vector2(1920 - 56 - 360, 1080 - 44)
+	date.position = Vector2(1920 - 56 - 360, 1080 - 62)
 	date.size = Vector2(360, 36)
 	date.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(date)
@@ -130,7 +130,7 @@ func _build() -> void:
 		var box := HBoxContainer.new()
 		box.add_theme_constant_override("separation", 4)
 		box.custom_minimum_size.x = 250 if r == "gold" else 218  # (the seven cells reach to the date)
-		box.add_child(UI.icon(Assets.res_icon(r), Vector2(52, 52)))  # (the pictures have a margin)
+		box.add_child(UI.icon(Assets.res_icon(r), Vector2(46, 46)))  # (in the strip between the garrison and the frame)
 		var l := UI.label("0", 27, Color(1, 0.95, 0.82))
 		box.add_child(l)
 		_res_labels[r] = l

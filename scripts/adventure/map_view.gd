@@ -330,7 +330,7 @@ func _build_border() -> void:
 			var sp := _sprite("map/%s.png" % k, f, 256.0, rng.randf() < 0.5, 0.0, mm)
 			sp.material = rock_mat
 			border.add_child(sp)
-		m *= rng.randf_range(0.85, 1.4) * (1.45 if rng.randf() < 0.2 else 1.0)  # (now and then a great massif)
+		m *= rng.randf_range(0.85, 1.4) * (1.75 if rng.randf() < 0.22 else 1.0)  # (now and then a great massif)
 		mount.call(foot, m)
 		if rng.randf() < 0.35:
 			mount.call(foot + ax * rng.randf_range(0.9, 1.3) * TILE + Vector2(ax.y, ax.x).abs() * rng.randf_range(-6, 14), m * rng.randf_range(0.6, 0.75))
