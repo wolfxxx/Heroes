@@ -9,8 +9,8 @@ You are a demanding visual/UX judge for "Heroes of the Shattered Crown", a Godot
 that aims to look and play like Heroes of Might and Magic III (classic adventure map, town screens, hex battles).
 Judge only what you can see in the screenshots; do not edit any files.
 
-Screenshots (all 1600x900) are in C:\Users\PC\Documents\GITHUBprojects\Heroes2\shots\judge<N>\ — 32 PNGs: menu,
-newgame, adventure_* (start, close, overview, path, snow, kingdom, date), hero_screen, town_* (build, build_rich,
+Screenshots (all 1600x900) are in C:\Users\PC\Documents\GITHUBprojects\Heroes2\shots\judge<N>\ — 33 PNGs: menu,
+newgame, adventure_* (start, close, overview, path, snow, kingdom, date, artifacts), hero_screen, town_* (build, build_rich,
 recruit, upgrade, capitol, blacksmith, haven_early, haven_full, necro_full), battle_* (0, 1, 2, fireball, hover,
 siege, siege_later, siege_turn, siege_haven, spellbook, surrender, turn, upgraded). View every one with the Read
 tool. For comparison the previous round's shots are in ...\shots\judge<N-1>\ (same names); look at a few to judge

@@ -36,6 +36,8 @@ func _ready() -> void:
 			s["seed"] = int(Shot.args.get("seed", "12345"))
 			s["faction"] = Shot.args.get("faction", s.get("faction", "haven"))
 		GameState.world = WorldGen.generate(s)
+		if Shot.setup == "artifacts":  # (judge shot: one artifact of each tier laid out beside the first hero)
+			_shot_artifacts(GameState.world)
 		if Shot.setup == "all_spells":
 			for h in GameState.world["heroes"].values():  # a seasoned hero: spells, skills and some gear
 				h["spells"] = GameData.SPELLS.keys()
@@ -123,6 +125,37 @@ func selected_hero() -> Dictionary:
 # ---------------------------------------------------------------------------------------------
 ## Screenshot harness options: --reveal (no fog), --cam=x,y (tile to centre on), --zoom=z; with --setup also
 ## --seed=n and --faction=f for the generated map.
+## Screenshot setup: a relic, a major, a minor and a treasure artifact and a set part on free tiles beside the first
+## hero, so the judge sees how artifacts lie on the map.
+static func _shot_artifacts(w: Dictionary) -> void:
+	var p0: Dictionary = w["players"][0]
+	var hero: Dictionary = w["heroes"][p0["heroes"][0]]
+	var size: Vector2i = w["size"]
+	var taken := {}
+	for o in w["objects"].values():
+		taken[o["pos"]] = true
+	for t in w["towns"].values():
+		for dy in range(-3, 2):
+			for dx in range(-3, 4):
+				taken[t["pos"] + Vector2i(dx, dy)] = true
+	var picks := ["banner_of_the_muster", "orb_of_embers", "cape_of_courage", "soldiers_shortsword", "dragonskull_helm"]
+	for r in range(2, 7):
+		for dy in range(-r, 1):  # (beside and above the hero: below, the resource bar would cover them)
+			for dx in range(-r, r + 1):
+				if picks.is_empty():
+					return
+				var q: Vector2i = hero["pos"] + Vector2i(dx, dy)
+				if q.x < 1 or q.y < 1 or q.x >= size.x - 1 or q.y >= size.y - 1 or taken.has(q):
+					continue
+				var i := q.y * size.x + q.x
+				if w["blocked"][i] != 0 or w["terrain"][i] in [WorldGen.T_WATER, WorldGen.T_ROAD]:
+					continue
+				var o := {"type": "artifact", "artifact": picks.pop_front(), "uid": GameState.next_uid(), "pos": q}
+				w["objects"][o["uid"]] = o
+				for ddy in range(-1, 2):
+					for ddx in range(-1, 2):
+						taken[q + Vector2i(ddx, ddy)] = true
+
 func _shot_view() -> void:
 	if Shot.args.has("reveal"):
 		human_player()["explored"].fill(1)

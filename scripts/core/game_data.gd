@@ -343,7 +343,7 @@ const ARTIFACTS := {
 		"desc": "+3 Morale, +2 Luck, +3 Defense; the army is immune to Curse and Weakness"},
 }
 ## The tiers with their names and socket colours (hero screen, hover panels).
-const ARTIFACT_TIERS := {"treasure": ["Treasure", Color(0.72, 0.5, 0.3)], "minor": ["Minor", Color(0.8, 0.82, 0.86)],
+const ARTIFACT_TIERS := {"treasure": ["Treasure", Color(0.66, 0.36, 0.2)], "minor": ["Minor", Color(0.8, 0.82, 0.86)],
 	"major": ["Major", Color(0.98, 0.8, 0.3)], "relic": ["Relic", Color(0.95, 0.35, 0.3)],
 	"combo": ["Combination", Color(0.75, 0.5, 1.0)]}
 

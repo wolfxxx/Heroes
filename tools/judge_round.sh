@@ -10,5 +10,5 @@ python -c "
 import glob
 from PIL import Image
 fs = glob.glob('shots/judge$N/*.png')
-print(len(fs), 'shots (want 32), wrong size:', [f for f in fs if Image.open(f).size != (1600, 900)])"
+print(len(fs), 'shots (want 33), wrong size:', [f for f in fs if Image.open(f).size != (1600, 900)])"
 git status --short

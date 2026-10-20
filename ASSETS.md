@@ -46,7 +46,8 @@ leaves the `_dead` sprite on the hex as a corpse.
 - `terrain/<terrain>.png` — seamless tileable 512x512 top-down ground textures: grass dirt sand snow swamp water road.
 - `map/town_<faction>.png` — town as seen on adventure map (3/4 oblique top-down), transparent, ~384x288 (occupies ~5x3 tiles at 64px; the entrance gate at bottom centre).
 - `map/<mine_id>.png` — mines (ids in `GameData.MINES`), transparent, ~192x160.
-- `map/res_<resource>.png` — resource pile on the ground, transparent, ~96x80.
+- `map/res_<resource>.png` — resource pile on the ground, transparent, ~96x80. `res_sulfur.png` was repainted
+  (sheet `sulfur` of `button_icons_paint.py`, then `tools/art/map_pile.py`: smoke dropped, scaled to the old size, shadow).
 - `map/chest.png`, `map/campfire.png`, `map/artifact.png` (generic artifact pedestal/glow), `map/shrine.png` (magic shrine),
   `map/windmill.png`, `map/obelisk.png`, `map/dwelling_neutral.png`, `map/watchtower.png`.
 - Decorations, transparent: `map/tree_oak_1..4.png`, `map/tree_pine_1..3.png`, `map/tree_dead_1..2.png`,

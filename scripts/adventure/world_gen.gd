@@ -274,6 +274,8 @@ func _generate(settings: Dictionary) -> Dictionary:
 				decor.append({"k": k, "p": Vector2((x + rng.randf_range(0.2, 0.8)) * TILE, (y + rng.randf_range(0.5, 0.95)) * TILE), "s": rng.randf_range(0.45, 0.7),
 					"m": rng.randf_range(0.8, 1.05) if k.begins_with("decor_") else rng.randf_range(0.7, 1.0), "flip": rng.randf() < 0.5, "flat": not upright})
 
+	_clear_view_of_objects()
+
 	# ---- players -------------------------------------------------------------------------
 	var res_amounts: Array = [[30000, 30, 15], [20000, 20, 10], [15000, 15, 7]][clampi(difficulty, 0, 2)]
 	var ai_amounts: Array = [[15000, 15, 7], [20000, 20, 10], [30000, 30, 15]][clampi(difficulty, 0, 2)]
@@ -607,6 +609,20 @@ func _place_artifacts(area_scale: float, n: int, reach: Dictionary) -> void:
 				if not o.is_empty():
 					_guard(o, 2.4 if GameData.ARTIFACTS[p]["tier"] == "major" else 1.6)
 
+## A tree standing on the tile just below an object rises over it (a gold pile inside a trunk): it becomes a low
+## bush there, so every object on the map can be seen.
+func _clear_view_of_objects() -> void:
+	for d in decor:
+		var k: String = d["k"]
+		if d.get("flat", false) or k.begins_with("mountain") or not (k.begins_with("tree") or k.begins_with("snow_pine")):
+			continue
+		var t := Vector2i(int(d["p"].x / TILE), int(d["p"].y / TILE))
+		for dx in [-1, 0, 1]:
+			if occupied.has(t + Vector2i(dx, -1)) or occupied.has(t + Vector2i(dx, 0)):
+				d["k"] = "bush_%d" % (1 + rng.randi() % 2)
+				d["s"] = rng.randf_range(0.5, 0.65)
+				break
+
 func _guard(o: Dictionary, strength := 1.6) -> void:
 	var p: Vector2i = o["pos"]
 	# beside the entrance, not on it (the figure hid the door); the entrance is still in its zone of control
@@ -615,7 +631,14 @@ func _guard(o: Dictionary, strength := 1.6) -> void:
 		cands = [Vector2i(0, 1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1)]
 	for d in cands:
 		var q: Vector2i = p + d
-		if inside(q) and _passable(q) and not occupied.has(q) and terrain[idx(q)] != T_ROAD:
+		# (and not beside another object or monster: two figures on neighbouring tiles were drawn into each other)
+		var crowded := false
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				var r: Vector2i = q + Vector2i(dx, dy)
+				if r != p and occupied.has(r) and occupied[r] != o["uid"]:
+					crowded = true
+		if inside(q) and _passable(q) and not occupied.has(q) and terrain[idx(q)] != T_ROAD and not crowded:
 			var m := {"type": "monster", "uid": GameState.next_uid(), "pos": q, "strength_bonus": strength}
 			_fill_monster(m)
 			world["objects"][m["uid"]] = m

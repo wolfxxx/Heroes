@@ -2,7 +2,7 @@
 
 Read this first, then `ARCHITECTURE.md` (code map), `ASSETS.md` (every asset path and the art pipeline) and
 `CREDITS.md`. This file is written so that another person or another AI assistant can pick the work up exactly
-where it stopped. Last updated 2026-10-20 (artifacts committed and pushed; judge 41 run on them), branch `main`, remote
+where it stopped. Last updated 2026-10-20 (round 42, artifact polish, committed and pushed; judge 42 run), branch `main`, remote
 `https://github.com/wolfxxx/Heroes.git` (public repo).
 
 ## 1. The project in one paragraph
@@ -24,6 +24,12 @@ the look and feel of HoMM3, and each round fixes what the judge found.
   it (scores in section 7). Next step of the plan: the AI work (section 8).
 - Found and fixed on the way: the all-computer simulation could overflow Godot's message queue once one computer
   player had beaten the others (the AI turn loop never waited a frame); `_run_ai_turns` now waits one frame per turn.
+- Round 42 (artifact polish after judge 41) committed and pushed, judge 42 run on it: a combination's linked sockets greyed out with a
+  chain mark, iron frames for non-artifact and empty sockets, copper for the treasure tier, dimmed backpack arrows,
+  the sulfur pile repainted (it read as a flat yellow disc; `tools/art/map_pile.py`), guards no longer placed beside
+  another object, trees just below an object turned into bushes (`WorldGen._clear_view_of_objects`), and a 33rd judge
+  shot `adventure_artifacts` (`--setup=artifacts`). The placement changes alter generated maps, so judge 42's adventure
+  shots show different maps from judge 41's.
 - Round 40 is committed and pushed.
 - Judge 40 scores: menu 9.2, adventure 9.2, town 9.4, dialogs 9.5, battle 8.9, **overall 9.2**.
 - Rounds 31–40 were run as one uninterrupted loop on the user's instruction ("build, commit and push, judge cycle
@@ -73,7 +79,8 @@ the look and feel of HoMM3, and each round fixes what the judge found.
 | One screenshot | `Godot --path . -- --shot=shots/x.png --scene=res://scenes/battle.tscn --delay=3 --setup=demo` |
 | Judge screenshot set | `sh tools/judge_round.sh N` → `shots/judgeN/` (32 shots, 1600x900) |
 
-Screenshot harness flags (`scripts/core/shot.gd`, coordinates in 1920x1080 space, images saved at 1600x900):
+Screenshot harness flags (`scripts/core/shot.gd`, coordinates in 1920x1080 space, images saved at 1600x900;
+`--setup=artifacts` lays an artifact of each tier beside the first hero):
 `--shot --scene --delay --shots --interval --click=x,y;x,y (prefix r for right click) --keys=A;S --hover=x,y`;
 scenes also read `--setup=` (`demo`, `rich`, `new_game`, `all_spells`, `upgraded`, `siege`, `siege_haven`,
 `necro_rich`, `necro_max`, `x`), `--seed --faction --reveal --cam=x,y --zoom --broken=a,b`. The harness parks the
@@ -118,11 +125,26 @@ magenta key for pink fringes (recolour them, as was done for the Luck clover).
 | 38 | 9.2 | 9.2 | 9.2 | 9.4 | 8.9 | 9.2 |
 | 39 | 9.2 | 9.2 | 9.3 | 9.4 | 8.8 | 9.2 |
 | 40 | 9.2 | 9.2 | 9.4 | 9.5 | 8.9 | 9.2 |
+| 41 | 9.2 | 9.2 | 9.4 | 9.6 | 8.9 | 9.2 |
 
 Trend: gains have flattened at 9.2 for three rounds. Battle is the weakest area; the next big step most likely comes
 from battle (crowded siege melees, the lightning effect) or from new gameplay (section 8), not more small polish.
 
 ## 8. What's next
+
+### Open findings from judge 41 (artifacts round)
+1. No artifact appears in any judge screenshot, so the map half of the feature was not judged: add a judge shot
+   framed on placed artifacts (`tools/judge_shots.sh`).
+2. A combination's linked sockets read as copies of the item: fade/desaturate them much harder and mark them
+   (HoMM3 greys out the slots a combination takes); the Dragonheart Arms icon is low-contrast on the maroon ground.
+3. Non-artifact sockets (war machines, spellbook, empty backpack cells) use a gold frame that reads as the "major"
+   tier: give them a neutral dark-iron frame.
+4. Bronze (treasure) and gold (major) tier frames are too close: push bronze toward copper and duller.
+5. A flat gold oval on the map (adventure_snow ~1057,357; adventure_overview ~455,282) reads as a placeholder.
+6. Map objects on neighbouring tiles overlap (two knights by the mine in adventure_snow; a gold pile inside a tree in
+   adventure_close).
+7. Backpack page arrows look active when everything fits on one page.
+8. Still open from judge 40: storm cloud on the top-row stack, faint open-field bolt, siege-gate pile-ups.
 
 ### Open findings from judge 40 (ranked)
 1. Lightning storm cloud looks like a flat cartoon blob (`battle.gd` class `_Burst`, the `bolt` branch); its pale

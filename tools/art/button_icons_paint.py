@@ -115,6 +115,11 @@ SHEETS = {"adventure": [
     (f"xp_{k}", "a gold star medal with a blue ribbon, drawn large and bold") for k in "ab"
 ] + [
     (f"speed_{k}", "a winged golden horseshoe with motion streaks, drawn large and bold") for k in "ab"
+], "sulfur": [  # (the map's sulfur pile: the old one read as a flat yellow disc; ingest -> imagegen, then
+    # tools/art/map_pile.py makes the map sprite)
+    (f"sulfur_{k}", "a small heap of bright yellow sulfur crystals lying on the ground, jagged chunky crystal lumps "
+     "with sharp facets and a little whitish crust, a faint wisp of pale smoke, seen from above at a three-quarter "
+     "angle, drawn bold") for k in "abcdefgh"
 ], "tome": [  # (the hero screen's spellbook slot: a closed, clasped tome, as the classic's; an open book read as Wisdom)
     (f"spellbook_closed_{k}", "a closed thick spellbook bound in deep red leather with ornate gold corner guards, a gold "
      "clasp and a glowing blue gem set in the cover, drawn large and bold, seen slightly from the front") for k in "abcdefgh"
@@ -171,7 +176,8 @@ def ingest(sheet):
         out.alpha_composite(obj, ((SIZE - obj.width) // 2, (SIZE - obj.height) // 2))
         dst = {"skills": f"assets/icons/skill_{name}.png", "stats": f"assets/icons/stat_{name}.png",
                "knowledge": f"assets/icons/stat_{name}.png", "misc_stats": f"assets/icons/stat_{name}.png",
-               "tome": f"assets/icons/{name}.png"}.get(sheet, f"assets/ui/btn_{name}.png")
+               "tome": f"assets/icons/{name}.png",
+               "sulfur": f"imagegen/batch20/out/{name}.png"}.get(sheet, f"assets/ui/btn_{name}.png")
         out.save(dst)
         print(f"  {dst}")
 

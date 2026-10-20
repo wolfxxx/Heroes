@@ -281,12 +281,14 @@ static func _doll(owner: Node, h: Dictionary, redo: Callable) -> Control:
 				redo.call()
 		else:
 			so.empty = true
+			so.neutral = true
 			var tip := "%s: empty" % SLOT_NAME[kind]
 			HoverInfo.attach(so, func(): return tip)
 	var have: Array = h.get("machines", [])
 	for i in MACHINES.size():
 		var id: String = MACHINES[i]
 		var so := _sock(doll, Vector2(0.92, 0.1 + 0.13 * i))
+		so.neutral = true  # (not an artifact: an iron frame, never a tier's colour)
 		so.empty = not (id in have or id == "catapult")
 		so.tex = Assets.creature_portrait(id)
 		var c: Dictionary = GameData.CREATURES[id]
@@ -294,6 +296,7 @@ static func _doll(owner: Node, h: Dictionary, redo: Callable) -> Control:
 			GameData.MACHINE_TEXT[id]]
 		HoverInfo.attach(so, func(): return tip)
 	var bk := _sock(doll, Vector2(0.92, 0.88))
+	bk.neutral = true
 	bk.tex = Assets.tex("icons/spellbook_closed.png")  # (a closed, clasped tome, as the classic: an open book read as Wisdom)
 	var n: int = h["spells"].size()
 	var btip := ("Spellbook: %d spell%s known. Click to open." % [n, "" if n == 1 else "s"]) if n > 0 else "Spellbook: no spells known."
@@ -325,6 +328,7 @@ static func _backpack(m: Modal, h: Dictionary, redo: Callable) -> Control:
 		b.custom_minimum_size = Vector2(30, SOCK)
 		b.focus_mode = Control.FOCUS_NONE
 		b.disabled = off + d < 0 or off + d > pack.size() - BACKPACK
+		b.modulate.a = 0.35 if b.disabled else 1.0  # (all of it fits on one page: the arrows plainly off)
 		b.pressed.connect(func():
 			m.set_meta("bp", off + d)
 			Audio.sfx("click", -6)
@@ -341,6 +345,7 @@ static func _backpack(m: Modal, h: Dictionary, redo: Callable) -> Control:
 		var so := _Socket.new()
 		so.custom_minimum_size = Vector2(SOCK, SOCK)
 		so.empty = off + i >= pack.size()
+		so.neutral = so.empty
 		if not so.empty:
 			var a: String = pack[off + i]
 			so.tex = Assets.artifact_icon(a)
@@ -417,7 +422,8 @@ class _Socket extends Control:
 	var rpressed := Callable()  # (a right click: split or join a combination)
 	var inner := false  # an artifact icon: drawn without its own frame, filling the socket
 	var tier_col := Color(0, 0, 0, 0)  # an artifact's tier, as the colour of its socket's frame
-	var linked := false  # a combination's other slot: its picture faded
+	var linked := false  # a combination's other slot: greyed out with a chain mark (as the classic)
+	var neutral := false  # not an artifact (a war machine, the spellbook, an empty slot): an iron frame
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		mouse_entered.connect(queue_redraw)
@@ -434,7 +440,22 @@ class _Socket extends Control:
 		draw_rect(r, Color(0.02, 0.02, 0.025, (0.22 if glass else 0.4) if empty else 0.92))
 		if tex and not empty and inner:
 			var ts := tex.get_size()
-			draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86), Color(1, 1, 1, 0.38 if linked else 1.0))
+			if linked:  # (taken by the combination worn elsewhere: a dark, greyed ghost of it and a chain link)
+				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86), Color(0.42, 0.4, 0.46, 0.45))
+				draw_rect(r.grow(-3), Color(0.05, 0.04, 0.06, 0.45))
+				var c := size * 0.5
+				var ch := Color(tier_col, 0.95)
+				draw_set_transform(c + Vector2(-7, 0), -0.6, Vector2(1, 0.62))
+				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, Color(0, 0, 0, 0.7), 6.0, true)
+				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, ch, 3.5, true)
+				draw_set_transform(c + Vector2(7, 0), -0.6, Vector2(1, 0.62))
+				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, Color(0, 0, 0, 0.7), 6.0, true)
+				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, ch, 3.5, true)
+				draw_set_transform(Vector2.ZERO)
+			else:
+				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86))
+				if tier_col.a > 0.0 and tex and tier_col.is_equal_approx(GameData.ARTIFACT_TIERS["combo"][1]):
+					draw_rect(r.grow(-4), Color(1, 0.85, 1.0, 0.55), false, 1.5)  # (a combination: a bright inner rim)
 		elif tex and not empty:
 			draw_texture_rect(tex, r.grow(-5), false)
 		elif tex:  # a machine not owned: its picture greyed out in the empty socket
@@ -446,6 +467,8 @@ class _Socket extends Control:
 		draw_line(Vector2(size.x - 1, 2), Vector2(size.x - 1, size.y - 1), Color(1, 0.9, 0.7, 0.18), 2)
 		var lit := pressed.is_valid() and get_global_rect().has_point(get_global_mouse_position())
 		var frame := Color(0.66, 0.5, 0.25) if empty else (tier_col if tier_col.a > 0.0 else Color(0.86, 0.68, 0.32))
+		if neutral:
+			frame = Color(0.42, 0.42, 0.46) if not empty else Color(0.3, 0.3, 0.33)
 		draw_rect(r.grow(1), Color(1, 0.9, 0.5) if lit else frame, false, 3.0 if lit else 2.0)
 		if tier_col.a > 0.0 and not empty and not lit:  # (the tier's colour a little stronger: an inner line)
 			draw_rect(r.grow(-2), Color(tier_col, 0.55), false, 1.0)

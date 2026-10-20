@@ -16,6 +16,8 @@ run --shot=$D/adventure_path.png --scene=res://scenes/adventure.tscn --delay=4 -
 # the status window cycled by clicks: the kingdom's income, then the date
 run --shot=$D/as.png --scene=res://scenes/adventure.tscn --delay=4 --setup=demo --click="1728,840;1728,840" --shots=2 --interval=0.5
 mv -f $D/as_0.png $D/adventure_kingdom.png; mv -f $D/as_1.png $D/adventure_date.png
+# artifacts lying on the map: a relic, a major, a minor, a treasure and a set part beside the hero
+run --shot=$D/adventure_artifacts.png --scene=res://scenes/adventure.tscn --delay=4 --setup=artifacts --zoom=1.3
 run --shot=$D/hero_screen.png --scene=res://scenes/adventure.tscn --delay=3 --setup=all_spells --keys=I
 run --shot=$D/town_haven_early.png --scene=res://scenes/town.tscn --delay=3 --setup=demo
 run --shot=$D/town_haven_full.png --scene=res://scenes/town.tscn --delay=3 --setup=rich
