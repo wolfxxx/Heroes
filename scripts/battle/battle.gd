@@ -852,7 +852,9 @@ func _stack_info(st: Dictionary) -> Control:
 		Color(0.6, 0.8, 1.0) if mine else Color(1.0, 0.6, 0.5), 17)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 14)
-	row.add_child(UI.icon(Assets.creature_portrait(st["id"]), Vector2(84, 84)))
+	var pic := UI.icon(Assets.creature_portrait(st["id"]), Vector2(132, 132))  # (as tall as the stats beside it)
+	pic.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(pic)
 	var g := _stat_grid()
 	_grid_row(g, "Attack", _stat_cell(c["attack"], L.attack_stat(st)))
 	_grid_row(g, "Defense", _stat_cell(c["defense"], L.defense_stat(st)))
@@ -1766,11 +1768,15 @@ func _see_through() -> void:
 		var m := n.get_node("Sprite").material as ShaderMaterial
 		if m == null:
 			continue
-		# the stack whose turn it is: a pale halo outside its gold outline, so it stands out in a crowd too
+		# the stack whose turn it is: a bright halo pulsing outside its gold outline (as the classic's pulsing
+		# outline), so it stands out in a crowd too
 		var act: bool = cur != null and cur["uid"] == k
+		if act:
+			m.set_shader_parameter("team", Color(1.0, 0.93, 0.6, 0.55 + 0.4 * sin(now * 0.006)))
 		if n.get_meta("lit", false) != act:
 			n.set_meta("lit", act)
-			m.set_shader_parameter("team", Color(1.0, 0.95, 0.7, 0.6) if act else Color(0, 0, 0, 0))
+			if not act:
+				m.set_shader_parameter("team", Color(0, 0, 0, 0))
 		var was: float = n.get_meta("body_alpha", 1.0)
 		var to := move_toward(was, fade, get_process_delta_time() * 4.0)
 		if to != was:

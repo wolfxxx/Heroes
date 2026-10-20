@@ -129,7 +129,7 @@ func _build() -> void:
 	for r in GameData.RESOURCES:
 		var box := HBoxContainer.new()
 		box.add_theme_constant_override("separation", 4)
-		box.custom_minimum_size.x = 230 if r == "gold" else 200  # (the seven cells reach to the date)
+		box.custom_minimum_size.x = 250 if r == "gold" else 218  # (the seven cells reach to the date)
 		box.add_child(UI.icon(Assets.res_icon(r), Vector2(36, 36)))
 		var l := UI.label("0", 23, Color(1, 0.95, 0.82))
 		box.add_child(l)
