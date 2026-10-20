@@ -1,9 +1,10 @@
 shader_type canvas_item;
 // Fog of war overlay: fog_map is one texel per tile, 1 = explored. The edge is a smooth field over the 4x4 tiles
 // around each pixel (the compact bump kernel of terrain.gdshader), so it is round instead of stair-stepped, then made
-// ragged with gradient noise (value noise showed tile-sized squares). Past the map's edge: a ragged band of boulders
-// (the classic map's rocky edge) and a dark slate void beyond it, told apart from the black shroud (the view may run
-// a little past the edge), never the bare background with stray tree shadows; a soft shadow falls inward along the edge.
+// ragged with gradient noise (value noise showed tile-sized squares). Past the map's edge: a ridge of boulders and tall
+// crags one to three tiles deep, its outline following the rocks (the classic map's rocky edge), casting its shadow
+// onto the map and the dark slate void beyond it, told apart from the black shroud (the view may run a little past the
+// edge), never the bare background with stray tree shadows.
 uniform sampler2D fog_map : filter_nearest;
 uniform vec2 map_size = vec2(48.0, 48.0);
 uniform float tile_px = 64.0;
@@ -34,8 +35,9 @@ float explored(vec2 t) {
 	return texture(fog_map, (c + 0.5) / map_size).r;
 }
 // The rocky ridge along the map's edge: boulders of varied size (a power diagram: each cell has its own weight), their
-// height a rounded shoulder from the cracks with fine crags on it, lit from the upper left by the slope of that height.
-// `s` is the depth past the edge (<0: on the map).
+// height a rounded shoulder from the cracks with fine crags on it, and here and there a tall crag rising over them (a
+// cone on a coarser grid); lit from the upper left by the slope of that height. `s` is the depth past the edge
+// (<0: on the map).
 vec2 rock_h(vec2 w) {  // (height, the cell's tone)
 	vec2 rp = w / 34.0;
 	vec2 ri = floor(rp);
@@ -54,17 +56,33 @@ vec2 rock_h(vec2 w) {  // (height, the cell's tone)
 	}
 	float gap = d2 - d1;
 	float h = sqrt(smoothstep(0.0, 0.6, gap)) * 20.0 + fbm(w / 7.0) * 3.0 + fbm(w / 19.0) * 6.0;
+	// the tall crags: about every other cell of a 96 px grid holds a jagged cone up to ~50 high
+	vec2 pp = w / 96.0;
+	vec2 pi = floor(pp);
+	float peak = 0.0;
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			vec2 g = pi + vec2(float(x), float(y));
+			float on = fract(sin(dot(g, vec2(27.1, 61.7))) * 9431.7);
+			if (on > 0.45) {
+				vec2 o = vec2(fract(sin(dot(g, vec2(3.7, 17.9))) * 5231.3), fract(sin(dot(g, vec2(41.2, 7.3))) * 7193.1));
+				float r = length(g + 0.2 + o * 0.6 - pp) / (0.45 + 0.25 * on);
+				peak = max(peak, (1.0 - r) * (34.0 + 26.0 * on));
+			}
+		}
+	}
+	peak += fbm(w / 11.0) * 8.0 * step(1.0, peak);
+	h = max(h, peak + h * 0.35);
 	return vec2(h, fract(sin(dot(cid, vec2(7.13, 3.71))) * 9137.1));
 }
-vec3 ridge(vec2 w, float s, float band) {
-	vec2 h0 = rock_h(w);
+vec3 ridge(vec2 w, vec2 h0) {
 	float hx = rock_h(w + vec2(1.5, 0.0)).x;
 	float hy = rock_h(w + vec2(0.0, 1.5)).x;
-	vec3 n = normalize(vec3(-(hx - h0.x) / 1.5, -(hy - h0.x) / 1.5, 0.9));
+	vec3 n = normalize(vec3(-(hx - h0.x) / 1.5, -(hy - h0.x) / 1.5, 0.8));
 	float lit = clamp(dot(n, normalize(vec3(-0.6, -0.7, 0.75))), 0.0, 1.0);
-	vec3 rock = mix(vec3(0.34, 0.30, 0.25), vec3(0.50, 0.45, 0.37), h0.y) * (0.38 + 0.9 * lit);
+	vec3 rock = mix(vec3(0.33, 0.29, 0.24), vec3(0.52, 0.47, 0.39), h0.y) * (0.3 + 1.05 * lit);
 	rock *= mix(0.45, 1.0, smoothstep(0.0, 10.0, h0.x));  // dark in the cracks
-	rock *= mix(0.3, 1.0, smoothstep(band, 6.0, s));  // the outer rocks sink into the void
+	rock *= mix(1.0, 1.18, smoothstep(26.0, 50.0, h0.x));  // the crags' tops catch more light
 	return rock;
 }
 
@@ -72,15 +90,23 @@ void fragment() {
 	vec2 mpx = map_size * tile_px;
 	vec2 out_v = max(-world, world - mpx);  // >0 past an edge
 	float inside = min(min(world.x, world.y), min(mpx.x - world.x, mpx.y - world.y));
-	float band = 48.0 + 26.0 * fbm(world / tile_px * 0.6);  // how far the ridge runs out past the edge
+	// how far the ridge runs out past the edge: one to three tiles, wandering slowly, its outline following the boulders
+	float band = clamp(44.0 + 110.0 * (fbm(world / 210.0) + 0.45) + 16.0 * fbm(world / 27.0), 36.0, 170.0);
 	float enc = 8.0 + 14.0 * (fbm(world / 40.0) + 0.5);  // and how far its boulders reach in onto the map (ragged)
+	vec2 h0 = vec2(0.0);
+	if (inside < 60.0) {  // (the rocks only near the edge: the rest of the map skips them)
+		h0 = rock_h(world);
+	}
 	if (inside < 0.0) {
 		float d = length(max(out_v, vec2(0.0)));
 		// the void: a dark slate, bluer and lighter than the shroud, with a faint grain
 		vec3 c = vec3(0.07, 0.075, 0.095) + vec3(0.03, 0.03, 0.035) * (fbm(world / tile_px * 1.3) + 0.5);
-		if (d < band) {
-			c = mix(c, ridge(world, d, band), smoothstep(band, band - 10.0, d));
-		}
+		float reach = band + (h0.x - 12.0) * 1.6;  // (a boulder or a crag runs out a little further than the gap beside it)
+		// the ridge's shadow on the void, cast down and to the right
+		float sh = smoothstep(reach + 26.0, reach, d) * 0.55;
+		c *= 1.0 - sh;
+		float on = smoothstep(reach, reach - 2.5, d);
+		c = mix(c, ridge(world, h0) * mix(0.55, 1.0, smoothstep(reach, reach - 30.0, d)), on);
 		COLOR = vec4(c, 1.0);
 	} else {
 		vec2 tp = world / tile_px;
@@ -98,10 +124,14 @@ void fragment() {
 		float e = es / max(ws, 1e-4);
 		float vis = smoothstep(0.38, 0.62, e + fbm(tp * 1.7) * 0.32);
 		vec3 fogc = vec3(0.02, 0.02, 0.03) + vec3(0.025) * (fbm(tp * 0.9) + 0.5);
-		float edge = pow(max(0.0, 1.0 - (inside - enc) / 26.0), 2.0) * 0.65;  // the ridge's shadow on the map
-		float a = 1.0 - vis * (1.0 - min(edge, 0.65));
-		float cov = smoothstep(enc + 1.5, enc - 1.5, inside);  // the boulders lying on the map's rim
-		vec3 rc = ridge(world, -inside, band);
+		float rim = enc + (h0.x - 12.0) * 0.5;  // the boulders lying on the map's rim, outlined by their own shapes
+		float edge = pow(max(0.0, 1.0 - (inside - rim) / 44.0), 2.0) * 0.8;  // the ridge's shadow on the map
+		float a = 1.0 - vis * (1.0 - min(edge, 0.8));
+		float cov = smoothstep(rim + 1.5, rim - 1.5, inside);
+		vec3 rc = vec3(0.0);
+		if (cov > 0.0) {
+			rc = ridge(world, h0);
+		}
 		float ao = a * (1.0 - cov) + cov;
 		COLOR = vec4((fogc * a * (1.0 - cov) + rc * cov) / max(ao, 1e-4), ao);
 	}

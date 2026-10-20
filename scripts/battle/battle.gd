@@ -58,6 +58,7 @@ var _corpses: Node2D
 var _fx: Node2D
 var _floats: Array = []
 var _obstacle_rects: Array = []  # (field space) labels keep off them
+var _low_obstacles: Array = []  # [sprite, rect]: the low ones on the ground, faded where a figure stands over them
 var _log_hist: Array = []   # combat log lines, oldest first
 var _log_scroll := 0        # how many lines back from the newest the bar shows
 var _log_seen := 0          # L.log_lines already copied into the log
@@ -236,6 +237,8 @@ func _build_scene() -> void:
 		(ground if vis_h < 90.0 else _sorted).add_child(s)
 		var rr := s.get_rect()
 		_obstacle_rects.append(Rect2(s.position + rr.position * s.scale, rr.size * s.scale).grow(-8))
+		if vis_h < 90.0:
+			_low_obstacles.append([s, _obstacle_rects[-1]])
 	if L.siege > 0:
 		_build_walls()
 	for st in L.stacks:
@@ -1624,6 +1627,13 @@ func _settle_badges() -> void:
 	var placed: Array = []
 	var keys := units.keys()
 	keys.sort()
+	var bodies := []  # [unit, the middle of its figure, waist to chest]: a plate there reads as that stack's
+	for k in keys:
+		var n: Node2D = units[k]
+		if n.visible and n.get_node("Badge").st.get("alive", false):
+			var top := float(n.get_meta("top", 120.0))
+			var hw := HEX_W * (0.4 if L.is_wide(n.get_node("Badge").st) else 0.25)
+			bodies.append([n, Rect2(n.position.x - hw, n.position.y - top * 0.85, hw * 2.0, top * 0.85 - 18.0)])
 	for k in keys:
 		var n: Node2D = units[k]
 		var b: Node2D = n.get_node("Badge")
@@ -1633,6 +1643,7 @@ func _settle_badges() -> void:
 		# (as the classic plates: with another stack on the hex in front, the plate moves in under its own figure, so
 		# two facing stacks' plates never sit side by side between them; a stack on a front diagonal stands there too)
 		var st: Dictionary = b.st
+		var corner := home
 		if st.has("hex") and not st.get("tower", false):
 			var fx := 1.0 if st["side"] == 0 else -1.0
 			var hp := hex_pos(st["hex"])
@@ -1648,11 +1659,16 @@ func _settle_badges() -> void:
 		# (as the classic plates: always at the front corner of the stack's own hex; only a plate it would touch
 		# moves it, a little lower)
 		var spots := [home, home + Vector2(0, 22)]
+		if corner != home:  # (moved in, unless that lands on another stack's figure: then back at its ring corner)
+			spots = [home, corner, home + Vector2(0, 22), corner + Vector2(0, 22)]
 		var hit := func(q: Rect2) -> float:
 			var c := 0.0
 			for o in placed:
 				if q.grow(4).intersects(o):
 					c += 1000.0
+			for f in bodies:
+				if f[0] != n and q.intersects(f[1]):
+					c += 300.0
 			return c
 		var r := Rect2(n.position + home - Vector2(24, 14), Vector2(48, 28))
 		var best := INF
@@ -1684,6 +1700,7 @@ func _process(_d: float) -> void:
 	_crowd()
 	_settle_badges()
 	_see_through()
+	_under_figures()
 
 func _ring(n: Node2D) -> _Shadow:
 	return n.get_meta("shadow")
@@ -1699,8 +1716,8 @@ func _follow_rings() -> void:
 
 ## Where a figure in front rises well over a stack standing behind it (the row above), it turns see-through around
 ## that stack's feet: the one behind keeps its ring, legs and badge readable instead of seeming to stand on the other.
-## The stack in play (the active one, the one under the pointer, one being struck) shows whole: a figure in front of
-## it turns see-through over all of its body.
+## The stack in play (the active one, the one under the pointer, one being struck) shows whole: a figure that covers
+## much of it fades evenly over its whole body (never one in play itself).
 func _see_through() -> void:
 	var focus := {}
 	var cur = L.current()
@@ -1720,6 +1737,7 @@ func _see_through() -> void:
 	for k in units:
 		var n: Node2D = units[k]
 		var holes := PackedVector4Array()
+		var fade := 1.0
 		for f in info:
 			if f[0] != n:
 				continue
@@ -1727,20 +1745,46 @@ func _see_through() -> void:
 				var dy: float = f[1].y - bk[1].y
 				if bk == f or dy < 20.0 or f[2] - dy < 36.0 or absf(f[1].x - bk[1].x) > (f[3] + bk[3]) * 0.75:
 					continue
-				if holes.size() < 4:
-					if bk[4]:  # (the whole figure, feet to head)
-						holes.append(Vector4(bk[1].x, bk[1].y - bk[2] * 0.5 + 10.0, bk[3] * 1.5, bk[2] + 50.0))
-					else:
-						holes.append(Vector4(bk[1].x, bk[1].y - 26.0, bk[3] * 0.95, 52.0))
+				if bk[4] and not f[4]:
+					# (it covers a good part of the stack in play: well up its body and across its middle)
+					if f[2] - dy >= 0.45 * bk[2] and absf(f[1].x - bk[1].x) < (f[3] + bk[3]) * 0.6:
+						fade = 0.45
+				elif holes.size() < 4:
+					holes.append(Vector4(bk[1].x, bk[1].y - 26.0, bk[3] * 0.95, 52.0))
 		var m := n.get_node("Sprite").material as ShaderMaterial
+		if m == null:
+			continue
+		var was: float = n.get_meta("body_alpha", 1.0)
+		var to := move_toward(was, fade, get_process_delta_time() * 4.0)
+		if to != was:
+			n.set_meta("body_alpha", to)
+			m.set_shader_parameter("body_alpha", to)
 		var key := str(holes)
-		if m == null or n.get_meta("holes_key", "") == key:
+		if n.get_meta("holes_key", "") == key:
 			continue
 		n.set_meta("holes_key", key)
 		m.set_shader_parameter("hole_count", holes.size())
 		while holes.size() < 4:
 			holes.append(Vector4(0, 0, 1, 1))
 		m.set_shader_parameter("holes", holes)
+
+## A low obstacle (a thorn bush, boulders) lies on the ground under the figures: where a figure standing in front rises
+## over it (a lance, a wing, a head) the obstacle fades, so it never seems to sit on the figure (a bush on a lance tip).
+func _under_figures() -> void:
+	for o in _low_obstacles:
+		var s: Sprite2D = o[0]
+		var r: Rect2 = o[1]
+		var to := 1.0
+		for k in units:
+			var n: Node2D = units[k]
+			if not n.visible or not n.get_node("Badge").st.get("alive", false) or n.position.y <= r.end.y - 4.0:
+				continue
+			var hw := HEX_W * (0.45 if L.is_wide(n.get_node("Badge").st) else 0.3)
+			var fig := Rect2(n.position.x - hw, n.position.y - float(n.get_meta("top", 120.0)), hw * 2.0, float(n.get_meta("top", 120.0)) - 30.0)
+			if fig.intersects(r):
+				to = 0.45
+				break
+		s.modulate.a = move_toward(s.modulate.a, to, get_process_delta_time() * 3.0)
 
 ## A floating label at `p` (field space), or, with `follow`, beside the point `at` of that unit (toward `dir`) and
 ## moving with it.

@@ -233,14 +233,14 @@ func _build_setup() -> void:
 	_scen_info = UI.label("", 19, Color(0.85, 0.8, 0.68))
 	v.add_child(_scen_info)
 	var cond := HBoxContainer.new()
-	cond.add_theme_constant_override("separation", 20)
 	v.add_child(cond)
 	_vic_row = HBoxContainer.new()
 	_loss_row = HBoxContainer.new()
-	for r in [_vic_row, _loss_row]:
+	for r in [_vic_row, _loss_row]:  # (side by side, Defeat just after Victory)
 		r.add_theme_constant_override("separation", 10)
-		r.custom_minimum_size.x = 495
 		cond.add_child(r)
+	_vic_row.custom_minimum_size.x = 340
+	cond.add_theme_constant_override("separation", 40)
 	v.add_child(_rule())
 
 	v.add_child(UI.label("Choose your faction", 24, UI.GOLD))
@@ -300,7 +300,7 @@ func _build_setup() -> void:
 	rv.add_child(t)
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 10)
-	for hc in [["Size", 60], ["Name", 382], ["Rivals", 70], ["Win", 52], ["Lose", 52]]:
+	for hc in [["Size", 60], ["Name", 354], ["Rivals", 70], ["Win", 66], ["Lose", 66]]:
 		var hl := UI.label(hc[0], 17, Color(0.8, 0.72, 0.55))
 		hl.custom_minimum_size.x = hc[1]
 		hl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if hc[0] != "Name" else HORIZONTAL_ALIGNMENT_LEFT
@@ -411,7 +411,7 @@ func _scenario_row(sc: Dictionary) -> Button:
 	badge.add_child(bl)
 	h.add_child(badge)
 	var nl := UI.label(sc["name"], 23, UI.TEXT)
-	nl.custom_minimum_size.x = 382
+	nl.custom_minimum_size.x = 354
 	nl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	nl.size_flags_vertical = Control.SIZE_FILL
 	h.add_child(nl)
@@ -422,8 +422,8 @@ func _scenario_row(sc: Dictionary) -> Button:
 	rl.size_flags_vertical = Control.SIZE_FILL
 	h.add_child(rl)
 	for ic in [_cond_icon(sc["victory"]), _cond_icon(sc["loss"])]:
-		var tr := UI.icon(ic, Vector2(44, 44))
-		tr.custom_minimum_size = Vector2(52, 44)
+		var tr := UI.icon(ic, Vector2(56, 56))  # (cut-out pictures, large enough to read in the list)
+		tr.custom_minimum_size = Vector2(66, 56)
 		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		h.add_child(tr)
 	for c in h.get_children():
@@ -437,9 +437,9 @@ func _scenario_row(sc: Dictionary) -> Button:
 ## The picture for a victory or loss condition.
 func _cond_icon(c: Dictionary) -> Texture2D:
 	match c.get("type", ""):
-		"capture": return Assets.tex("ui/btn_kingdom.png")
-		"gold": return Assets.res_icon("gold")
-		"hero": return Assets.hero_portrait(_settings.get("hero", "sir_aldric"))
+		"capture": return Assets.tex("ui/cond_capture.png")
+		"gold": return Assets.tex("ui/cond_gold.png")
+		"hero": return Assets.tex("ui/cond_hero.png")
 		"days": return Assets.tex("ui/btn_end_turn.png")
 		"standard": return Assets.tex("ui/cond_lose.png")
 	return Assets.tex("ui/cond_win.png")
@@ -544,11 +544,6 @@ func _refresh_scenario() -> void:
 		tv.add_child(UI.label(pair[1], 17, Color(0.8, 0.72, 0.55)))
 		tv.add_child(UI.label(pair[3], 21, UI.TEXT))
 		row.add_child(tv)
-	if _scen_buttons.has("last_champion"):  # (its loss icon is the chosen hero)
-		var icons: Array = _scen_buttons["last_champion"].get_child(0).get_children().filter(
-			func(c): return c is TextureRect)
-		if icons.size() > 0:
-			icons[-1].texture = Assets.hero_portrait(_settings.get("hero", "sir_aldric"))
 
 ## Selected toggles sit on the bright gold texture: force dark ink text in every pressed/focus state, no focus ring.
 func _ink(b: Button) -> void:

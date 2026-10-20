@@ -15,6 +15,8 @@ uniform vec4 team : source_color = vec4(0.0);
 uniform vec4 holes[4];
 uniform int hole_count = 0;
 uniform float hole_alpha = 0.4;
+// the whole figure faded evenly (battle: it stands in front of the stack in play)
+uniform float body_alpha = 1.0;
 
 varying vec4 vcol;
 varying vec2 world;
@@ -58,5 +60,5 @@ void fragment() {
 		vec2 d = (world - holes[i].xy) / holes[i].zw;
 		keep = min(keep, mix(hole_alpha, 1.0, smoothstep(0.5, 1.0, length(d))));
 	}
-	COLOR = vec4(rgb, alpha * keep) * vcol;
+	COLOR = vec4(rgb, alpha * keep * body_alpha) * vcol;
 }

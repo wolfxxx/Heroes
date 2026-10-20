@@ -1009,7 +1009,7 @@ class _BuildCard extends Button:
 		var rows: Array = [items]
 		if items.size() > 3:
 			rows = [items.slice(0, (items.size() + 1) / 2), items.slice((items.size() + 1) / 2)]
-		const ROW_H := 24.0  # (two tight price rows: the picture keeps its height)
+		const ROW_H := 28.0  # (two tight price rows: the picture keeps most of its height)
 		var strip_h := ROW_H * maxi(rows.size(), min_rows) + 4.0
 		var built := status == "Built"
 		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - strip_h - 15))
@@ -1043,21 +1043,28 @@ class _BuildCard extends Button:
 		var x0 := sb.position.x + 6
 		var room := sb.end.x - 6 - x0
 		if not items.is_empty():
-			var ic := 26.0
-			var fs := 18
+			var ic := 34.0  # (the resource pictures are drawn with a margin: their glyphs ~27 x 19)
+			var fs := 21
+			for row in rows:  # (a long price, four to a row, a size smaller so it fits the card)
+				var w := -10.0
+				for it in row:
+					w += ic + 1 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 10
+				if w > room:
+					ic = 28.0
+					fs = 18
 			for k in rows.size():
 				var row: Array = rows[k]
 				var w := 0.0
 				for it in row:
-					w += ic + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 12
-				w -= 12
+					w += ic + 1 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 10
+				w -= 10
 				var x := x0 + maxf(0.0, (room - w) * 0.5)
 				var cy := sb.position.y + 2.0 + ROW_H * (k + 0.5) + ROW_H * 0.5 * (maxi(rows.size(), min_rows) - rows.size())
 				for it in row:
 					draw_texture_rect(Assets.res_icon(it[0]), Rect2(Vector2(x, cy - ic * 0.5), Vector2(ic, ic)), false)
 					var ok: bool = have.get(it[0], 0) >= cost[it[0]]
-					draw_string(f, Vector2(x + ic + 3, cy + 6), it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.95, 0.9, 0.8) if ok else Color(1, 0.48, 0.4))
-					x += ic + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 12
+					draw_string(f, Vector2(x + ic + 1, cy + 7), it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0.95, 0.9, 0.8) if ok else Color(1, 0.48, 0.4))
+					x += ic + 1 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 10
 		else:
 			var txt := status
 			while txt.length() > 4 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x > room:

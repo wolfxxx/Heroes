@@ -5,7 +5,8 @@ python tools/art/button_icons_paint.py paint [adventure|battle]   ->  imagegen/b
 python tools/art/button_icons_paint.py ingest [adventure|battle]  ->  assets/ui/btn_<name>.png (128 px, transparent)
 (the "retreat", "retreat2", "retreat3" and "retreat4" sheets paint eight takes of the retreat icon; the best is kept as btn_retreat.png by hand;
 "conditions" paints takes of the scenario win and loss icons, kept as ui/cond_win.png and ui/cond_lose.png, and the Offense skill,
-kept as icons/skill_offense.png)"""
+kept as icons/skill_offense.png; "conditions2" the gold, hero and capture conditions, kept as ui/cond_gold.png, ui/cond_hero.png
+and ui/cond_capture.png)"""
 import os, sys
 import numpy as np
 from PIL import Image
@@ -67,6 +68,15 @@ SHEETS = {"adventure": [
 ] + [
     (f"offense_{k}", "a steel sword swinging down with a bright red curved slash trail behind its blade, drawn large "
      "and bold, a compact square composition") for k in "ab"
+], "conditions2": [  # (the scenario list's other conditions: gather gold, keep your hero alive, take a town)
+    (f"gold_{k}", "an open wooden treasure chest overflowing with shining gold coins, drawn large and bold, a compact "
+     "square composition") for k in "abc"
+] + [
+    (f"hero_{k}", "a knight's steel helmet with a red plume lying fallen on its side beside a broken sword, drawn "
+     "large and bold, a compact square composition") for k in "abc"
+] + [
+    (f"capture_{k}", "a stone castle gatehouse with a big golden banner flying from its tower, drawn large and bold, a "
+     "compact square composition") for k in "ab"
 ]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "

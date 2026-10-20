@@ -383,14 +383,14 @@ func _kingdom_view(me: Dictionary) -> void:
 		var box := HBoxContainer.new()
 		box.add_theme_constant_override("separation", 6)
 		box.custom_minimum_size.x = w
-		box.add_child(UI.icon(Assets.res_icon(r), Vector2(26, 26)))
-		box.add_child(UI.label("+%d" % inc[r], 20, UI.GOLD if inc[r] > 0 else dim))
+		box.add_child(UI.icon(Assets.res_icon(r), Vector2(32, 32)))
+		box.add_child(UI.label("+%d" % inc[r], 23, UI.GOLD if inc[r] > 0 else dim))
 		var n: int = mines.get(r, 0)
 		if n > 0:  # (no "0 mines" clutter: a resource with no mine shows just its +0)
 			box.add_child(UI.label("%d mine%s" % [n, "" if n == 1 else "s"], 17, Color(0.9, 0.85, 0.72)))
 		return box
 	var gold: HBoxContainer = cell.call("gold", MINI - 24)
-	var src := UI.label("%d town%s" % [me["towns"].size(), "" if me["towns"].size() == 1 else "s"], 17, Color(0.9, 0.85, 0.72))
+	var src := UI.label("from %d town%s" % [me["towns"].size(), "" if me["towns"].size() == 1 else "s"], 17, Color(0.9, 0.85, 0.72))
 	gold.add_child(src)
 	_detail.add_child(gold)
 	var g := GridContainer.new()
@@ -403,7 +403,7 @@ func _kingdom_view(me: Dictionary) -> void:
 	if g.get_child_count() > 0:
 		_detail.add_child(g)
 	else:
-		_detail.add_child(UI.label("No mines held", 18, Color(0.75, 0.7, 0.6)))
+		_detail.add_child(UI.label("No mines held yet", 18, UI.TEXT))
 	# the week ahead: the gold it brings and the creatures the dwellings breed
 	var grow := 0
 	var dw := 0
@@ -413,15 +413,18 @@ func _kingdom_view(me: Dictionary) -> void:
 			if TownLogic.has_building(t, "dwelling_%d" % tier):
 				dw += 1
 				grow += int(GameData.CREATURES[GameData.faction_creature(t["faction"], tier)]["growth"] * TownLogic.growth_mult(t))
+	var gap := Control.new()  # (the week ahead set apart from the day's income)
+	gap.custom_minimum_size.y = 12
+	_detail.add_child(gap)
 	_detail.add_child(UI.label("Each week", 18, Color(0.9, 0.85, 0.72)))
 	var wk := HBoxContainer.new()
 	wk.add_theme_constant_override("separation", 6)
-	wk.add_child(UI.icon(Assets.res_icon("gold"), Vector2(26, 26)))
-	wk.add_child(UI.label("+%d" % (inc["gold"] * 7), 20, UI.GOLD))
-	wk.add_child(UI.label("  +%d creatures" % grow, 18, UI.TEXT))
+	wk.add_child(UI.icon(Assets.res_icon("gold"), Vector2(32, 32)))
+	wk.add_child(UI.label("+%d" % (inc["gold"] * 7), 23, UI.GOLD))
+	wk.add_child(UI.label("  +%d creatures" % grow, 20, UI.TEXT))
 	_detail.add_child(wk)
 	_detail.add_child(UI.label("%d dwelling%s, %d hero%s" % [dw, "" if dw == 1 else "s", me["heroes"].size(),
-		"" if me["heroes"].size() == 1 else "es"], 18, Color(0.9, 0.85, 0.72)))
+		"" if me["heroes"].size() == 1 else "es"], 19, Color(0.9, 0.85, 0.72)))
 
 ## The status window's date view: the day, the week and the month, and the week's creature.
 func _date_view() -> void:
