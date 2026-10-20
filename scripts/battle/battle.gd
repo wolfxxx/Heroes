@@ -2439,24 +2439,38 @@ class _Burst extends Node2D:
 		queue_redraw()
 	func _draw() -> void:
 		var a := 1.0 - t
-		if bolt and t < 0.5:
-			# (from a storm cloud just under the turn queue: from higher up it seemed to come out of the queue's frame)
+		if bolt and t < 0.8:  # (the cloud lingers a little after the bolt)
+			# (from a dark storm cloud just under the turn queue: from higher up it seemed to come out of the queue's frame)
 			var top_y := minf(-120.0, 205.0 - global_position.y)
 			var p := Vector2(380.0 * slant * (-top_y / 620.0), top_y)
-			var a0 := 1.0 - t * 2.0
-			for c in [[-34.0, 6.0, 30.0], [0.0, -4.0, 38.0], [34.0, 6.0, 30.0], [-14.0, 12.0, 28.0], [16.0, 12.0, 28.0]]:
-				draw_set_transform(p + Vector2(c[0], c[1]), 0, Vector2(1, 0.6))
-				draw_circle(Vector2.ZERO, c[2], Color(0.22, 0.24, 0.3, 0.85 * a0))
+			var a0 := 1.0 - t * 1.25
+			for c in [[-52.0, 8.0, 34.0], [-18.0, -8.0, 42.0], [22.0, -6.0, 40.0], [56.0, 8.0, 32.0], [-30.0, 16.0, 34.0],
+					[4.0, 18.0, 38.0], [36.0, 16.0, 32.0]]:
+				draw_set_transform(p + Vector2(c[0], c[1]), 0, Vector2(1, 0.62))
+				draw_circle(Vector2.ZERO, c[2], Color(0.13, 0.14, 0.2, 0.95 * a0))
+			for c in [[-26.0, 30.0, 30.0], [10.0, 32.0, 34.0], [40.0, 28.0, 24.0]]:  # its underside lit by the bolt
+				draw_set_transform(p + Vector2(c[0], c[1]), 0, Vector2(1, 0.3))
+				draw_circle(Vector2.ZERO, c[2], Color(0.55, 0.7, 1.0, 0.55 * a0))
 			draw_set_transform(Vector2.ZERO)
-			var pts := PackedVector2Array([p])
-			for i in 8:
-				p = p.lerp(Vector2.ZERO, 1.0 / (8 - i)) + Vector2(randf_range(-22, 22), randf_range(-14, 14)) * (1.0 if i < 7 else 0.0)
-				pts.append(p)
-			var a2 := 1.0 - t * 2.0
-			draw_polyline(pts, Color(0.45, 0.65, 1.0, 0.16 * a2), 22.0)  # outer glow
-			draw_polyline(pts, Color(0.6, 0.8, 1.0, 0.4 * a2), 10.0)
-			draw_polyline(pts, Color(0.85, 0.95, 1.0, a2), 5.0)
-			draw_polyline(pts, Color(1, 1, 1, a2), 2.0)
+			var rng := RandomNumberGenerator.new()
+			rng.seed = get_instance_id()  # (the same zig-zag every frame of its flash)
+			var pts := PackedVector2Array([p + Vector2(0, 24)])
+			var q: Vector2 = pts[0]
+			for i in 11:
+				q = q.lerp(Vector2.ZERO, 1.0 / (11 - i)) + Vector2(rng.randf_range(-30, 30), rng.randf_range(-10, 10)) * (1.0 if i < 10 else 0.0)
+				pts.append(q)
+			var fork := PackedVector2Array([pts[4]])
+			var f: Vector2 = pts[4]
+			for i in 4:
+				f += Vector2(slant * -26.0 + rng.randf_range(-14, 14), 34.0)
+				fork.append(f)
+			var a2 := maxf(0.0, 1.0 - t * 2.0)
+			for line in [pts, fork]:
+				var wk := 1.0 if line == pts else 0.6
+				draw_polyline(line, Color(0.45, 0.65, 1.0, 0.2 * a2), 26.0 * wk)  # outer glow
+				draw_polyline(line, Color(0.6, 0.8, 1.0, 0.5 * a2), 12.0 * wk)
+				draw_polyline(line, Color(0.88, 0.96, 1.0, a2), 6.0 * wk)
+				draw_polyline(line, Color(1, 1, 1, a2), 3.0 * wk)
 			draw_set_transform(Vector2.ZERO, 0, Vector2(1, 0.35))  # impact flash on the ground
 			draw_circle(Vector2.ZERO, 70.0 * (1.0 - t), Color(0.9, 0.95, 1.0, 0.45 * a2))
 			draw_set_transform(Vector2.ZERO)

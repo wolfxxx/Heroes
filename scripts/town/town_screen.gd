@@ -117,7 +117,7 @@ func _build() -> void:
 
 	# the treasury along the whole foot, as on the adventure map: even cells, the date at the right
 	var bar := HBoxContainer.new()
-	bar.position = Vector2(24, 1080 - 50)
+	bar.position = Vector2(24, 1080 - 56)
 	bar.add_theme_constant_override("separation", 0)
 	add_child(bar)
 	var d: int = world.get("day", 1)
@@ -130,7 +130,7 @@ func _build() -> void:
 		var box := HBoxContainer.new()
 		box.add_theme_constant_override("separation", 4)
 		box.custom_minimum_size.x = 250 if r == "gold" else 218  # (the seven cells reach to the date)
-		box.add_child(UI.icon(Assets.res_icon(r), Vector2(44, 44)))
+		box.add_child(UI.icon(Assets.res_icon(r), Vector2(52, 52)))  # (the pictures have a margin)
 		var l := UI.label("0", 27, Color(1, 0.95, 0.82))
 		box.add_child(l)
 		_res_labels[r] = l

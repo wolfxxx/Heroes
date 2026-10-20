@@ -143,7 +143,7 @@ static func upgrade_dialog(owner_node: Node, st: Dictionary, up: String, player:
 		var title := UI.label(c["plural"] if n != 1 else c["name"], 24, UI.GOLD, true)
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		col.add_child(title)
-		col.add_child(UI.icon(Assets.creature_portrait(GameData.base_of(st["id"]) if k == 0 else up), Vector2(290, 290)))
+		col.add_child(UI.icon(Assets.creature_portrait(GameData.base_of(st["id"]) if k == 0 else up), Vector2(310, 310)))
 		var g := GridContainer.new()
 		g.columns = 2
 		g.add_theme_constant_override("h_separation", 40)
@@ -157,7 +157,7 @@ static func upgrade_dialog(owner_node: Node, st: Dictionary, up: String, player:
 		col.add_child(g)
 		h.add_child(col)
 		if k == 0:
-			var arrow := UI.label("»", 64, UI.GOLD, true)
+			var arrow := UI.label("»", 110, Color(1.0, 0.86, 0.4), true)
 			arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			h.add_child(arrow)
 	var cost := TownLogic.upgrade_cost(st["id"], up, n)

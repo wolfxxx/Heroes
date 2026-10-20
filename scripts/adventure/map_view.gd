@@ -330,7 +330,7 @@ func _build_border() -> void:
 			var sp := _sprite("map/%s.png" % k, f, 256.0, rng.randf() < 0.5, 0.0, mm)
 			sp.material = rock_mat
 			border.add_child(sp)
-		m *= rng.randf_range(0.85, 1.4)
+		m *= rng.randf_range(0.85, 1.4) * (1.45 if rng.randf() < 0.2 else 1.0)  # (now and then a great massif)
 		mount.call(foot, m)
 		if rng.randf() < 0.35:
 			mount.call(foot + ax * rng.randf_range(0.9, 1.3) * TILE + Vector2(ax.y, ax.x).abs() * rng.randf_range(-6, 14), m * rng.randf_range(0.6, 0.75))
@@ -343,17 +343,17 @@ func _build_border() -> void:
 	# tiles past the edge, a range further out showed as slivers)
 	var x := -2.0
 	while x < size.x + 2.0:  # along the top and the bottom
-		put.call(Vector2(x * TILE, 0.15 * TILE + rng.randf_range(-26, 10)), rng.randf_range(0.6, 0.7), Vector2i(int(x), 0), Vector2.RIGHT)
-		x += rng.randf_range(2.6, 7.0)  # (fewer, larger peaks, bare rock between, never evenly spaced)
+		put.call(Vector2(x * TILE, 0.15 * TILE + rng.randf_range(-30, 44)), rng.randf_range(0.6, 0.7), Vector2i(int(x), 0), Vector2.RIGHT)
+		x += rng.randf_range(1.6, 7.6)  # (fewer, larger peaks, bare rock between, never evenly spaced)
 	x = -2.0
 	while x < size.x + 2.0:
 		put.call(Vector2(x * TILE, (size.y + 1.3) * TILE + rng.randf_range(-6, 8)), rng.randf_range(0.58, 0.68), Vector2i(int(x), size.y - 1), Vector2.RIGHT)
-		x += rng.randf_range(2.6, 7.0)  # (fewer, larger peaks, bare rock between, never evenly spaced)
+		x += rng.randf_range(1.6, 7.6)  # (fewer, larger peaks, bare rock between, never evenly spaced)
 	var y := 1.0
 	while y < size.y + 1.0:  # down the sides
 		put.call(Vector2(-1.2 * TILE + rng.randf_range(-22, 6), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(0, int(y)), Vector2.DOWN)
 		put.call(Vector2((size.x + 1.2) * TILE + rng.randf_range(-6, 22), y * TILE), rng.randf_range(0.5, 0.58), Vector2i(size.x - 1, int(y)), Vector2.DOWN)
-		y += rng.randf_range(2.0, 4.6)
+		y += rng.randf_range(1.6, 5.2)
 
 func rebuild_objects() -> void:
 	for n in _object_nodes.values():

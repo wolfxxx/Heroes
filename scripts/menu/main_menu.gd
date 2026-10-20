@@ -552,7 +552,7 @@ func _ink(b: Button) -> void:
 
 ## A big choice card (faction, hero): picture + gold title + wrapped text. The selected card keeps light text on a
 ## dark panel and is marked by a bright gold frame and glow (dark ink on the gold toggle texture read poorly).
-func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, title_size := 25, sub_size := 19) -> void:
+func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, title_size := 25, sub_size := 19, caps := true) -> void:
 	b.focus_mode = Control.FOCUS_NONE
 	var on := UI.selected_plate()
 	on.set_border_width_all(4)
@@ -581,7 +581,7 @@ func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, 
 	v.add_theme_constant_override("separation", 2)
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(v)
-	var t := UI.label(title, title_size, Color(1.0, 0.88, 0.5), true)  # (a lighter gold: legible on an unselected card's wood)
+	var t := UI.label(title, title_size, Color(1.0, 0.88, 0.5), caps)  # (a lighter gold: legible on an unselected card's wood)
 	t.add_theme_color_override("font_outline_color", Color(0.06, 0.035, 0.01, 1.0))
 	# (legible on the light wood of an unselected card too; thinner on small names, a thick one made them muddy)
 	t.add_theme_constant_override("outline_size", clampi(title_size / 3, 4, 8))
@@ -645,7 +645,7 @@ func _select_faction(f: String) -> void:
 		b.custom_minimum_size = Vector2(238, 104)
 		# (every card two lines, the name and the class: a long name a size smaller rather than broken in two)
 		var nm: String = h["name"]
-		_card(b, Assets.hero_portrait(hid), 58, nm, h["class"], 19 if nm.length() <= 11 else 16, 19)
+		_card(b, Assets.hero_portrait(hid), 58, nm, h["class"], 21 if nm.length() <= 11 else 19, 19, false)  # (plain mixed case: small caps at this size were dim)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)
