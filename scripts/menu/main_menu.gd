@@ -251,7 +251,7 @@ func _build_setup() -> void:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(495, 96)
-		_card(b, Assets.tex("map/town_%s.png" % f), 120, GameData.FACTIONS[f]["name"], GameData.FACTIONS[f]["desc"], 23, 17)
+		_card(b, Assets.tex("map/town_%s.png" % f), 120, GameData.FACTIONS[f]["name"], GameData.FACTIONS[f]["desc"], 24, 19)
 		b.pressed.connect(_select_faction.bind(f))
 		frow.add_child(b)
 		_faction_buttons[f] = b
@@ -643,7 +643,7 @@ func _select_faction(f: String) -> void:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(238, 104)
-		_card(b, Assets.hero_portrait(hid), 72, h["name"], h["class"], 18, 18)  # (a long name takes two lines)
+		_card(b, Assets.hero_portrait(hid), 72, h["name"], h["class"], 20, 19)  # (a long name takes two lines)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)

@@ -625,7 +625,8 @@ func heal(d: Dictionary, amount: int, resurrect: bool) -> int:
 func _new_round() -> void:
 	round_num += 1
 	hero_cast = [false, false]
-	order = alive_stacks(-1, true)
+	# (as in the classic: the ammo cart never acts, it only keeps the quivers full, so it takes no turn)
+	order = alive_stacks(-1, true).filter(func(s): return s["id"] != "ammo_cart")
 	order.sort_custom(func(a, b):
 		var sa := speed(a)
 		var sb := speed(b)
@@ -670,7 +671,7 @@ func upcoming(n: int) -> Array:
 	for s in waited:
 		out.append(s)
 	if out.size() < n:
-		var nxt := alive_stacks()
+		var nxt := alive_stacks().filter(func(s): return s["id"] != "ammo_cart")
 		nxt.sort_custom(func(a, b): return speed(a) > speed(b) if speed(a) != speed(b) else a["side"] < b["side"])
 		for s in nxt:
 			out.append(s)

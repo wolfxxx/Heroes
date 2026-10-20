@@ -99,6 +99,13 @@ SHEETS = {"adventure": [
      "large and bold") for k in "ab"
 ] + [
     ("knowledge_b", "a rolled parchment scroll and an open book with glowing blue runes floating above, drawn large and bold"),
+], "knowledge": [  # (the rune books read as the spellbook artifact: knowledge as an owl, a lamp or a scroll instead)
+    (f"knowledge_{k}", "a wise brown owl perched on a rolled parchment scroll, drawn large and bold") for k in "abc"
+] + [
+    (f"knowledge_{k}", "a brass oil lamp of learning with a small blue flame, beside a rolled scroll tied with a red ribbon, "
+     "drawn large and bold") for k in "def"
+] + [
+    (f"knowledge_{k}", "a glowing blue crystal brain-shaped gem in a gold setting, drawn large and bold") for k in "gh"
 ]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "
@@ -150,7 +157,8 @@ def ingest(sheet):
         obj = obj.resize((max(1, round(obj.width * s)), max(1, round(obj.height * s))), Image.LANCZOS)
         out = Image.new("RGBA", (SIZE, SIZE))
         out.alpha_composite(obj, ((SIZE - obj.width) // 2, (SIZE - obj.height) // 2))
-        dst = {"skills": f"assets/icons/skill_{name}.png", "stats": f"assets/icons/stat_{name}.png"}.get(sheet, f"assets/ui/btn_{name}.png")
+        dst = {"skills": f"assets/icons/skill_{name}.png", "stats": f"assets/icons/stat_{name}.png",
+               "knowledge": f"assets/icons/stat_{name}.png"}.get(sheet, f"assets/ui/btn_{name}.png")
         out.save(dst)
         print(f"  {dst}")
 

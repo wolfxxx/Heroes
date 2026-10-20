@@ -330,13 +330,14 @@ func _build_border() -> void:
 			var sp := _sprite("map/%s.png" % k, f, 256.0, rng.randf() < 0.5, 0.0, mm)
 			sp.material = rock_mat
 			border.add_child(sp)
-		m *= rng.randf_range(0.8, 1.22)
+		m *= rng.randf_range(0.72, 1.3)
 		mount.call(foot, m)
-		if rng.randf() < 0.4:
+		if rng.randf() < 0.55:
 			mount.call(foot + ax * rng.randf_range(0.9, 1.3) * TILE + Vector2(ax.y, ax.x).abs() * rng.randf_range(-6, 14), m * rng.randf_range(0.6, 0.75))
-		if rng.randf() < 0.5:
-			var r := _sprite("map/rock_%d.png" % rng.randi_range(1, 3), foot - ax * rng.randf_range(1.3, 1.7) * TILE + Vector2(ax.y, ax.x).abs() * 10.0,
-				90.0, rng.randf() < 0.5, 0.0, rng.randf_range(0.7, 1.0))
+		for i in rng.randi_range(0, 2):
+			var r := _sprite("map/rock_%d.png" % rng.randi_range(1, 3), foot - ax * rng.randf_range(1.0, 1.9) * TILE + Vector2(ax.y, ax.x).abs() * rng.randf_range(-4, 14),
+				90.0, rng.randf() < 0.5, 0.0, rng.randf_range(0.6, 1.05))
+			r.material = rock_mat
 			border.add_child(r)
 	# (standing on the map's outermost row, which the generator fills with rocks and trees anyway: the view runs only two
 	# tiles past the edge, a range further out showed as slivers)

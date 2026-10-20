@@ -110,7 +110,7 @@ static func _fill(m: Modal, owner: Node, h: Dictionary) -> void:
 		so.tex = Assets.tex("icons/stat_%s.png" % s)
 		so.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		v.add_child(so)
-		var nl := UI.label("Spell Power" if s == "power" else s.capitalize(), 20, UI.GOLD)
+		var nl := UI.label("Spell Power" if s == "power" else s.capitalize(), 22, UI.GOLD)
 		nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(nl)
 		var vl := UI.label(str(GameState.hero_stat(h, s)), 30, UI.TEXT, true)
@@ -133,7 +133,7 @@ static func _fill(m: Modal, owner: Node, h: Dictionary) -> void:
 		so.tex = Assets.tex("icons/%s.png" % e[2])
 		so.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		v.add_child(so)
-		var nl := UI.label(e[0], 20, UI.GOLD)
+		var nl := UI.label(e[0], 22, UI.GOLD)
 		nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(nl)
 		var val: int = e[1]

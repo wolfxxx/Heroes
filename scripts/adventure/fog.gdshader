@@ -39,7 +39,8 @@ float explored(vec2 t) {
 // cone on a coarser grid); lit from the upper left by the slope of that height. `s` is the depth past the edge
 // (<0: on the map).
 vec2 rock_h(vec2 w) {  // (height, the cell's tone)
-	vec2 rp = w / 34.0;
+	// (the cells warped: their cracks wander and bend instead of running straight, no paving of flat slabs)
+	vec2 rp = w / 30.0 + vec2(fbm(w / 46.0), fbm(w / 46.0 + vec2(7.3, 2.9))) * 1.1;
 	vec2 ri = floor(rp);
 	float d1 = 9.0, d2 = 9.0; vec2 cid = vec2(0.0);
 	for (int y = -1; y <= 1; y++) {
@@ -55,7 +56,7 @@ vec2 rock_h(vec2 w) {  // (height, the cell's tone)
 		}
 	}
 	float gap = d2 - d1;
-	float h = sqrt(smoothstep(0.0, 0.6, gap)) * 20.0 + fbm(w / 7.0) * 3.0 + fbm(w / 19.0) * 6.0;
+	float h = sqrt(smoothstep(0.0, 0.6, gap)) * 16.0 + fbm(w / 7.0) * 4.0 + fbm(w / 19.0) * 9.0;
 	// the tall crags: about every other cell of a 96 px grid holds a jagged cone up to ~50 high
 	vec2 pp = w / 96.0;
 	vec2 pi = floor(pp);

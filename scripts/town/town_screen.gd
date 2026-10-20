@@ -129,7 +129,7 @@ func _build() -> void:
 	for r in GameData.RESOURCES:
 		var box := HBoxContainer.new()
 		box.add_theme_constant_override("separation", 4)
-		box.custom_minimum_size.x = 190 if r == "gold" else 170
+		box.custom_minimum_size.x = 230 if r == "gold" else 200  # (the seven cells reach to the date)
 		box.add_child(UI.icon(Assets.res_icon(r), Vector2(36, 36)))
 		var l := UI.label("0", 23, Color(1, 0.95, 0.82))
 		box.add_child(l)
@@ -534,14 +534,13 @@ func _open_build() -> void:
 					id = c
 					break
 			h.add_child(_hall_card(id, m))
-	# (room for a two-row price on every card only when one of them has a long price: all cards alike, captions
-	# level in every row, and no empty band under the others)
-	var cards := []
-	for h in rows.get_children():
-		cards.append_array(h.get_children())
-	var two := cards.any(func(c): return c.cost.values().filter(func(v): return v > 0).size() > 4)
-	for c in cards:
-		c.min_rows = 2 if two else 1
+	# (room for a two-row price on the cards of a row only when one of them has a long price: captions level in
+	# every row, and no empty band under the others)
+	for h in rows.get_children():  # (row by row: a row without one keeps the taller pictures)
+		var cards := h.get_children()
+		var two := cards.any(func(c): return c.cost.values().filter(func(v): return v > 0).size() > 4)
+		for c in cards:
+			c.min_rows = 2 if two else 1
 	m.add_buttons([["Close", ""]])
 	m.set_meta("cancel", "")
 	var r = await m.closed

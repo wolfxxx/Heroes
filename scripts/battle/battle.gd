@@ -384,7 +384,7 @@ func _crowd() -> void:
 		if not near.is_empty() and vis > span:
 			kk = clampf(span * 0.95 / vis, 0.88, 1.0)
 		if near.size() >= 2:  # (in a melee of three or more: every figure a little smaller, each keeps to its hexes)
-			kk = minf(kk, 0.9)
+			kk = minf(kk, 0.9 if near.size() == 2 else 0.84)
 		if is_equal_approx(kk, float(n.get_meta("crowd", 1.0))):
 			continue
 		var was: float = n.get_meta("crowd", 1.0)
@@ -1667,6 +1667,12 @@ func _settle_badges() -> void:
 		# (last, the back corner of its own ring: the free side, when another figure covers the front one)
 		spots.append(Vector2(-corner.x, corner.y))
 		spots.append(Vector2(-corner.x, corner.y + 22))
+		# (and in a crowd, where a figure in front covers its feet: up on its own figure, beside its legs)
+		for up in [-54.0, -76.0]:
+			spots.append(Vector2(corner.x * 0.6, up))
+			spots.append(Vector2(-corner.x * 0.6, up))
+		spots.append(Vector2(corner.x * 1.3, -30))
+		spots.append(Vector2(-corner.x * 1.3, -30))
 		var hit := func(q: Rect2) -> float:
 			var c := 0.0
 			for o in placed:
@@ -1760,6 +1766,11 @@ func _see_through() -> void:
 		var m := n.get_node("Sprite").material as ShaderMaterial
 		if m == null:
 			continue
+		# the stack whose turn it is: a pale halo outside its gold outline, so it stands out in a crowd too
+		var act: bool = cur != null and cur["uid"] == k
+		if n.get_meta("lit", false) != act:
+			n.set_meta("lit", act)
+			m.set_shader_parameter("team", Color(1.0, 0.95, 0.7, 0.6) if act else Color(0, 0, 0, 0))
 		var was: float = n.get_meta("body_alpha", 1.0)
 		var to := move_toward(was, fade, get_process_delta_time() * 4.0)
 		if to != was:
@@ -2263,7 +2274,10 @@ class _QueueIcon extends Control:
 				_crops[key] = Rect2(_solid_rect(img)) if img else Rect2(Vector2.ZERO, t2.get_size())
 			var src: Rect2 = _crops[key]
 			var area := Rect2(inner.position, Vector2(inner.size.x, inner.size.y - band + 2))
-			var sc := minf(area.size.x / src.size.x, area.size.y / src.size.y)
+			# (filling the cell's height: a wide machine is cut at its ends rather than drawn as a thin smudge)
+			var sc := minf(area.size.y / src.size.y, area.size.x * 1.5 / src.size.x)
+			if src.size.x * sc > area.size.x:
+				src = Rect2(src.get_center().x - area.size.x / sc * 0.5, src.position.y, area.size.x / sc, src.size.y)
 			var dsz := src.size * sc
 			draw_texture_rect_region(t2, Rect2(area.position + Vector2((area.size.x - dsz.x) * 0.5, area.size.y - dsz.y), dsz), src)
 		else:
