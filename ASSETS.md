@@ -62,6 +62,8 @@ leaves the `_dead` sprite on the hex as a corpse.
 - `terrain/snow.png` is painted (`tools/art/snow_paint.py`, imagegen/batch15, made seamless); the old graded photo is in
   `tools/art/raw/terrain/snow_old_graded.png`.
 - `map/monster_<creature_id>.png` optional — default is to reuse the creature sprite scaled.
+- Past the map's edge there are no assets: `fog.gdshader` draws the rocky ridge and void, and `MapView._build_border`
+  reuses `map/mountain_*.png` and `map/rock_*.png` (with `border_rock.gdshader` recolouring their grass to rock).
 
 ## Battle
 - `battle/bg_<terrain>.png` — 1920x1080 painted battlefield backdrop (side/elevated view, open flat ground in the
@@ -102,8 +104,14 @@ leaves the `_dead` sprite on the hex as a corpse.
 - `icons/res_<resource>.png` — 64x64 resource icons.
 - `icons/spell_<spell_id>.png` — 96x96 spell icons.
 - `icons/artifact_<artifact_id>.png` — 96x96.
-- `icons/skill_<skill_id>.png` — 64x64 secondary skills.
-- `icons/stat_attack.png stat_defense.png stat_power.png stat_knowledge.png` 64x64.
+- `icons/skill_<skill_id>.png` — 128 px secondary skills (painted, sheet `skills`; Offense from `conditions`).
+- `icons/stat_attack.png stat_defense.png stat_power.png stat_knowledge.png stat_morale.png` — 128 px primary stats and
+  morale (sheets `stats`, `knowledge`); `stat_health.png stat_damage.png stat_xp.png stat_speed.png` (sheet `misc_stats`).
+- `icons/spellbook_closed.png` — the hero screen's spellbook slot (sheet `tome`).
+- `ui/cond_win.png cond_lose.png cond_gold.png cond_hero.png cond_capture.png` — scenario victory / loss pictures on
+  New Game (sheets `conditions`, `conditions2`).
+  All of these come from `tools/art/button_icons_paint.py` (imagegen/batch20): `paint <sheet>`, then `ingest <sheet>`,
+  then keep the chosen take under its final name.
 - `icons/building_<faction>_<building>.png` — 160x100 thumbnails for the build screen (can be auto-cropped from town sprites).
 - `ui/btn_<kingdom|hero|sleep|move|spellbook|next_hero|end_turn|system>.png` — 128 px adventure panel button icons,
   and `ui/btn_<retreat|auto|defend|surrender|options|ballista|catapult|first_aid>.png` for the battle bar (the last

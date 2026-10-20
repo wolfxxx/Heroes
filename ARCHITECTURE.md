@@ -21,9 +21,9 @@ Design resolution 1920x1080, stretch mode canvas_items/expand. All UI coordinate
 | Scene | Scripts | Notes |
 |---|---|---|
 | scenes/main_menu.tscn (main) | scripts/menu/ | menu, new-game setup, quick battle |
-| scenes/adventure.tscn | scripts/adventure/ | `WorldGen` (random map), `AdvRules` (pathing, visits, day/week, battles), `AdvAI`, `MapView` (terrain shader, sprites, fog), `AdventureHUD` |
+| scenes/adventure.tscn | scripts/adventure/ | `WorldGen` (random map), `AdvRules` (pathing, visits, day/week, battles), `AdvAI`, `MapView` (terrain shader, sprites, fog, the mountain border `_build_border`), `AdventureHUD`; `fog.gdshader` also draws the void and rocky ridge past the map edge |
 | scenes/town.tscn | scripts/town/ | town screen; building art positions come from `assets/town/layout_<faction>.json` (fallback `TownLayout`) |
-| scenes/battle.tscn | scripts/battle/ | `BattleLogic` (pure rules, emits events), `BattleAI`, battle.gd (animation/UI) |
+| scenes/battle.tscn | scripts/battle/ | `BattleLogic` (pure rules, emits events), `BattleAI`, battle.gd (animation/UI; readability helpers `_see_through`, `_crowd`, `_settle_badges`, `_under_figures` run every frame — see HANDOFF.md §9) |
 
 ## World dict (GameState.world) — owned by adventure code
 ```
@@ -44,15 +44,21 @@ AI turns run inside the adventure scene and resume after a battle scene change.
 
 Every scene also works when launched DIRECTLY (for screenshots): missing state -> demo state.
 
-## Tools
+## Tools (see HANDOFF.md for the workflow and expected outputs)
 - `sh tools/check.sh` — re-import + compile every script (prints only errors).
+- `sh tools/run_tests.sh` — the full test pass of a round: check, `battle_test` (40 AI-vs-AI battles checking hex
+  rules), `click_test` (map clicks, drag, queued clicks), `visit_test` (hover "visited" lines), `sim_test` (all-AI soak).
+- `sh tools/judge_round.sh N` — the 32 judge screenshots (`tools/judge_shots.sh`) into shots/judgeN, size-checked;
+  the judge agent's prompt is `tools/judge_prompt.md`.
 - `tools/sim_test.tscn` — all-AI soak test: `Godot --path . res://tools/sim_test.tscn -- --seconds=80`
   (prints `SIM day ...` summaries and `SIMBATTLE` lines).
 - Screenshot harness:
 ```
 Godot_v4.7.2-stable_win64_console.exe --path . -- --shot=shots/x.png --scene=res://scenes/battle.tscn --delay=3
 ```
-Options: `--shots=N --interval=S`, `--click=x,y;x,y`, `--keys=Space;Enter`, `--setup=<name>` (`demo`, `rich`, `new_game`).
+Options: `--shots=N --interval=S`, `--click=x,y;x,y` (`r` prefix = right click), `--keys=Space;Enter`, `--hover=x,y`,
+`--setup=<name>` (`demo`, `rich`, `new_game`, `all_spells`, `upgraded`, `siege`, `siege_haven`, `necro_rich`,
+`necro_max`, `x`); adventure also `--seed --faction --reveal --cam=x,y --zoom`, battle `--broken=a,b` (breached walls).
 Window must not be headless (rendering needed). Screens are saved at the window resolution (1600x900 by default).
 
 ## Art & audio pipeline (see ASSETS.md)
