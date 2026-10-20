@@ -18,7 +18,7 @@ const OBSTACLES := {
 	"swamp": ["swamp_tree", "rotten_log", "thorns", "dead_tree", "skull_pile"],
 }
 ## Widest figure in hexes, wings and capes included: 1-hex and 2-hex units (a stack mustn't swallow its neighbours).
-const VIS_MAX_W := [1.2, 2.2]
+const VIS_MAX_W := [1.1, 2.2]
 
 static var _sizes = null
 
@@ -228,6 +228,10 @@ func _build_scene() -> void:
 		s.position = hex_pos(h) + Vector2(0, 22)
 		var vis_h := Vector2(s.texture.get_size()).y * s.scale.y
 		if vis_h < 90.0:  # a low one lies inside its own hex (its middle on the ground where the stacks stand), not up into the hex behind
+			if kind != "stump":  # (and a little smaller: a lance or a head behind it stays clear of it)
+				s.scale = Vector2.ONE * 0.33
+				s.offset = Vector2(0, -s.texture.get_height() * 0.5 + 6)
+				vis_h = Vector2(s.texture.get_size()).y * s.scale.y
 			s.position.y = hex_pos(h).y + 14.0 + vis_h * 0.5 - (6.0 * s.scale.y if kind != "stump" else 0.0)
 		(ground if vis_h < 90.0 else _sorted).add_child(s)
 		var rr := s.get_rect()
@@ -289,7 +293,8 @@ func _make_unit(st: Dictionary) -> void:
 		var sc := 0.5
 		if fig.y > 0:
 			sc = FIG_H[c["tier"]] / fig.y
-			sc = minf(sc, HEX_W * VIS_MAX_W[1 if wide else 0] / fig_vis_w(st["id"]))
+			# (but never below 85% of its tier's height: an archangel stays a big figure)
+			sc = maxf(minf(sc, HEX_W * VIS_MAX_W[1 if wide else 0] / fig_vis_w(st["id"])), sc * 0.85)
 		s.scale = Vector2.ONE * sc
 		s.offset = (Vector2(0.5, 0.5) - anc) * tsz
 		s.set_meta("anchor_x", (0.5 - anc.x) * tsz.x)
@@ -1041,7 +1046,7 @@ func _on_surrender() -> void:
 	if L.heroes[side] == null or L.heroes[1 - side] == null:
 		return
 	var cost := _surrender_cost(side)
-	var have := 99999  # (a test battle launched on its own: no kingdom, no treasury to run short)
+	var have := 20000  # (a test battle launched on its own: no kingdom, a starting treasury)
 	if not GameState.world.is_empty() and L.players[side] >= 0:
 		have = int(GameState.world["players"][L.players[side]]["resources"]["gold"])
 	var foe: String = L.heroes[1 - side]["name"]
@@ -1049,7 +1054,7 @@ func _on_surrender() -> void:
 		Audio.sfx("error")
 		await Modal.message(self, "Surrender", "%s asks %d gold to let your army go, and you have only %d." % [foe, cost, have]).closed
 		return
-	if await Modal.confirm(self, "Surrender", "%s will let you leave with your hero and army for %d gold.\nAccept?" % [foe, cost],
+	if await Modal.confirm(self, "Surrender", "%s will let you leave with your hero and army for %d gold.\nYour treasury holds %d. Accept?" % [foe, cost, have],
 			"Pay %d" % cost, "Fight on").closed:
 		_retreated = side
 		_surrendered = true

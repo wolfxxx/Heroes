@@ -1,7 +1,9 @@
 shader_type canvas_item;
 // Fog of war overlay: fog_map is one texel per tile, 1 = explored. The edge is a smooth field over the 4x4 tiles
 // around each pixel (the compact bump kernel of terrain.gdshader), so it is round instead of stair-stepped, then made
-// ragged with gradient noise (value noise showed tile-sized squares).
+// ragged with gradient noise (value noise showed tile-sized squares). Past the map's edge: a bronze frame with a gold
+// line and a dark void beyond it (the view may run past the edge to centre a hero), never the bare background with
+// stray tree shadows; a soft shadow falls inward along the edge.
 uniform sampler2D fog_map : filter_nearest;
 uniform vec2 map_size = vec2(48.0, 48.0);
 uniform float tile_px = 64.0;
@@ -32,20 +34,34 @@ float explored(vec2 t) {
 	return texture(fog_map, (c + 0.5) / map_size).r;
 }
 void fragment() {
-	vec2 tp = world / tile_px;
-	vec2 base = floor(tp - 0.5) - 1.0;
-	float ws = 0.0, es = 0.0;
-	for (int y = 0; y < 4; y++) {
-		for (int x = 0; x < 4; x++) {
-			vec2 t = base + vec2(float(x), float(y));
-			float d2 = dot(tp - (t + 0.5), tp - (t + 0.5));
-			float w = pow(max(0.0, 1.0 - d2 / 2.25), 4.0);
-			ws += w;
-			es += w * explored(t);
+	vec2 mpx = map_size * tile_px;
+	vec2 out_v = max(-world, world - mpx);  // >0 past an edge
+	float inside = min(min(world.x, world.y), min(mpx.x - world.x, mpx.y - world.y));
+	if (inside < 0.0) {
+		float d = length(max(out_v, vec2(0.0)));
+		vec3 c = vec3(0.035, 0.028, 0.022) + vec3(0.02, 0.016, 0.01) * (fbm(world / tile_px * 1.3) + 0.5);
+		if (d < 14.0) {
+			c = mix(vec3(0.46, 0.33, 0.16), vec3(0.12, 0.085, 0.05), d / 14.0);
+			c = mix(c, vec3(0.9, 0.72, 0.36), smoothstep(1.2, 0.0, abs(d - 3.5)));
 		}
+		COLOR = vec4(c, 1.0);
+	} else {
+		vec2 tp = world / tile_px;
+		vec2 base = floor(tp - 0.5) - 1.0;
+		float ws = 0.0, es = 0.0;
+		for (int y = 0; y < 4; y++) {
+			for (int x = 0; x < 4; x++) {
+				vec2 t = base + vec2(float(x), float(y));
+				float d2 = dot(tp - (t + 0.5), tp - (t + 0.5));
+				float w = pow(max(0.0, 1.0 - d2 / 2.25), 4.0);
+				ws += w;
+				es += w * explored(t);
+			}
+		}
+		float e = es / max(ws, 1e-4);
+		float vis = smoothstep(0.38, 0.62, e + fbm(tp * 1.7) * 0.32);
+		vec3 fogc = vec3(0.02, 0.02, 0.03) + vec3(0.025) * (fbm(tp * 0.9) + 0.5);
+		float edge = pow(max(0.0, 1.0 - inside / 22.0), 2.0) * 0.6;  // a soft shadow in along the edge
+		COLOR = vec4(fogc, 1.0 - vis * (1.0 - edge));
 	}
-	float e = es / max(ws, 1e-4);
-	float vis = smoothstep(0.38, 0.62, e + fbm(tp * 1.7) * 0.32);
-	vec3 fogc = vec3(0.02, 0.02, 0.03) + vec3(0.025) * (fbm(tp * 0.9) + 0.5);
-	COLOR = vec4(fogc, 1.0 - vis);
 }

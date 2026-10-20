@@ -1008,7 +1008,8 @@ class _BuildCard extends Button:
 		var rows: Array = [items]
 		if items.size() > 3:
 			rows = [items.slice(0, (items.size() + 1) / 2), items.slice((items.size() + 1) / 2)]
-		var strip_h := 26.0 * maxi(rows.size(), min_rows)
+		const ROW_H := 19.0  # (two tight price rows: the picture keeps its height)
+		var strip_h := ROW_H * maxi(rows.size(), min_rows) + 4.0
 		var bottom := 35.0 + strip_h + 5.0
 		var built := status == "Built"
 		var pr := Rect2(Vector2(5, 5), Vector2(size.x - 10, size.y - bottom - 5))
@@ -1018,7 +1019,9 @@ class _BuildCard extends Button:
 			var tint := Color(0.55, 0.53, 0.5) if built else Color.WHITE
 			if is_hovered():
 				tint *= Color(1.15, 1.12, 1.05)
-			draw_texture_rect_region(pic, pr, Rect2((ts - pr.size / sc) * 0.5, pr.size / sc), tint)
+			# (cropped from the ground up: the roofs and spires stay, a strip of the ground goes)
+			var src := pr.size / sc
+			draw_texture_rect_region(pic, pr, Rect2(Vector2((ts.x - src.x) * 0.5, (ts.y - src.y) * 0.2), src), tint)
 		if built:  # a gold tick in the corner of the picture
 			var c := pr.end - Vector2(24, 22)
 			draw_circle(c, 15, Color(0.1, 0.07, 0.03, 0.85))
@@ -1043,8 +1046,8 @@ class _BuildCard extends Button:
 		var x0 := sb.position.x + 28
 		var room := sb.end.x - 6 - x0
 		if not items.is_empty():
-			var ic := 20.0
-			var fs := 17
+			var ic := 18.0
+			var fs := 16
 			for k in rows.size():
 				var row: Array = rows[k]
 				var w := 0.0
@@ -1052,7 +1055,7 @@ class _BuildCard extends Button:
 					w += ic + 3 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 12
 				w -= 12
 				var x := x0 + maxf(0.0, (room - w) * 0.5)
-				var cy := sb.position.y + 13 + 26 * k + 13.0 * (maxi(rows.size(), min_rows) - rows.size())
+				var cy := sb.position.y + 2.0 + ROW_H * (k + 0.5) + ROW_H * 0.5 * (maxi(rows.size(), min_rows) - rows.size())
 				for it in row:
 					draw_texture_rect(Assets.res_icon(it[0]), Rect2(Vector2(x, cy - ic * 0.5), Vector2(ic, ic)), false)
 					var ok: bool = have.get(it[0], 0) >= cost[it[0]]

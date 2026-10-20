@@ -173,21 +173,17 @@ static func _fill(m: Modal, owner: Node, h: Dictionary) -> void:
 	m.add_buttons([["Close", "close"], ["Dismiss Hero", "dismiss"]])
 
 ## A small labelled meter: title, value and a thin bar.
+## A labelled meter: its name over the value in large figures, a bar under them (as the classic screen's boxes).
 static func _meter(title: String, value: String, frac: float, col: Color) -> Control:
 	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 2)
+	v.add_theme_constant_override("separation", 0)
 	v.custom_minimum_size.x = 170
-	var t := HBoxContainer.new()
-	t.add_child(UI.label(title, 18, UI.GOLD))
-	var sp := Control.new()
-	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	t.add_child(sp)
-	t.add_child(UI.label(value, 18))
-	v.add_child(t)
+	v.add_child(UI.label(title, 16, UI.GOLD))
+	v.add_child(UI.label(value, 22))
 	var bar := _Bar.new()
 	bar.frac = frac
 	bar.col = col
-	bar.custom_minimum_size = Vector2(170, 9)
+	bar.custom_minimum_size = Vector2(170, 11)
 	v.add_child(bar)
 	return v
 
@@ -417,6 +413,7 @@ class _Bar extends Control:
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.6))
 		draw_rect(Rect2(Vector2(1, 1), Vector2((size.x - 2) * frac, size.y - 2)), col)
+		draw_rect(Rect2(Vector2.ZERO, size), UI.GOLD_DARK, false, 1.0)
 
 ## A backpack scroll arrow: a gold triangle, dimmed when there is nothing more that way.
 class _Arrow extends Control:

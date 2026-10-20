@@ -19,6 +19,10 @@ var _scen_info: Label
 var _vic_row: HBoxContainer
 var _loss_row: HBoxContainer
 var _random_opts: Control
+var _preview: TextureRect   # the chosen scenario's map in miniature (as the classic scenario screen)
+var _preview_info: Label
+var _preview_box: Control
+var _preview_cache := {}    # "scenario/faction" -> [texture, text]
 var _logo: Control
 var _menu_band: Control
 
@@ -314,6 +318,31 @@ func _build_setup() -> void:
 		MAP_SIZES.map(func(m): return m[1]), 100))
 	_random_opts.add_child(_option_group("Rivals", ["1", "2", "3"], "opponents", [1, 2, 3], 100))
 	rv.add_child(_random_opts)
+	var pm := MarginContainer.new()
+	pm.add_theme_constant_override("margin_left", 12)
+	pm.add_theme_constant_override("margin_top", 6)
+	var pb := HBoxContainer.new()
+	pb.add_theme_constant_override("separation", 18)
+	pm.add_child(pb)
+	var fr := PanelContainer.new()
+	var fs := StyleBoxFlat.new()
+	fs.bg_color = Color.BLACK
+	fs.border_color = UI.GOLD_DARK
+	fs.set_border_width_all(3)
+	fr.add_theme_stylebox_override("panel", fs)
+	pb.add_child(fr)
+	_preview = TextureRect.new()
+	_preview.custom_minimum_size = Vector2(140, 140)
+	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_preview.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	fr.add_child(_preview)
+	_preview_info = UI.label("", 18, Color(0.85, 0.8, 0.68))
+	_preview_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_preview_info.custom_minimum_size.x = 480
+	_preview_info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pb.add_child(_preview_info)
+	_preview_box = pm
+	rv.add_child(pm)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	rv.add_child(spacer)
@@ -421,6 +450,67 @@ func _select_scenario(id: String) -> void:
 	_scen_title.text = sc["name"]
 	_scen_desc.text = sc["desc"]
 	_refresh_options()
+	_refresh_preview()
+
+const TERRAIN_WORDS := ["grassland", "dirt", "sand", "snow", "swamp", "water", "road"]
+
+## The chosen scenario's map in miniature, made from its own seed (the map you will play, your faction's town in
+## it), with the towns marked and a line on what the land holds. A random map shows only its options.
+func _refresh_preview() -> void:
+	if _preview_box == null:
+		return
+	var sc := GameData.scenario(_settings.get("scenario", ""))
+	_preview_box.visible = not sc.get("random", false)
+	if sc.get("random", false):
+		return
+	var key := "%s/%s" % [sc["id"], _settings.get("faction", "haven")]
+	if not _preview_cache.has(key):
+		var s := _settings.duplicate()
+		s["seed"] = int(sc["seed"])
+		s["map_size"] = sc["size"]
+		s["opponents"] = sc["opponents"]
+		var wd := WorldGen.generate(s)
+		var size: Vector2i = wd["size"]
+		var img := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+		var terr: PackedByteArray = wd["terrain"]
+		var blk: PackedByteArray = wd["blocked"]
+		var counts := {}
+		for y in size.y:
+			for x in size.x:
+				var i := y * size.x + x
+				var c: Color = AdventureHUD.TERRAIN_COLORS[terr[i]]
+				img.set_pixel(x, y, c.darkened(0.35) if blk[i] else c)
+				counts[terr[i]] = counts.get(terr[i], 0) + 1
+		img.resize(size.x * 4, size.y * 4, Image.INTERPOLATE_BILINEAR)
+		var mines := 0
+		for o in wd["objects"].values():
+			if o["type"] == "mine":
+				mines += 1
+		for t in wd["towns"].values():  # (towns as dots in their owner's colour, neutral ones pale)
+			var col: Color = Color(0.85, 0.83, 0.78) if t["owner"] < 0 else GameData.PLAYER_COLORS[t["owner"]]
+			var cp: Vector2 = (Vector2(t["pos"]) + Vector2(0.5, 0.0)) * 4.0
+			for yy in range(-7, 8):
+				for xx in range(-7, 8):
+					var d := Vector2(xx, yy).length()
+					var p := Vector2i(cp) + Vector2i(xx, yy)
+					if d <= 7.0 and p.x >= 0 and p.y >= 0 and p.x < img.get_width() and p.y < img.get_height():
+						img.set_pixel(p.x, p.y, col if d <= 5.5 else Color(0.05, 0.03, 0.02))
+		var land := []
+		for k in counts:
+			if k != WorldGen.T_ROAD and k != WorldGen.T_WATER and counts[k] > size.x * size.y * 0.08:
+				land.append(k)
+		land.sort_custom(func(a, b): return counts[a] > counts[b])
+		var words := land.map(func(k): return TERRAIN_WORDS[k])
+		var txt := "Mostly %s" % words[0] if words.size() > 0 else "Varied land"
+		if words.size() > 1:
+			txt += ", with %s" % " and ".join(PackedStringArray(words.slice(1, 3)))
+		if counts.get(WorldGen.T_WATER, 0) > size.x * size.y * 0.04:
+			txt += "; lakes"
+		txt += ".
+%d towns, %d mines." % [wd["towns"].size(), mines]
+		_preview_cache[key] = [ImageTexture.create_from_image(img), txt]
+	_preview.texture = _preview_cache[key][0]
+	_preview_info.text = _preview_cache[key][1]
 
 ## The details pane: size, rivals and the two conditions (the hero icon follows the chosen hero).
 func _refresh_scenario() -> void:
@@ -489,8 +579,8 @@ func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, 
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(v)
 	var t := UI.label(title, title_size, UI.GOLD, true)
-	t.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02, 0.95))
-	t.add_theme_constant_override("outline_size", 6)
+	t.add_theme_color_override("font_outline_color", Color(0.06, 0.035, 0.01, 1.0))
+	t.add_theme_constant_override("outline_size", 8)  # (legible on the light wood of an unselected card too)
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(t)
 	var d := UI.label(sub, sub_size, UI.TEXT)
@@ -533,6 +623,7 @@ func _refresh_options() -> void:
 
 func _select_faction(f: String) -> void:
 	_settings["faction"] = f
+	_refresh_preview()
 	for k in _faction_buttons:
 		_faction_buttons[k].button_pressed = k == f
 	for c in _hero_row.get_children():
@@ -547,7 +638,7 @@ func _select_faction(f: String) -> void:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(238, 104)
-		_card(b, Assets.hero_portrait(hid), 60, h["name"], h["class"], 17, 16)
+		_card(b, Assets.hero_portrait(hid), 60, h["name"], h["class"], 16, 16)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)

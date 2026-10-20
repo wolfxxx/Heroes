@@ -48,7 +48,7 @@ func setup(w: Dictionary) -> void:
 	add_child(_sorted)
 
 	_fog = _RectNode.new()
-	_fog.rect = Rect2(Vector2(-TILE * 4, -TILE * 4), Vector2(size + Vector2i(8, 8)) * TILE)
+	_fog.rect = Rect2(Vector2(-TILE * 16, -TILE * 16), Vector2(size + Vector2i(32, 32)) * TILE)  # (and the frame past the edge)
 	_fog_img = Image.create(size.x, size.y, false, Image.FORMAT_L8)
 	_fog_tex = ImageTexture.create_from_image(_fog_img)
 	var fm := ShaderMaterial.new()
