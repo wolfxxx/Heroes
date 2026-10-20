@@ -538,7 +538,7 @@ func _refresh_scenario() -> void:
 		for c in row.get_children():
 			row.remove_child(c)
 			c.queue_free()
-		row.add_child(UI.icon(_cond_icon(pair[2]), Vector2(44, 44)))
+		row.add_child(UI.icon(_cond_icon(pair[2]), Vector2(56, 56)))
 		var tv := VBoxContainer.new()
 		tv.add_theme_constant_override("separation", 0)
 		tv.add_child(UI.label(pair[1], 17, Color(0.8, 0.72, 0.55)))
@@ -583,12 +583,13 @@ func _card(b: Button, tex: Texture2D, pic_w: float, title: String, sub: String, 
 	h.add_child(v)
 	var t := UI.label(title, title_size, UI.GOLD, true)
 	t.add_theme_color_override("font_outline_color", Color(0.06, 0.035, 0.01, 1.0))
-	t.add_theme_constant_override("outline_size", 8)  # (legible on the light wood of an unselected card too)
+	# (legible on the light wood of an unselected card too; thinner on small names, a thick one made them muddy)
+	t.add_theme_constant_override("outline_size", clampi(title_size / 3, 4, 8))
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(t)
 	var d := UI.label(sub, sub_size, UI.TEXT)
 	d.add_theme_color_override("font_outline_color", Color(0.1, 0.06, 0.02, 0.85))
-	d.add_theme_constant_override("outline_size", 4)
+	d.add_theme_constant_override("outline_size", 3)
 	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	v.add_child(d)
@@ -641,7 +642,7 @@ func _select_faction(f: String) -> void:
 		var b := Button.new()
 		b.toggle_mode = true
 		b.custom_minimum_size = Vector2(238, 104)
-		_card(b, Assets.hero_portrait(hid), 60, h["name"], h["class"], 16, 16)
+		_card(b, Assets.hero_portrait(hid), 60, h["name"], h["class"], 17, 16)
 		b.set_meta("hero", hid)
 		b.pressed.connect(_select_hero.bind(hid))
 		_hero_row.add_child(b)

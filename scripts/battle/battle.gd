@@ -1661,6 +1661,9 @@ func _settle_badges() -> void:
 		var spots := [home, home + Vector2(0, 22)]
 		if corner != home:  # (moved in, unless that lands on another stack's figure: then back at its ring corner)
 			spots = [home, corner, home + Vector2(0, 22), corner + Vector2(0, 22)]
+		# (last, the back corner of its own ring: the free side, when another figure covers the front one)
+		spots.append(Vector2(-corner.x, corner.y))
+		spots.append(Vector2(-corner.x, corner.y + 22))
 		var hit := func(q: Rect2) -> float:
 			var c := 0.0
 			for o in placed:
@@ -1747,7 +1750,7 @@ func _see_through() -> void:
 					continue
 				if bk[4] and not f[4]:
 					# (it covers a good part of the stack in play: well up its body and across its middle)
-					if f[2] - dy >= 0.45 * bk[2] and absf(f[1].x - bk[1].x) < (f[3] + bk[3]) * 0.6:
+					if f[2] - dy >= 0.3 * bk[2] and absf(f[1].x - bk[1].x) < (f[3] + bk[3]) * 0.7:
 						fade = 0.45
 				elif holes.size() < 4:
 					holes.append(Vector4(bk[1].x, bk[1].y - 26.0, bk[3] * 0.95, 52.0))
@@ -1782,7 +1785,7 @@ func _under_figures() -> void:
 			var hw := HEX_W * (0.45 if L.is_wide(n.get_node("Badge").st) else 0.3)
 			var fig := Rect2(n.position.x - hw, n.position.y - float(n.get_meta("top", 120.0)), hw * 2.0, float(n.get_meta("top", 120.0)) - 30.0)
 			if fig.intersects(r):
-				to = 0.45
+				to = 0.6
 				break
 		s.modulate.a = move_toward(s.modulate.a, to, get_process_delta_time() * 3.0)
 
@@ -1873,8 +1876,8 @@ func _float_text(p: Vector2, t: String, col: Color, size := 30, sub := "", delay
 	box.scale = Vector2(0.6, 0.6)
 	tw.tween_property(box, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(box, "position:y", box.position.y - (6 if dir != 0 else 40), 1.3).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "modulate:a", 0.0, 0.1).set_delay(1.1)  # (a quick fade: no half-faded smear over the next stack)
-	tw.chain().tween_callback(box.queue_free)
+	# (then gone at once, as a log line is replaced: a fading plate turned into a half-seen smear over the next stack)
+	tw.tween_callback(box.queue_free).set_delay(1.2)
 
 ## Where a damage label for the stack of `n` goes: centred over its head, or higher up the same column when another
 ## stack, badge or label is there, else beside its head; the first spot that covers nothing, else the one that covers

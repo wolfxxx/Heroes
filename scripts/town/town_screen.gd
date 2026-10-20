@@ -600,8 +600,8 @@ func _building_detail(id: String) -> void:
 				continue
 			var have: int = player["resources"].get(r, 0)
 			var cell := HBoxContainer.new()
-			cell.add_child(UI.icon(Assets.res_icon(r), Vector2(30, 30)))
-			cell.add_child(UI.label(str(need), 20, UI.TEXT if have >= need else Color(1, 0.5, 0.4)))
+			cell.add_child(UI.icon(Assets.res_icon(r), Vector2(34, 34)))
+			cell.add_child(UI.label(str(need), 22, UI.TEXT if have >= need else Color(1, 0.5, 0.4)))
 			cell.tooltip_text = "%s: need %d, have %d" % [GameData.RESOURCE_NAMES[r], need, have]
 			cost.add_child(cell)
 	var st := _build_status(id)
@@ -1050,8 +1050,8 @@ class _BuildCard extends Button:
 				for it in row:
 					w += ic + 1 + f.get_string_size(it[1], HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x + 10
 				if w > room:
-					ic = 28.0
-					fs = 18
+					ic = 30.0
+					fs = 19
 			for k in rows.size():
 				var row: Array = rows[k]
 				var w := 0.0
@@ -1118,10 +1118,10 @@ class _DwellingCard extends Button:
 		draw_string(f, Vector2(14, y0 + 47), stats, HORIZONTAL_ALIGNMENT_LEFT, size.x - 28, 16, Color(0.82, 0.78, 0.68))
 		var x := 14.0
 		for res in c.get("cost", {}):
-			draw_texture_rect(Assets.res_icon(res), Rect2(Vector2(x, y0 + 57), Vector2(22, 22)), false)
+			draw_texture_rect(Assets.res_icon(res), Rect2(Vector2(x, y0 + 52), Vector2(32, 32)), false)
 			var amt := str(c["cost"][res])
-			draw_string(f, Vector2(x + 26, y0 + 75), amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UI.TEXT)
-			x += 34 + f.get_string_size(amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+			draw_string(f, Vector2(x + 33, y0 + 76), amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UI.TEXT)
+			x += 43 + f.get_string_size(amt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
 		draw_string(f, Vector2(size.x - 214, y0 + 75), "+%d / week" % growth, HORIZONTAL_ALIGNMENT_RIGHT, 200, 17,
 			Color(0.55, 0.9, 0.5) if available >= 0 else Color(0.6, 0.58, 0.52))
 		draw_rect(r, UI.GOLD if is_hovered() and available >= 0 else UI.GOLD_DARK, false, 1.5)

@@ -80,9 +80,12 @@ vec3 ridge(vec2 w, vec2 h0) {
 	float hy = rock_h(w + vec2(0.0, 1.5)).x;
 	vec3 n = normalize(vec3(-(hx - h0.x) / 1.5, -(hy - h0.x) / 1.5, 0.8));
 	float lit = clamp(dot(n, normalize(vec3(-0.6, -0.7, 0.75))), 0.0, 1.0);
-	vec3 rock = mix(vec3(0.33, 0.29, 0.24), vec3(0.52, 0.47, 0.39), h0.y) * (0.3 + 1.05 * lit);
-	rock *= mix(0.45, 1.0, smoothstep(0.0, 10.0, h0.x));  // dark in the cracks
-	rock *= mix(1.0, 1.18, smoothstep(26.0, 50.0, h0.x));  // the crags' tops catch more light
+	// warm ochre and umber stone, as the map's own mountains
+	vec3 rock = mix(vec3(0.40, 0.31, 0.21), vec3(0.62, 0.50, 0.35), h0.y) * (0.32 + 1.0 * lit);
+	rock *= mix(0.6, 1.0, smoothstep(0.0, 10.0, h0.x));  // darker in the cracks (not inked: a wall of slabs)
+	// the tall crags: snow on their lit upper faces, like the peaks on the map
+	float snow = smoothstep(48.0, 58.0, h0.x + fbm(w / 9.0) * 8.0) * smoothstep(0.35, 0.7, lit);
+	rock = mix(rock, vec3(0.88, 0.89, 0.92) * (0.55 + 0.5 * lit), snow);
 	return rock;
 }
 
@@ -92,9 +95,9 @@ void fragment() {
 	float inside = min(min(world.x, world.y), min(mpx.x - world.x, mpx.y - world.y));
 	// how far the ridge runs out past the edge: one to three tiles, wandering slowly, its outline following the boulders
 	float band = clamp(44.0 + 110.0 * (fbm(world / 210.0) + 0.45) + 16.0 * fbm(world / 27.0), 36.0, 170.0);
-	float enc = 8.0 + 14.0 * (fbm(world / 40.0) + 0.5);  // and how far its boulders reach in onto the map (ragged)
+	float enc = 4.0 + 34.0 * clamp(fbm(world / 110.0) + 0.5 + 0.4 * fbm(world / 31.0), 0.0, 1.0);  // and how far its boulders reach in onto the map (wandering)
 	vec2 h0 = vec2(0.0);
-	if (inside < 60.0) {  // (the rocks only near the edge: the rest of the map skips them)
+	if (inside < 90.0) {  // (the rocks only near the edge: the rest of the map skips them)
 		h0 = rock_h(world);
 	}
 	if (inside < 0.0) {
@@ -125,7 +128,7 @@ void fragment() {
 		float vis = smoothstep(0.38, 0.62, e + fbm(tp * 1.7) * 0.32);
 		vec3 fogc = vec3(0.02, 0.02, 0.03) + vec3(0.025) * (fbm(tp * 0.9) + 0.5);
 		float rim = enc + (h0.x - 12.0) * 0.5;  // the boulders lying on the map's rim, outlined by their own shapes
-		float edge = pow(max(0.0, 1.0 - (inside - rim) / 44.0), 2.0) * 0.8;  // the ridge's shadow on the map
+		float edge = (1.0 - smoothstep(0.0, 60.0, inside - rim)) * 0.8;  // the ridge's shadow on the map
 		float a = 1.0 - vis * (1.0 - min(edge, 0.8));
 		float cov = smoothstep(rim + 1.5, rim - 1.5, inside);
 		vec3 rc = vec3(0.0);

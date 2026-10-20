@@ -6,7 +6,7 @@ python tools/art/button_icons_paint.py ingest [adventure|battle]  ->  assets/ui/
 (the "retreat", "retreat2", "retreat3" and "retreat4" sheets paint eight takes of the retreat icon; the best is kept as btn_retreat.png by hand;
 "conditions" paints takes of the scenario win and loss icons, kept as ui/cond_win.png and ui/cond_lose.png, and the Offense skill,
 kept as icons/skill_offense.png; "conditions2" the gold, hero and capture conditions, kept as ui/cond_gold.png, ui/cond_hero.png
-and ui/cond_capture.png)"""
+and ui/cond_capture.png; "skills" the secondary skills -> icons/skill_<name>.png)"""
 import os, sys
 import numpy as np
 from PIL import Image
@@ -77,6 +77,15 @@ SHEETS = {"adventure": [
 ] + [
     (f"capture_{k}", "a stone castle gatehouse with a big golden banner flying from its tower, drawn large and bold, a "
      "compact square composition") for k in "ab"
+], "skills": [  # (the secondary skills, in the style of the Offense icon: each a bold object, no frame)
+    ("archery", "a wooden longbow drawn with a steel-tipped arrow nocked, pointing up and to the right, drawn large and bold"),
+    ("armorer", "a polished steel breastplate with gold trim and rivets, drawn large and bold"),
+    ("leadership", "a blue war banner with a gold cross on a wooden pole with a gold finial, waving, drawn large and bold"),
+    ("logistics", "a brown leather riding boot with a silver spur and small white wings at its heel, drawn large and bold"),
+    ("luck", "a bright green four-leaf clover with a soft golden glow and a few sparkles, drawn large and bold"),
+    ("necromancy", "a pale skull wreathed in swirling green ghostly flame, drawn large and bold"),
+    ("sorcery", "a glowing violet crystal orb on a gold claw stand, magic sparks around it, drawn large and bold"),
+    ("wisdom", "an open ancient tome with a lit candle beside it and a feather quill, drawn large and bold"),
 ]}
 PROMPT = ("This is a blank icon sheet for a fantasy strategy game's interface: a flat magenta (#FF00FF) background "
           "divided into a 4 x 2 grid of equal square cells (4 columns, 2 rows). Paint exactly one icon in the centre of "
@@ -128,8 +137,9 @@ def ingest(sheet):
         obj = obj.resize((max(1, round(obj.width * s)), max(1, round(obj.height * s))), Image.LANCZOS)
         out = Image.new("RGBA", (SIZE, SIZE))
         out.alpha_composite(obj, ((SIZE - obj.width) // 2, (SIZE - obj.height) // 2))
-        out.save(f"assets/ui/btn_{name}.png")
-        print(f"  ui/btn_{name}.png")
+        dst = f"assets/icons/skill_{name}.png" if sheet == "skills" else f"assets/ui/btn_{name}.png"
+        out.save(dst)
+        print(f"  {dst}")
 
 
 if __name__ == "__main__":

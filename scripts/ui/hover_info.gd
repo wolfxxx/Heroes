@@ -78,9 +78,9 @@ static func cost_row(cost: Dictionary, have = null) -> Control:
 			continue
 		var cell := HBoxContainer.new()
 		cell.add_theme_constant_override("separation", 4)
-		cell.add_child(UI.icon(Assets.res_icon(r), Vector2(26, 26)))
+		cell.add_child(UI.icon(Assets.res_icon(r), Vector2(34, 34)))  # (as the build cards: the pictures have a margin)
 		var ok: bool = have == null or have.get(r, 0) >= need
-		cell.add_child(UI.label(str(need), 19, UI.TEXT if ok else Color(1, 0.5, 0.4)))
+		cell.add_child(UI.label(str(need), 22, UI.TEXT if ok else Color(1, 0.5, 0.4)))
 		h.add_child(cell)
 	return h
 
