@@ -685,18 +685,27 @@ class _ArtifactGlow extends Node2D:
 			t += d
 			queue_redraw()
 	func _draw() -> void:
+		# (the item's own sprite casts its shadow; here only a pale light, its tier's colour washed toward white: a
+		# saturated red under the relic read as a burnt patch)
+		var light := col.lerp(Color(1, 0.95, 0.8), 0.55)
 		draw_set_transform(Vector2(0, -2), 0, Vector2(1, 0.38))
-		for i in 6:  # (a soft falloff, faint at the middle too)
-			draw_circle(Vector2.ZERO, 34 - i * 4, Color(col, 0.025 + i * 0.008))
-		draw_circle(Vector2.ZERO, 14, Color(0, 0, 0, 0.32))
+		for i in 6:
+			draw_circle(Vector2.ZERO, 34 - i * 4, Color(light, 0.018 + i * 0.006))
 		draw_set_transform(Vector2.ZERO)
-		if strong:
+		if strong:  # a soft four-pointed glint now and then (never a hard cross: a still caught it as a debug mark)
 			for k in 2:
-				var a := 0.5 + 0.5 * sin(t * 2.2 + k * 2.6)
+				var a := clampf(sin(t * 1.6 + k * 2.6) * 1.6 - 0.6, 0.0, 1.0)
+				if a <= 0.0:
+					continue
 				var p := Vector2(-16 + k * 30, -40 - k * 14)
-				var c := Color(1.0, 0.96, 0.85, 0.75 * a)
-				draw_line(p - Vector2(5, 0), p + Vector2(5, 0), c, 1.5, true)
-				draw_line(p - Vector2(0, 5), p + Vector2(0, 5), c, 1.5, true)
+				var r := 7.0 * a
+				for sc in [[1.0, 0.25], [0.55, 0.55]]:
+					var c := Color(1.0, 0.97, 0.88, sc[1] * a)
+					var l: float = r * sc[0]
+					var wd: float = r * 0.16
+					draw_colored_polygon(PackedVector2Array([p + Vector2(0, -l), p + Vector2(wd, -wd), p + Vector2(l, 0),
+						p + Vector2(wd, wd), p + Vector2(0, l), p + Vector2(-wd, wd), p + Vector2(-l, 0), p + Vector2(-wd, -wd)]), c)
+				draw_circle(p, r * 0.22, Color(1, 1, 1, 0.8 * a))
 
 class _RectNode extends Node2D:
 	var rect := Rect2()

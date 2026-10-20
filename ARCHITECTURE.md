@@ -58,6 +58,10 @@ Every scene also works when launched DIRECTLY (for screenshots): missing state -
 - `sh tools/run_tests.sh` — the full test pass of a round: check, `battle_test` (40 AI-vs-AI battles checking hex
   rules), `click_test` (map clicks, drag, queued clicks), `visit_test` (hover "visited" lines), `artifact_test` (every
   artifact's effect, slots, combinations, tiered placement), `sim_test` (all-AI soak).
+- `tools/ai_tournament.tscn` — the current battle AI against the frozen baseline (`tools/ai/battle_ai_baseline.gd`):
+  `Godot --headless --path . res://tools/ai_tournament.tscn -- --games=300` (600 battles, ~15 s); prints the win rate
+  and the paired difference in army kept, with its error bar. Measure every battle-AI change with it; refreeze the
+  baseline (copy battle_ai.gd over it, class `BattleAIBaseline`) only after a change is accepted.
 - `sh tools/judge_round.sh N` — the 32 judge screenshots (`tools/judge_shots.sh`) into shots/judgeN, size-checked;
   the judge agent's prompt is `tools/judge_prompt.md`.
 - `tools/sim_test.tscn` — all-AI soak test: `Godot --path . res://tools/sim_test.tscn -- --seconds=80`

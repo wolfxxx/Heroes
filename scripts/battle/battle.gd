@@ -708,6 +708,11 @@ func _next() -> void:
 			"shoot": ev = L.do_shoot(s, act["target"])
 			"melee": ev = L.do_melee(s, act["target"], act["from"])
 			"move": ev = L.do_move(s, act["hex"])
+			"wait":  # (the computer waits, as a player may: it acts again at the end of the round)
+				if L.do_wait(s):
+					_set_log("%s %s." % [L._name(s), "waits" if s["count"] == 1 else "wait"])
+				else:
+					ev = L.do_defend(s)
 			_: ev = L.do_defend(s)
 		await _play(ev)
 		_next()

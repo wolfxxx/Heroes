@@ -2,7 +2,7 @@
 
 Read this first, then `ARCHITECTURE.md` (code map), `ASSETS.md` (every asset path and the art pipeline) and
 `CREDITS.md`. This file is written so that another person or another AI assistant can pick the work up exactly
-where it stopped. Last updated 2026-10-20 (round 43, artifact polish, committed and pushed; judge 43 run), branch `main`, remote
+where it stopped. Last updated 2026-10-20 (round 44, tournament harness and first battle-AI changes, committed and pushed; judge 44 run), branch `main`, remote
 `https://github.com/wolfxxx/Heroes.git` (public repo).
 
 ## 1. The project in one paragraph
@@ -24,6 +24,17 @@ the look and feel of HoMM3, and each round fixes what the judge found.
   it (scores in section 7). Next step of the plan: the AI work (section 8).
 - Found and fixed on the way: the all-computer simulation could overflow Godot's message queue once one computer
   player had beaten the others (the AI turn loop never waited a frame); `_run_ai_turns` now waits one frame per turn.
+- Round 44 (AI work begins) committed and pushed, judge 44 run on it: `tools/ai_tournament.gd` plays the current battle AI against a
+  frozen copy (`tools/ai/battle_ai_baseline.gd`, class `BattleAIBaseline`) on equal-value army pairings, each fought
+  twice with the AIs swapping sides on the same dice (identical AIs split exactly 50%); it prints win rate and a
+  paired "army kept" difference with an error bar. First battle-AI changes (`battle_ai.gd`, constants at the end):
+  no retaliation counted from a stack that has already struck back this round (a real bug), retaliation weighed
+  fully, enemy shooters favoured as melee targets (blocking them), and, when no strike is possible, holding just
+  outside enemy melee reach unless the enemy has the stronger shooters or we storm the walls (waiting if nothing
+  better). Measured: 52% wins, +1.4 points of army kept (+-0.9) over 600 battles — real but small. The battle scene
+  and battle_test handle the AI's new "wait". Also the last artifact fixes from judge 43: soft star twinkle, a pale
+  light instead of the relic's red disc, a greyed copy of the combination plus interlocked chain links in its taken
+  sockets, no flowers under the showcase artifacts.
 - Round 43 (artifact polish after judge 42) committed and pushed, judge 43 run on it: map artifacts without the flat glow plate
   (a dark contact shadow, a faint soft light, a slow twinkle on major and relic ones) and sized by tier by area (the
   relic banner was the smallest); a combination's ghost sockets in iron frames with only a purple chain mark (redrawn so
@@ -134,11 +145,25 @@ magenta key for pink fringes (recolour them, as was done for the Luck clover).
 | 40 | 9.2 | 9.2 | 9.4 | 9.5 | 8.9 | 9.2 |
 | 41 | 9.2 | 9.2 | 9.4 | 9.6 | 8.9 | 9.2 |
 | 42 | 9.2 | 9.3 | 9.4 | 9.7 | 8.9 | 9.3 |
+| 43 | 9.2 | 9.4 | 9.4 | 9.7 | 8.9 | 9.3 |
 
 Trend: gains have flattened at 9.2 for three rounds. Battle is the weakest area; the next big step most likely comes
 from battle (crowded siege melees, the lightning effect) or from new gameplay (section 8), not more small polish.
 
 ## 8. What's next
+
+### Open findings from judge 43 (second artifact polish round; overall 9.3, adventure 9.4)
+1. Siege-gate pile-ups (battle_siege_haven, battle_siege_later) — unchanged, the main battle problem.
+2. The map artifacts' twinkle shows as a hard white "+" in a still (looks like a debug mark): soft 4-point star with
+   falloff, or hidden in its off phase.
+3. The relic banner's baked shadow is a reddish disc offset from the pole's foot (`art_banner_of_the_muster.png`):
+   a neutral dark ellipse centred under the foot.
+4. The chain mark on a combination's taken sockets reads as an orbit symbol: two clearly interlocked links, or a
+   greyed copy of the artifact behind the mark, as HoMM3.
+5. Lightning cloud covers the top-row stack and the enemy hero (battle_0, battle_siege).
+6. Ground flowers ring an artifact (adventure_artifacts, the cape): keep flat decor off artifact tiles.
+7. Hero-screen Formation toggle: the selected option is unclear.
+8. New Game starting-bonus card text is cramped.
 
 ### Open findings from judge 42 (artifact polish round; overall 9.3)
 1. Siege-gate melee clusters still unreadable (battle_siege_haven, battle_siege_later); badges drift from their stacks.
@@ -195,7 +220,7 @@ Suggested order: **artifacts → AI → hot-seat multiplayer → war-machine wre
    pieces stay separate would be the RPG way, not HoMM3's — flag it if the user prefers that. The proposal
    (38 artifacts in four tiers, three combinations) is in `docs/ARTIFACTS_PROPOSAL.md`, **awaiting the user's
    answers to its four questions** before anything is built.
-2. **Computer opponent.** `scripts/adventure/adv_ai.gd` (~220 lines) is greedy: value ÷ distance per hero this
+2. **Computer opponent — IN PROGRESS (round 44: tournament harness + first battle-AI changes, see section 2).** `scripts/adventure/adv_ai.gd` (~220 lines) is greedy: value ÷ distance per hero this
    turn, a fixed build order, fixed strength ratios, no defending threatened towns, no multi-turn plans, no troop
    transfers between heroes, no map spells, and it likely sees through the fog (it reads the whole object list).
    `scripts/battle/battle_ai.gd` (~150 lines) scores the best strike or shot now minus the retaliation; it never

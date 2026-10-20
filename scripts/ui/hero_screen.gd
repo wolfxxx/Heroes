@@ -440,22 +440,10 @@ class _Socket extends Control:
 		draw_rect(r, Color(0.02, 0.02, 0.025, (0.22 if glass else 0.4) if empty else 0.92))
 		if tex and not empty and inner:
 			var ts := tex.get_size()
-			if linked:  # (taken by the combination worn elsewhere: a dark, greyed ghost of it and a chain link)
-				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86), Color(0.42, 0.4, 0.46, 0.45))
-				draw_rect(r.grow(-3), Color(0.05, 0.04, 0.06, 0.45))
-				var c := size * 0.5
-				var ch := Color(tier_col, 0.95)
-				# (two chain links along a diagonal, one seen edge-on through the other: not an infinity sign)
-				draw_set_transform(c + Vector2(-6, 6), -PI * 0.25, Vector2(1, 0.55))
-				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, Color(0, 0, 0, 0.7), 6.5, true)
-				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, ch, 4.0, true)
-				draw_set_transform(c + Vector2(6, -6), -PI * 0.25, Vector2(1, 0.55))
-				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, Color(0, 0, 0, 0.7), 6.5, true)
-				draw_arc(Vector2.ZERO, 11, 0, TAU, 24, ch, 4.0, true)
-				draw_set_transform(c, PI * 0.25, Vector2(1, 0.3))  # (the middle link, edge-on, joining them)
-				draw_arc(Vector2.ZERO, 9, 0, TAU, 20, Color(0, 0, 0, 0.7), 6.0, true)
-				draw_arc(Vector2.ZERO, 9, 0, TAU, 20, ch.lightened(0.25), 3.5, true)
-				draw_set_transform(Vector2.ZERO)
+			if linked:  # (taken by the combination worn elsewhere: a greyed copy of it, as the classic, and a chain)
+				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86), Color(0.55, 0.53, 0.6, 0.5))
+				draw_rect(r.grow(-3), Color(0.05, 0.04, 0.06, 0.35))
+				_chain(size * 0.5 + Vector2(0, size.y * 0.24), Color(tier_col, 0.95))
 			else:
 				draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86))
 				if tier_col.a > 0.0 and tex and tier_col.is_equal_approx(GameData.ARTIFACT_TIERS["combo"][1]):
@@ -479,6 +467,19 @@ class _Socket extends Control:
 		draw_rect(r.grow(1), Color(1, 0.9, 0.5) if lit else frame, false, 3.0 if lit else 2.0)
 		if tier_col.a > 0.0 and not empty and not lit and not linked:  # (the tier's colour a little stronger: an inner line)
 			draw_rect(r.grow(-2), Color(tier_col, 0.55), false, 1.0)
+
+	## Two interlocked oval chain links, side by side: the left one drawn whole, the right one over it, then the left
+	## one's near side again over the right one (so they pass through each other).
+	func _chain(c: Vector2, col: Color) -> void:
+		var dark := Color(0, 0, 0, 0.75)
+		var link := func(at: Vector2, a0: float, a1: float) -> void:
+			draw_set_transform(at, 0, Vector2(1, 0.62))
+			draw_arc(Vector2.ZERO, 9, a0, a1, 18, dark, 6.0, true)
+			draw_arc(Vector2.ZERO, 9, a0, a1, 18, col, 3.2, true)
+			draw_set_transform(Vector2.ZERO)
+		link.call(c + Vector2(-6, 0), 0, TAU)
+		link.call(c + Vector2(6, 0), 0, TAU)
+		link.call(c + Vector2(-6, 0), -0.7, 0.7)  # (its right side passes over the other link)
 
 class _Bar extends Control:
 	var frac := 0.0

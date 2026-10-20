@@ -37,12 +37,16 @@ static func decide(L: BattleLogic, s: Dictionary) -> Dictionary:
 			var moved: int = reach.get(h, 0)
 			var dmg := _avg(L.damage_range(s, e, false, moved))
 			var score := _value_of_damage(L, e, dmg)
+			if L.cdata(e)["shots"] > 0 and e["shots"] > 0:
+				score *= SHOOTER_BLOCK  # (a shooter held in melee shoots no more and strikes at half: block it)
 			# estimated retaliation
-			if not L.has_ab(s, "no_retaliation") and dmg < L.total_hp(e):
+			# (none if it has already struck back this round: as the classic computer, strike it now with the stack
+			# that would otherwise suffer the retaliation)
+			if not L.has_ab(s, "no_retaliation") and dmg < L.total_hp(e) and e["retaliations"] > 0:
 				var left_frac := 1.0 - dmg / float(L.total_hp(e))
 				var tmp: Dictionary = e.duplicate()
 				tmp["count"] = maxi(1, int(e["count"] * left_frac))
-				score -= 0.6 * _value_of_damage(L, s, _avg(L.damage_range(tmp, s, false)))
+				score -= RETALIATION * _value_of_damage(L, s, _avg(L.damage_range(tmp, s, false)))
 			# prefer staying put when already adjacent
 			if h == s["hex"]:
 				score += 5.0
@@ -52,6 +56,12 @@ static func decide(L: BattleLogic, s: Dictionary) -> Dictionary:
 				best_act = {"type": "melee", "target": e, "from": h}
 	if not best_act.is_empty():
 		return best_act
+	# No strike this turn. As the classic computer: unless the enemy has the stronger shooters (or we must storm the
+	# walls), hold just outside the reach of the enemy's melee stacks, so they come to us and we strike first;
+	# otherwise advance, by the least exposed way.
+	var hold: bool = HOLD and _shoot_power(L, s["side"]) >= _shoot_power(L, 1 - s["side"]) * HOLD_RATIO \
+		and not (L.siege > 0 and s["side"] == 0)
+	var threat := _threats(L, s, reach)
 	# Advance toward the juiciest enemy.
 	var target: Dictionary = enemies[0]
 	var tv := -1.0
@@ -61,15 +71,71 @@ static func decide(L: BattleLogic, s: Dictionary) -> Dictionary:
 			tv = v
 			target = e
 	var best_h: Vector2i = s["hex"]
+	if hold:
+		# the nearest spot to the target that no enemy can reach next turn; else the least threatened
+		var bkey := Vector2(threat.get(s["hex"], 0.0), L.distance(s["hex"], target["hex"]))
+		for h in reach:
+			var key := Vector2(threat.get(h, 0.0), L.distance(h, target["hex"]))
+			if key.x < bkey.x - 0.01 or (absf(key.x - bkey.x) <= 0.01 and key.y < bkey.y):
+				bkey = key
+				best_h = h
+		if best_h == s["hex"]:
+			if WAIT and not s["waited"] and L.order.size() > 1:
+				return {"type": "wait"}
+			return {"type": "defend"}
+		return {"type": "move", "hex": best_h}
 	var bd := L.distance(s["hex"], target["hex"])
+	var bt: float = threat.get(s["hex"], 0.0)
 	for h in reach:
 		var d := L.distance(h, target["hex"])
-		if d < bd or (d == bd and reach[h] < reach.get(best_h, 99)):
+		var t: float = threat.get(h, 0.0)
+		if d < bd or (d == bd and (t < bt - 0.01 or (absf(t - bt) <= 0.01 and reach[h] < reach.get(best_h, 99)))):
 			bd = d
+			bt = t
 			best_h = h
 	if best_h == s["hex"]:
 		return {"type": "defend"}
 	return {"type": "move", "hex": best_h}
+
+## Tuning, measured with tools/ai_tournament.gd against the frozen baseline.
+const SHOOTER_BLOCK := 1.4
+const RETALIATION := 1.0
+const HOLD := true
+const HOLD_RATIO := 0.8
+const WAIT := true
+
+## Shooting strength of a side: the value of its stacks that can still shoot (towers included).
+static func _shoot_power(L: BattleLogic, side: int) -> float:
+	var v := 0.0
+	for o in L.alive_stacks(side, true):
+		if L.cdata(o)["shots"] > 0 and o["shots"] > 0:
+			v += L.cdata(o)["ai_value"] * o["count"]
+	return v
+
+## For each hex the stack could stand on (and its own), the damage the enemy's melee stacks could deal it there next
+## turn, valued as _value_of_damage (0: out of their reach).
+static func _threats(L: BattleLogic, s: Dictionary, reach: Dictionary) -> Dictionary:
+	var out := {}
+	var spots: Array = reach.keys() + [s["hex"]]
+	for e in L.alive_stacks(1 - s["side"]):
+		if e.get("machine", false) or e.get("tower", false):
+			continue
+		var er := L.reachable(e)
+		for c in L.cells(e):
+			er[c] = 0
+		var v := _value_of_damage(L, s, _avg(L.damage_range(e, s, false)))
+		for h in spots:
+			var hit := false
+			for c in L.cells(s, h):
+				for n in BattleLogic.neighbors(c):
+					if er.has(n):
+						hit = true
+						break
+				if hit:
+					break
+			if hit:
+				out[h] = out.get(h, 0.0) + v
+	return out
 
 ## Staging of a melee (a tie-break between spots to strike the same target from): side by side in the target's row
 ## reads best, as in the classics; a spot right above or below other stacks piles the figures on each other.

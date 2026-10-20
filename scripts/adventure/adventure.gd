@@ -152,6 +152,7 @@ static func _shot_artifacts(w: Dictionary) -> void:
 					continue
 				var o := {"type": "artifact", "artifact": picks.pop_front(), "uid": GameState.next_uid(), "pos": q}
 				w["objects"][o["uid"]] = o
+				w["decor"] = w["decor"].filter(func(d): return Vector2i(d["p"] / WorldGen.TILE) != q)  # (flowers on it)
 				for ddy in range(-1, 2):
 					for ddx in range(-1, 2):
 						taken[q + Vector2i(ddx, ddy)] = true

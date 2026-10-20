@@ -43,6 +43,9 @@ func _ready() -> void:
 				"shoot": L.do_shoot(s, act["target"])
 				"melee": L.do_melee(s, act["target"], act["from"])
 				"move": L.do_move(s, act["hex"])
+				"wait":
+					if not L.do_wait(s):
+						L.do_defend(s)
 				_: L.do_defend(s)
 			L.roll_good_morale(s)
 			var err := _check(L)
