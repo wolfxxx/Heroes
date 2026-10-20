@@ -35,6 +35,15 @@ Design resolution 1920x1080, stretch mode canvas_items/expand. All UI coordinate
 day -> week = (day-1)/7+1, day_of_week = (day-1)%7+1, month = (day-1)/28+1.
 Tiles are 64px; objects have an action tile `pos` and an optional footprint (WorldGen.footprint_for).
 
+## Artifacts
+`GameData.ARTIFACTS` (tiers treasure/minor/major/relic, set pieces with `"set"`, combinations with `"parts"`; the
+bonus keys and flags are listed in its header comment) and `GameData.ARTIFACT_TIERS`. Rules in `GameState`:
+`hero_stat` (numbers), `hero_flags` (immunities, raise), `artifact_slots`, `can_wear`, `give_artifact` / `swap_artifact`
+(both return the name of a combination they completed), `merge_combinations`, `split_combination`,
+`join_combination` (a hero's `"apart"` list keeps split sets from re-merging). Effects are applied in
+`BattleLogic.max_hp / speed / spell_damage / immune`, `battle.gd` (necromancy), `AdvRules` (scouting, daily gold and
+mana, weekly first-level growth). Placement by tier: `WorldGen._place_artifacts`. Design: `docs/ARTIFACTS_PROPOSAL.md`.
+
 ## Scene flow
 Main menu -> New Game -> sets `GameState.new_game_settings`, clears `GameState.world`, changes to adventure, which
 generates the world. Adventure -> town: `open_town(uid)`; town "Exit" -> adventure.
@@ -47,7 +56,8 @@ Every scene also works when launched DIRECTLY (for screenshots): missing state -
 ## Tools (see HANDOFF.md for the workflow and expected outputs)
 - `sh tools/check.sh` — re-import + compile every script (prints only errors).
 - `sh tools/run_tests.sh` — the full test pass of a round: check, `battle_test` (40 AI-vs-AI battles checking hex
-  rules), `click_test` (map clicks, drag, queued clicks), `visit_test` (hover "visited" lines), `sim_test` (all-AI soak).
+  rules), `click_test` (map clicks, drag, queued clicks), `visit_test` (hover "visited" lines), `artifact_test` (every
+  artifact's effect, slots, combinations, tiered placement), `sim_test` (all-AI soak).
 - `sh tools/judge_round.sh N` — the 32 judge screenshots (`tools/judge_shots.sh`) into shots/judgeN, size-checked;
   the judge agent's prompt is `tools/judge_prompt.md`.
 - `tools/sim_test.tscn` — all-AI soak test: `Godot --path . res://tools/sim_test.tscn -- --seconds=80`

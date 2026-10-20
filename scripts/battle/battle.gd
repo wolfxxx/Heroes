@@ -867,8 +867,8 @@ func _stack_info(st: Dictionary) -> Control:
 	elif st["effects"].has("curse"):
 		dnow = GameData.dmg_text(lo, lo)
 	_grid_row(g, "Damage", _stat_cell(dmg, dnow, 1 if st["effects"].has("bless") else -1))
-	_grid_row(g, "Health", _stat_cell(c["hp"], st["hp_top"]))
-	var full: int = L.start_counts.get(st["uid"], st["count"]) * c["hp"]
+	_grid_row(g, "Health", _stat_cell(c["hp"], L.max_hp(st)))
+	var full: int = L.start_counts.get(st["uid"], st["count"]) * L.max_hp(st)
 	_grid_row(g, "Total HP", UI.label("%d / %d" % [L.total_hp(st), full], 18))
 	_grid_row(g, "Speed", _stat_cell(c["speed"], L.speed(st)))
 	if c["shots"] > 0:
@@ -996,7 +996,7 @@ func _update_hover() -> void:
 	_set_status(txt)
 
 func _kills(t: Dictionary, r: Array) -> String:
-	var hp: int = L.cdata(t)["hp"]
+	var hp: int = L.max_hp(t)
 	var top: int = t["hp_top"]
 	var k0: int = 0 if r[0] < top else 1 + (r[0] - top) / hp
 	var k1: int = 0 if r[1] < top else 1 + (r[1] - top) / hp
@@ -1999,6 +1999,7 @@ func _end_battle(winner: int) -> void:
 	var loser := 1 - winner
 	var xp := L.killed_hp(loser)
 	var raised := 0
+	var raise_id := "skeleton"
 	var wh = L.heroes[winner]
 	if wh and int(wh["skills"].get("necromancy", 0)) > 0:
 		var cas := L.casualties(loser)
@@ -2007,7 +2008,11 @@ func _end_battle(winner: int) -> void:
 			if not "undead" in GameData.CREATURES[id]["abilities"]:
 				living += cas[id]
 		var amp := 0.1 if TownLogic.player_has(L.players[winner], "necromancy_amplifier") else 0.0
+		amp += GameState.hero_stat(wh, "necromancy") / 100.0  # (a gravecloak, the lich king's mantle)
 		raised = int(living * (0.1 * int(wh["skills"]["necromancy"]) + amp))
+		if "zombie" in GameState.hero_flags(wh, "raise"):  # (as many zombies as the skeletons' health allows)
+			raise_id = "zombie"
+			raised = int(raised * GameData.CREATURES["skeleton"]["hp"] / float(GameData.CREATURES["zombie"]["hp"]))
 	var human_side := 0 if not L.ai_side[0] else (1 if not L.ai_side[1] else -1)
 	var human_won := human_side == winner
 	Audio.music("victory" if human_won or human_side < 0 else "defeat")
@@ -2048,7 +2053,7 @@ func _end_battle(winner: int) -> void:
 	if wh:
 		m.add_text("%s gains %d experience." % [wh["name"], xp], 22)
 	if raised > 0:
-		m.add_text("Necromancy raises %d skeletons from the fallen." % raised, 22)
+		m.add_text("Necromancy raises %d %s from the fallen." % [raised, GameData.CREATURES[raise_id]["plural"].to_lower()], 22)
 	m.add_buttons([["OK", true]])
 	m.set_meta("default", true)
 	await m.closed
@@ -2060,7 +2065,7 @@ func _end_battle(winner: int) -> void:
 		"winner": "attacker" if winner == 0 else "defender",
 		"attacker_army": L.army_out(0) if _retreated != 0 or _surrendered else [null, null, null, null, null, null, null],
 		"defender_army": L.army_out(1) if _retreated != 1 or _surrendered else [null, null, null, null, null, null, null],
-		"xp": xp, "retreated": _retreated >= 0, "raised": raised, "fled": _retreated,
+		"xp": xp, "retreated": _retreated >= 0, "raised": raised, "raised_id": raise_id, "fled": _retreated,
 		"surrendered": _surrendered, "surrender_gold": _surrender_gold,
 	}
 	if GameState.pending_battle.is_empty():

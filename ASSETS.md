@@ -103,7 +103,11 @@ leaves the `_dead` sprite on the hex as a corpse.
 ## Icons & UI
 - `icons/res_<resource>.png` — 64x64 resource icons.
 - `icons/spell_<spell_id>.png` — 96x96 spell icons.
-- `icons/artifact_<artifact_id>.png` — 96x96.
+- `icons/artifact_<artifact_id>.png` — 128 px framed paintings on a wine-red ground (one per artifact and combination,
+  ids in `GameData.ARTIFACTS`), painted by `tools/art/artifact_icons.py paint [ids]` (imagegen/batch27) and framed by
+  `... ingest`. On the map an artifact is drawn as its own icon over a glow of its tier's colour (`MapView._ArtifactGlow`);
+  that picture is `map/art_<id>.png`, the item keyed out of its painting with a cast shadow by
+  `tools/art/artifact_map_sprites.py`; `map/artifact.png` (the old pedestal) is no longer used.
 - `icons/skill_<skill_id>.png` — 128 px secondary skills (painted, sheet `skills`; Offense from `conditions`).
 - `icons/stat_attack.png stat_defense.png stat_power.png stat_knowledge.png stat_morale.png` — 128 px primary stats and
   morale (sheets `stats`, `knowledge`); `stat_health.png stat_damage.png stat_xp.png stat_speed.png` (sheet `misc_stats`).

@@ -264,8 +264,8 @@ func reveal_all_for(player: Dictionary) -> void:
 		if o["type"] == "mine" and o["owner"] == player["index"]:
 			reveal(player, o["pos"], 3)
 
-func hero_scout_radius(_hero: Dictionary) -> int:
-	return 7
+func hero_scout_radius(hero: Dictionary) -> int:
+	return 7 + GameState.hero_stat(hero, "scout")
 
 func is_explored(player: Dictionary, p: Vector2i) -> bool:
 	return inside(p) and player["explored"][p.y * w + p.x] == 1
@@ -382,9 +382,11 @@ func visit(hero: Dictionary, o: Dictionary) -> Dictionary:
 			_remove_object(o)
 		"artifact":
 			var a: String = o["artifact"]
-			GameState.give_artifact(hero, a)
+			var made := GameState.give_artifact(hero, a)
 			ev["title"] = GameData.ARTIFACTS[a]["name"]
 			ev["text"] = "You found the %s! (%s)" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
+			if made != "":  # (its last part: the set merges, as the classic's combination artifacts)
+				ev["text"] += "\n\nIts parts join into the %s!" % made
 			ev["icons"] = [[Assets.artifact_icon(a), GameData.ARTIFACTS[a]["desc"]]]
 			ev["sfx"] = "chest_open"
 			_remove_object(o)
@@ -637,7 +639,7 @@ func apply_battle(result: Dictionary) -> Dictionary:
 		ev["hero"] = att["uid"]
 		ev["levels"] = gain_xp(att, int(result.get("xp", 0)))
 		if result.has("raised") and result["raised"] > 0:
-			GameState.add_to_army(att["army"], "skeleton", result["raised"])
+			GameState.add_to_army(att["army"], result.get("raised_id", "skeleton"), result["raised"])
 	elif not att.is_empty():
 		var winner_uid: int = ctx.get("defender", -1)
 		var dh: Dictionary = world["heroes"].get(winner_uid, {})
@@ -726,7 +728,9 @@ func new_day() -> Dictionary:
 				var tt: Dictionary = world["towns"][tid]
 				if tt["pos"] == hh["pos"] and TownLogic.has_building(tt, "stables"):
 					hh["movement"] += 400
-			hh["mana"] = mini(GameState.max_mana(hh), hh["mana"] + 1 + GameState.hero_stat(hh, "knowledge") / 4)
+			hh["mana"] = mini(GameState.max_mana(hh), hh["mana"] + 1 + GameState.hero_stat(hh, "knowledge") / 4
+				+ GameState.hero_stat(hh, "mana_day"))
+			p["resources"]["gold"] += GameState.hero_stat(hh, "gold_day")  # (a purse or a signet)
 	for o in world["objects"].values():
 		if o["type"] == "mine" and o["owner"] >= 0:
 			var m: Dictionary = GameData.MINES[o["mine"]]
@@ -735,6 +739,14 @@ func new_day() -> Dictionary:
 	if new_week:
 		for t in world["towns"].values():
 			TownLogic.on_new_week(t)
+		for p in world["players"]:  # (a muster banner worn by any of a player's heroes: more first-level recruits)
+			var extra := 0
+			for hid in p["heroes"]:
+				extra += GameState.hero_stat(world["heroes"][hid], "growth1")
+			if extra > 0:
+				for tid in p["towns"]:
+					if TownLogic.has_building(world["towns"][tid], "dwelling_1"):
+						world["towns"][tid]["available"][0] += extra
 		for o in world["objects"].values():
 			match o["type"]:
 				"windmill":

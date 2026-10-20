@@ -196,8 +196,14 @@ func _object_value(hero: Dictionary, player: Dictionary, o: Dictionary, me: floa
 			return 2000.0
 		"chest":
 			return 3000.0
-		"artifact":
-			return 2500.0
+		"artifact":  # (by tier; more for the part of a set the hero already half wears)
+			var d: Dictionary = GameData.ARTIFACTS[o["artifact"]]
+			var v: float = {"treasure": 1500.0, "minor": 2500.0, "major": 4500.0, "relic": 7000.0}.get(d["tier"], 2500.0)
+			if d.has("set"):
+				for p in GameData.ARTIFACTS[d["set"]]["parts"]:
+					if p in hero.get("artifacts", []) + hero.get("backpack", []):
+						v += 2000.0
+			return v
 		"mine":
 			if o["owner"] == hero["owner"]:
 				return 0.0

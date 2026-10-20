@@ -139,48 +139,120 @@ func hero_stat(h: Dictionary, stat: String) -> int:
 		v += GameData.ARTIFACTS[a]["bonus"].get(stat, 0)
 	return v
 
-## Whether the hero has a free body slot for the artifact (worn ones count, the backpack does not).
-func can_wear(h: Dictionary, a: String) -> bool:
-	var sl: String = GameData.ARTIFACTS[a]["slot"]
-	var n := 0
+## The listed flags of what a hero wears, merged (immune_school, immune_spells, raise).
+func hero_flags(h, key: String) -> Array:
+	var out := []
+	if h == null:
+		return out
+	for a in h.get("artifacts", []):
+		for v in GameData.ARTIFACTS[a].get("flags", {}).get(key, []):
+			if not v in out:
+				out.append(v)
+	return out
+
+## The body slots an artifact fills: its own, or for a combination every slot of its parts.
+func artifact_slots(a: String) -> Array:
+	var d: Dictionary = GameData.ARTIFACTS[a]
+	if d.has("parts"):
+		return d["parts"].map(func(p): return GameData.ARTIFACTS[p]["slot"])
+	return [d["slot"]]
+
+func _slot_use(h: Dictionary) -> Dictionary:
+	var use := {}
 	for w in h.get("artifacts", []):
-		if GameData.ARTIFACTS[w]["slot"] == sl:
-			n += 1
-	return n < int(GameData.ARTIFACT_SLOTS.get(sl, 1))
+		for sl in artifact_slots(w):
+			use[sl] = use.get(sl, 0) + 1
+	return use
 
-## A found or won artifact: worn if its slot is free, else into the backpack (as the classic game).
-func give_artifact(h: Dictionary, a: String) -> void:
-	if can_wear(h, a):
-		h["artifacts"].append(a)
-		h["max_movement"] = hero_max_movement(h)
-	else:
-		if not h.has("backpack"):
-			h["backpack"] = []
-		h["backpack"].append(a)
+## Whether the hero has free body slots for the artifact (worn ones count, the backpack does not).
+func can_wear(h: Dictionary, a: String) -> bool:
+	var use := _slot_use(h)
+	var need := {}
+	for sl in artifact_slots(a):
+		need[sl] = need.get(sl, 0) + 1
+	for sl in need:
+		if use.get(sl, 0) + need[sl] > int(GameData.ARTIFACT_SLOTS.get(sl, 1)):
+			return false
+	return true
 
-## Takes a worn artifact off into the backpack, or puts one from the backpack on (swapping out what wears its slot
-## when that is full). Movement left today never grows from it.
-func swap_artifact(h: Dictionary, a: String, worn: bool) -> void:
+## A found or won artifact: worn if its slots are free, else into the backpack (as the classic game). Returns the
+## name of a combination its arrival completed ("" if none).
+func give_artifact(h: Dictionary, a: String) -> String:
 	if not h.has("backpack"):
 		h["backpack"] = []
+	if can_wear(h, a):
+		h["artifacts"].append(a)
+	else:
+		h["backpack"].append(a)
+	var merged := merge_combinations(h)
+	h["max_movement"] = hero_max_movement(h)
+	return merged
+
+## Takes a worn artifact off into the backpack, or puts one from the backpack on (moving to the backpack what wears
+## the slots it needs). Movement left today never grows from it. Returns the name of a combination it completed.
+func swap_artifact(h: Dictionary, a: String, worn: bool) -> String:
+	if not h.has("backpack"):
+		h["backpack"] = []
+	var merged := ""
 	if worn:
 		h["artifacts"].erase(a)
 		h["backpack"].append(a)
+		var cs: String = GameData.ARTIFACTS[a].get("set", "")
+		h.get("apart", []).erase(cs)  # (a split set taken apart further merges again once complete)
 	else:
 		var i: int = h["backpack"].find(a)
 		if i < 0:
-			return
+			return ""
 		h["backpack"].remove_at(i)
-		if not can_wear(h, a):
-			var sl: String = GameData.ARTIFACTS[a]["slot"]
-			for w in h["artifacts"]:
-				if GameData.ARTIFACTS[w]["slot"] == sl:
-					h["artifacts"].erase(w)
-					h["backpack"].insert(i, w)
-					break
+		for sl in artifact_slots(a):
+			if not can_wear(h, a):
+				for w in h["artifacts"]:
+					if sl in artifact_slots(w):
+						h["artifacts"].erase(w)
+						h["backpack"].insert(i, w)
+						break
 		h["artifacts"].append(a)
+		merged = merge_combinations(h)
 	h["max_movement"] = hero_max_movement(h)
 	h["movement"] = mini(h["movement"], h["max_movement"])
+	return merged
+
+## As the classic's combination artifacts: when every part of one is worn, the parts merge into it (unless the player
+## split it on the hero screen and keeps it apart). Returns the name of the combination made ("" if none).
+func merge_combinations(h: Dictionary) -> String:
+	var made := ""
+	for c in GameData.combinations():
+		if c in h.get("apart", []):
+			continue
+		var parts: Array = GameData.ARTIFACTS[c]["parts"]
+		if parts.all(func(p): return p in h["artifacts"]):
+			for p in parts:
+				h["artifacts"].erase(p)
+			h["artifacts"].append(c)
+			made = GameData.ARTIFACTS[c]["name"]
+	return made
+
+## Splits a worn combination back into its parts (worn in the same slots) and keeps them apart until joined again.
+func split_combination(h: Dictionary, c: String) -> void:
+	var i: int = h["artifacts"].find(c)
+	if i < 0:
+		return
+	h["artifacts"].remove_at(i)
+	for p in GameData.ARTIFACTS[c]["parts"]:
+		h["artifacts"].append(p)
+	if not h.has("apart"):
+		h["apart"] = []
+	if not c in h["apart"]:
+		h["apart"].append(c)
+	h["max_movement"] = hero_max_movement(h)
+	h["movement"] = mini(h["movement"], h["max_movement"])
+
+## Joins the worn parts of a combination that was split. Returns its name if it merged.
+func join_combination(h: Dictionary, c: String) -> String:
+	h.get("apart", []).erase(c)
+	var made := merge_combinations(h)
+	h["max_movement"] = hero_max_movement(h)
+	return made
 
 func max_mana(h: Dictionary) -> int:
 	return hero_stat(h, "knowledge") * 10

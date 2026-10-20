@@ -208,21 +208,34 @@ static func _skill_cell(id: String, lvl: int) -> Control:
 	HoverInfo.attach(h, func(): return tip)
 	return h
 
-## The worn artifact in each doll socket (rings and misc fill their sockets in order).
+## The worn artifact in each doll socket (rings and misc fill their sockets in order): [artifact, linked], where a
+## combination fills every socket of its parts and `linked` marks all but its own.
 static func _placed(h: Dictionary) -> Dictionary:
 	var seen := {}
 	var out := {}
 	for a in h["artifacts"]:
-		var kind: String = GameData.ARTIFACTS[a]["slot"]
-		var k: int = seen.get(kind, 0)
-		seen[kind] = k + 1
-		for sl in SOCKETS:
-			if SOCKETS[sl][1] == kind and SOCKETS[sl][2] == k:
-				out[sl] = a
+		var first := true
+		for kind in GameState.artifact_slots(a):
+			var k: int = seen.get(kind, 0)
+			seen[kind] = k + 1
+			for sl in SOCKETS:
+				if SOCKETS[sl][1] == kind and SOCKETS[sl][2] == k:
+					out[sl] = [a, not first]
+			first = false
 	return out
 
-static func _artifact_tip(a: String, hint := "") -> String:
-	var t := "%s\n%s" % [GameData.ARTIFACTS[a]["name"], GameData.ARTIFACTS[a]["desc"]]
+## The hover text of an artifact: name, tier, effect, the set it belongs to, and what a click does.
+static func _artifact_tip(a: String, hint := "", h = null) -> String:
+	var d: Dictionary = GameData.ARTIFACTS[a]
+	var t := "%s\n%s artifact\n%s" % [d["name"], GameData.ARTIFACT_TIERS[d["tier"]][0], d["desc"]]
+	if d.has("parts"):
+		t += "\nCombined from: " + ", ".join(PackedStringArray(d["parts"].map(func(p): return GameData.ARTIFACTS[p]["name"])))
+	elif d.has("set"):
+		var c: Dictionary = GameData.ARTIFACTS[d["set"]]
+		var worn := 0
+		if h != null:
+			worn = c["parts"].filter(func(p): return p in h["artifacts"]).size()
+		t += "\nPart of the %s (%d of %d worn): %s" % [c["name"], worn, c["parts"].size(), c["desc"]]
 	return t + ("\n" + hint if hint != "" else "")
 
 ## The painted figure with a socket on each body part, the misc sockets down its left edge, the war machines and the
@@ -239,10 +252,28 @@ static func _doll(owner: Node, h: Dictionary, redo: Callable) -> Control:
 		var kind: String = SOCKETS[sl][1]
 		so.glass = true
 		if worn.has(sl):
-			var a: String = worn[sl]
+			var a: String = worn[sl][0]
+			var d: Dictionary = GameData.ARTIFACTS[a]
 			so.tex = Assets.artifact_icon(a)
 			so.inner = true
-			var tip := _artifact_tip(a, "Click: take it off into the backpack.")
+			so.tier_col = GameData.ARTIFACT_TIERS[d["tier"]][1]
+			so.linked = worn[sl][1]  # (a combination's other slots: its picture faded)
+			var hint := "Click: take it off into the backpack."
+			if d.has("parts"):
+				hint += "\nRight-click: split it into its parts."
+				so.rpressed = func():
+					GameState.split_combination(h, a)
+					Audio.sfx("click")
+					redo.call()
+			elif d.has("set") and d["set"] in h.get("apart", []) \
+					and GameData.ARTIFACTS[d["set"]]["parts"].all(func(p): return p in h["artifacts"]):
+				hint += "\nRight-click: join the parts into the %s." % GameData.ARTIFACTS[d["set"]]["name"]
+				var c: String = d["set"]
+				so.rpressed = func():
+					GameState.join_combination(h, c)
+					Audio.sfx("build", -6)
+					redo.call()
+			var tip := _artifact_tip(a, hint, h)
 			HoverInfo.attach(so, func(): return tip)
 			so.pressed = func():
 				GameState.swap_artifact(h, a, true)
@@ -314,13 +345,17 @@ static func _backpack(m: Modal, h: Dictionary, redo: Callable) -> Control:
 			var a: String = pack[off + i]
 			so.tex = Assets.artifact_icon(a)
 			so.inner = true
+			so.tier_col = GameData.ARTIFACT_TIERS[GameData.ARTIFACTS[a]["tier"]][1]
 			var hint := "Click: put it on." if GameState.can_wear(h, a) else "Click: put it on in place of the one worn there."
-			var tip := _artifact_tip(a, hint)
+			var tip := _artifact_tip(a, hint, h)
 			HoverInfo.attach(so, func(): return tip)
 			so.pressed = func():
-				GameState.swap_artifact(h, a, false)
-				Audio.sfx("click")
+				var made := GameState.swap_artifact(h, a, false)
+				Audio.sfx("build" if made != "" else "click", -6 if made != "" else 0)
 				redo.call()
+				if made != "":  # (its last part: the set merges, as the classic's combination artifacts)
+					Modal.message(m, made, "The parts join into the %s!\n%s" % [made,
+						GameData.ARTIFACTS[GameData.ARTIFACTS[a]["set"]]["desc"]])
 		row.add_child(so)
 	row.add_child(arrow.call(1))
 	var out := VBoxContainer.new()
@@ -379,7 +414,10 @@ class _Socket extends Control:
 	var empty := false
 	var glass := false  # on the paper-doll: a translucent well, so the figure shows through when empty
 	var pressed := Callable()  # (a left click on it)
+	var rpressed := Callable()  # (a right click: split or join a combination)
 	var inner := false  # an artifact icon: drawn without its own frame, filling the socket
+	var tier_col := Color(0, 0, 0, 0)  # an artifact's tier, as the colour of its socket's frame
+	var linked := false  # a combination's other slot: its picture faded
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_PASS
 		mouse_entered.connect(queue_redraw)
@@ -388,12 +426,15 @@ class _Socket extends Control:
 		if pressed.is_valid() and e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 			accept_event()
 			pressed.call()
+		elif rpressed.is_valid() and e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_RIGHT:
+			accept_event()
+			rpressed.call()
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		draw_rect(r, Color(0.02, 0.02, 0.025, (0.22 if glass else 0.4) if empty else 0.92))
 		if tex and not empty and inner:
 			var ts := tex.get_size()
-			draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86))
+			draw_texture_rect_region(tex, r.grow(-3), Rect2(ts * 0.07, ts * 0.86), Color(1, 1, 1, 0.38 if linked else 1.0))
 		elif tex and not empty:
 			draw_texture_rect(tex, r.grow(-5), false)
 		elif tex:  # a machine not owned: its picture greyed out in the empty socket
@@ -404,8 +445,10 @@ class _Socket extends Control:
 		draw_line(Vector2(2, size.y - 1), Vector2(size.x - 1, size.y - 1), Color(1, 0.9, 0.7, 0.18), 2)
 		draw_line(Vector2(size.x - 1, 2), Vector2(size.x - 1, size.y - 1), Color(1, 0.9, 0.7, 0.18), 2)
 		var lit := pressed.is_valid() and get_global_rect().has_point(get_global_mouse_position())
-		draw_rect(r.grow(1), Color(1, 0.9, 0.5) if lit else (Color(0.66, 0.5, 0.25) if empty else Color(0.86, 0.68, 0.32)),
-			false, 3.0 if lit else 2.0)
+		var frame := Color(0.66, 0.5, 0.25) if empty else (tier_col if tier_col.a > 0.0 else Color(0.86, 0.68, 0.32))
+		draw_rect(r.grow(1), Color(1, 0.9, 0.5) if lit else frame, false, 3.0 if lit else 2.0)
+		if tier_col.a > 0.0 and not empty and not lit:  # (the tier's colour a little stronger: an inner line)
+			draw_rect(r.grow(-2), Color(tier_col, 0.55), false, 1.0)
 
 class _Bar extends Control:
 	var frac := 0.0

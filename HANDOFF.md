@@ -2,7 +2,7 @@
 
 Read this first, then `ARCHITECTURE.md` (code map), `ASSETS.md` (every asset path and the art pipeline) and
 `CREDITS.md`. This file is written so that another person or another AI assistant can pick the work up exactly
-where it stopped. Last updated 2026-10-20, at commit `59129b0` (round 40), branch `main`, remote
+where it stopped. Last updated 2026-10-20 (artifacts committed and pushed; judge 41 run on them), branch `main`, remote
 `https://github.com/wolfxxx/Heroes.git` (public repo).
 
 ## 1. The project in one paragraph
@@ -14,17 +14,22 @@ music and sound. All art is 3D library models rendered in Blender and then paint
 painted icons and UI. The work has gone in **rounds**: an independent judge agent scores 32 screenshots against
 the look and feel of HoMM3, and each round fixes what the judge found.
 
-## 2. Status at round 40
+## 2. Status
 
-- Everything is committed and pushed. All tests pass (see section 5).
+- **Artifacts and combination artifacts are built** (the user approved `docs/ARTIFACTS_PROPOSAL.md` as proposed:
+  merging as in HoMM3, relics also on random maps, our own names). 41 artifacts in four tiers plus three
+  combinations, effects in battle and on the map, tiered placement with guards, the hero screen (tier-coloured
+  sockets, combinations across their slots, right-click to split or join), each artifact's own picture on the map,
+  30 new painted icons, AI valuation, and `tools/artifact_test` (307 checks). Committed and pushed; judge 41 ran on
+  it (scores in section 7). Next step of the plan: the AI work (section 8).
+- Found and fixed on the way: the all-computer simulation could overflow Godot's message queue once one computer
+  player had beaten the others (the AI turn loop never waited a frame); `_run_ai_turns` now waits one frame per turn.
+- Round 40 is committed and pushed.
 - Judge 40 scores: menu 9.2, adventure 9.2, town 9.4, dialogs 9.5, battle 8.9, **overall 9.2**.
 - Rounds 31–40 were run as one uninterrupted loop on the user's instruction ("build, commit and push, judge cycle
   until level 40 judge has run"). That authorisation ended with round 40: **from now on, commit and push only when
   the user asks.**
-- The last thing discussed with the user (not yet started): four bigger topics — war-machine wreck graphics,
-  multiplayer, AI quality, and artifacts with combinations. My recommendations are in section 8. The open question
-  to the user was: *"Should I start on artifacts? I'd write up the proposed list and the combination sets for you
-  to approve before building anything."*
+- The four bigger topics the user raised and my recommendations are in section 8; artifacts (the first) are done.
 
 ## 3. Standing rules from the user (keep to them)
 
@@ -138,13 +143,14 @@ The siege drawbridge reads as a stray plank, but it is part of the painted siege
 ### The four bigger topics the user raised (recommendations given, awaiting a go-ahead)
 Suggested order: **artifacts → AI → hot-seat multiplayer → war-machine wrecks** (the last can go in any round).
 
-1. **Artifacts and combinations** (high value, true to HoMM3). Today: 11 plain stat artifacts in
+1. **Artifacts and combinations — BUILT 2026-10-20** (see section 2 and `docs/ARTIFACTS_PROPOSAL.md`). Today: 11 plain stat artifacts in
    `GameData.ARTIFACTS` and no tiers, sets or special effects. Proposal: about 30–40 artifacts in HoMM3's tiers
    (treasure / minor / major / relic) that let a hero specialise (might, magic schools, logistics, economy,
    necromancy), plus 2–3 **combination artifacts** the HoMM3 way: when all parts are worn they merge into one item
    with a stronger effect (for example Dragon Sword + Shield + Helm → "Dragonheart Arms"). A set bonus while the
-   pieces stay separate would be the RPG way, not HoMM3's — flag it if the user prefers that. First step: write
-   the list and the sets for the user to approve.
+   pieces stay separate would be the RPG way, not HoMM3's — flag it if the user prefers that. The proposal
+   (38 artifacts in four tiers, three combinations) is in `docs/ARTIFACTS_PROPOSAL.md`, **awaiting the user's
+   answers to its four questions** before anything is built.
 2. **Computer opponent.** `scripts/adventure/adv_ai.gd` (~220 lines) is greedy: value ÷ distance per hero this
    turn, a fixed build order, fixed strength ratios, no defending threatened towns, no multi-turn plans, no troop
    transfers between heroes, no map spells, and it likely sees through the fog (it reads the whole object list).
@@ -181,6 +187,12 @@ Suggested order: **artifacts → AI → hot-seat multiplayer → war-machine wre
   - `_QueueIcon` — turn queue; machines and towers drawn whole with a name band.
   - `_Burst` (bolt) — lightning from a storm cloud, drawn on the rings layer, under the figures.
   - Damage labels vanish at once (no fade) — `_float_text`.
+- **Artifacts** (2026-10-20): data `GameData.ARTIFACTS` / `ARTIFACT_TIERS`; rules `GameState.hero_stat`,
+  `hero_flags`, `artifact_slots`, `can_wear`, `give_artifact`, `swap_artifact`, `merge_combinations`,
+  `split_combination`, `join_combination`; battle `BattleLogic.max_hp / speed / spell_damage / immune`, necromancy in
+  `battle.gd`; map `AdvRules.hero_scout_radius`, `new_day` (gold, mana, muster growth); placement
+  `WorldGen._place_artifacts`; hero screen `hero_screen.gd` (`_placed`, `_artifact_tip`, `_Socket.tier_col / linked /
+  rpressed`); map picture `MapView._object_node` + `_ArtifactGlow`; test `tools/artifact_test.gd`.
 - **Rules change**: the ammo cart never takes a turn (`battle_logic.gd` `_new_round` and `upcoming`), as in HoMM3.
 - **Town**: `_BuildCard` price rows (one row at one of three sizes, else two; `min_rows` per card row), the
   full-width inset treasury and date (`town_screen.gd` top), bigger price icons everywhere (`HoverInfo.cost_row`,
@@ -202,5 +214,7 @@ Suggested order: **artifacts → AI → hot-seat multiplayer → war-machine wre
 - Painting on magenta leaves pink fringes around glows: recolour pixels where `(r+b)/2 - g` is large.
 - Judges contradict each other between rounds (for example plates "on the wrong figure" vs "floating above its
   own"); check against the shots before acting.
+- The screenshot harness's `--hover` did not bring up the adventure map's hover panel for objects (tested on an
+  artifact); battle and town hover shots work. Not investigated.
 - Blender: never remove data blocks one by one in loops (use `bpy.data.batch_remove`); MCP calls over ~2 min report
   "No data received" while the job continues.

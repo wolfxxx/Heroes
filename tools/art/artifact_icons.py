@@ -20,6 +20,40 @@ ARTS = {
     "cape_of_courage": "a flowing deep red cape with a gold lion clasp and gold-trimmed hem",
     "amulet_of_insight": "a gold amulet on a fine chain, set with a glowing blue sapphire eye",
     "breastplate_of_ironbark": "a breastplate of dark polished wood bound with iron bands and engraved leaves",
+    # (the tiered set of 2026-10-20, docs/ARTIFACTS_PROPOSAL.md)
+    "soldiers_shortsword": "a plain short soldier's sword with a simple iron cross-guard and a leather grip",
+    "ogre_hewn_cleaver": "a huge brutal cleaver of dark iron with a jagged edge and a bone handle wrapped in hide",
+    "oaken_buckler": "a small round buckler of oak planks with an iron boss and rim",
+    "ironwood_tower_shield": "a tall rectangular tower shield of dark ironwood reinforced with riveted iron bands",
+    "quilted_gambeson": "a padded quilted cloth gambeson jacket in faded blue linen with brass buttons",
+    "ring_of_swiftness": "a slender silver ring set with a pale blue gem, small wind swirls and a tiny feather around it",
+    "apprentices_circlet": "a thin bronze circlet with a single small amber stone at the brow",
+    "pendant_of_clarity": "a teardrop pendant of clear blue crystal glowing softly on a silver chain",
+    "orb_of_tempests": "a glass orb holding a swirling storm with tiny lightning bolts, on a silver claw stand",
+    "orb_of_embers": "a glass orb filled with roiling flames and glowing embers, on a blackened iron claw stand",
+    "orb_of_tides": "a glass orb filled with deep blue swirling water and a cresting wave, on a coral-pink stand",
+    "orb_of_bedrock": "a heavy orb of polished granite veined with glowing amber, on a rough stone stand",
+    "travellers_boots": "a pair of worn brown leather travelling boots with buckles and a little road dust",
+    "wayfarers_cloak": "a hooded green travelling cloak with a bronze leaf brooch",
+    "seers_spyglass": "an extended brass spyglass with engraved bands and a glinting lens",
+    "signet_of_coin": "a heavy gold signet ring engraved with a coin and a crown",
+    "bottomless_purse": "a fat red velvet purse tied with gold cord, gold coins spilling from its mouth",
+    "banner_of_the_muster": "a tall war banner of crimson and gold with an embroidered marching column of soldiers, on a gilded pole",
+    "dragonbone_blade": "a long sword whose blade is carved from a single ivory dragon fang, with a dark red leather hilt",
+    "dragonscale_shield": "a kite shield covered in overlapping dark red dragon scales with a gold rim",
+    "dragonskull_helm": "a helmet shaped from a horned dragon skull, the eye sockets glowing faintly orange",
+    "bone_crown": "a crown of yellowed bones and small skulls with a dull green gem",
+    "gravecloak": "a tattered black cloak with a ghostly green glow at its frayed hem and a skull clasp",
+    "phylactery_of_ages": "a small ornate silver-and-black reliquary box with a glowing sickly green crystal inside",
+    "sun_pendant": "a gold pendant shaped like a radiant sun with a white gem at its centre",
+    "seraphs_feather": "a single long white angel feather glowing with a soft golden light",
+    "sunsteel_cuirass": "a gleaming golden-white steel breastplate with a radiant sun embossed on the chest",
+    "dragonheart_arms": "a dragon-fang sword crossed over a red dragon-scale shield with a horned dragon-skull helm "
+                        "above them, all wreathed in a fiery red-gold glow",
+    "mantle_of_the_lich_king": "a tattered black cloak with a crown of bones resting on it and a green-glowing reliquary, "
+                               "wreathed in ghostly green mist",
+    "seraphs_covenant": "a golden sun-embossed breastplate with a radiant sun pendant and white angel feathers, "
+                        "bathed in holy golden light",
 }
 PROMPT = ("Paint a single inventory icon for a fantasy strategy game: {what}, centred and filling most of the square, "
           "seen slightly from above. Hand-painted digital fantasy illustration in the style of classic late-1990s "

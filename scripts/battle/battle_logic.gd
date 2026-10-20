@@ -109,7 +109,8 @@ func _deploy(army: Array, side: int) -> void:
 			hex = Vector2i(x, 5 - (filled.size() - 1) / 2 + filled.find(i))
 		_uid += 1
 		var st := {
-			"uid": _uid, "id": a["id"], "side": side, "slot": i, "count": a["count"], "hp_top": c["hp"],
+			"uid": _uid, "id": a["id"], "side": side, "slot": i, "count": a["count"],
+			"hp_top": c["hp"] + (GameState.hero_stat(h, "hp") if h != null else 0),
 			"hex": hex, "shots": c["shots"],
 			"retaliations": 2 if "two_retaliations" in c["abilities"] else 1, "effects": {},
 			"alive": true, "defending": false, "waited": false, "acted": false,
@@ -135,6 +136,24 @@ static func _stagger(slot: int, side: int) -> Vector2i:
 
 func cdata(s: Dictionary) -> Dictionary:
 	return GameData.CREATURES[s["id"]]
+
+## A creature's health in this battle: its own, plus what its hero's artifacts give every creature (machines and
+## towers excepted).
+func max_hp(s: Dictionary) -> int:
+	var v: int = cdata(s)["hp"]
+	var h = heroes[s["side"]] if s["side"] >= 0 and s["side"] < heroes.size() else null
+	if h != null and not s.get("machine", false) and not s.get("tower", false):
+		v += GameState.hero_stat(h, "hp")
+	return v
+
+## Whether the side's army is immune to the spell (a combination artifact of its hero).
+func immune(side: int, spell: String) -> bool:
+	var h = heroes[side]
+	if h == null:
+		return false
+	var sp: Dictionary = GameData.SPELLS[spell]
+	return spell in GameState.hero_flags(h, "immune_spells") \
+		or (sp.has("damage") and sp["school"] in GameState.hero_flags(h, "immune_school"))
 
 func has_ab(s: Dictionary, ab: String) -> bool:
 	return ab in cdata(s)["abilities"]
@@ -213,7 +232,7 @@ func machine_act(s: Dictionary) -> Array:
 			var best = null
 			var gap := 0
 			for a in alive_stacks(s["side"]):
-				var g: int = cdata(a)["hp"] - a["hp_top"]
+				var g: int = max_hp(a) - a["hp_top"]
 				if not a.get("machine", false) and g > gap:
 					gap = g
 					best = a
@@ -351,6 +370,9 @@ func _touches(a_cells: Array, b_cells: Array) -> bool:
 # ---------------------------------------------------------------------------------------------
 func speed(s: Dictionary) -> int:
 	var v: int = cdata(s)["speed"]
+	var h = heroes[s["side"]]
+	if h != null and not s.get("machine", false) and not s.get("tower", false):
+		v += GameState.hero_stat(h, "speed")  # (a ring of swiftness)
 	if s["effects"].has("haste"):
 		v += 3
 	if s["effects"].has("slow"):
@@ -382,7 +404,7 @@ func defense_stat(s: Dictionary) -> int:
 	return maxi(0, v)
 
 func total_hp(s: Dictionary) -> int:
-	return (s["count"] - 1) * cdata(s)["hp"] + s["hp_top"] if s["count"] > 0 else 0
+	return (s["count"] - 1) * max_hp(s) + s["hp_top"] if s["count"] > 0 else 0
 
 func luck(side: int) -> int:
 	var h = heroes[side]
@@ -596,7 +618,7 @@ func _roll_damage(a: Dictionary, d: Dictionary, ranged: bool, moved: int) -> int
 
 ## Applies dmg to stack. Returns number killed.
 func apply_damage(d: Dictionary, dmg: int) -> int:
-	var hp: int = cdata(d)["hp"]
+	var hp: int = max_hp(d)
 	var before: int = d["count"]
 	var pool := total_hp(d) - dmg
 	if pool <= 0:
@@ -611,7 +633,7 @@ func apply_damage(d: Dictionary, dmg: int) -> int:
 	return before - d["count"]
 
 func heal(d: Dictionary, amount: int, resurrect: bool) -> int:
-	var hp: int = cdata(d)["hp"]
+	var hp: int = max_hp(d)
 	var cap: int = start_counts.get(d["uid"], d["count"]) * hp if resurrect else total_hp(d) - d["hp_top"] + hp
 	var pool := mini(cap, total_hp(d) + amount)
 	var gained := pool - total_hp(d)
@@ -649,7 +671,7 @@ func _new_round() -> void:
 			if fx[k] <= 0:
 				fx.erase(k)
 		if has_ab(s, "regenerate"):
-			s["hp_top"] = cdata(s)["hp"]
+			s["hp_top"] = max_hp(s)
 
 ## Returns the stack whose turn it is (advancing rounds as needed).
 func current() -> Variant:
@@ -817,6 +839,9 @@ func spell_damage(side: int, spell: String) -> int:
 	var d: Array = GameData.SPELLS[spell]["damage"]
 	var v: float = d[0] + d[1] * spell_power(side)
 	v *= 1.0 + 0.1 * hero_skill(side, "sorcery")
+	var h = heroes[side]
+	if h != null:  # (an orb of that school)
+		v *= 1.0 + GameState.hero_stat(h, "school_" + String(GameData.SPELLS[spell]["school"])) / 100.0
 	return int(v)
 
 ## Valid targets: "enemy", "ally" -> stack; "area" -> any hex; "all_living" -> none needed.
@@ -825,9 +850,9 @@ func spell_target_ok(side: int, spell: String, hex: Vector2i) -> bool:
 	var s = stack_at(hex)
 	match t:
 		"enemy":
-			return s != null and s["side"] != side
+			return s != null and s["side"] != side and not immune(s["side"], spell)
 		"ally":
-			return s != null and s["side"] == side
+			return s != null and s["side"] == side and not immune(s["side"], spell)
 		"area":
 			return in_bounds(hex)
 		"all_living":
@@ -853,6 +878,7 @@ func cast(side: int, spell: String, hex: Vector2i) -> Array:
 			for s in alive_stacks():
 				if not has_ab(s, "undead"):
 					targets.append(s)
+	targets = targets.filter(func(t): return not immune(t["side"], spell))  # (a combination's protection)
 	ev["targets"] = targets
 	var first_name := _name(targets[0]) if targets.size() > 0 else ""  # (before the damage: "on Liches", not after)
 	var out := [ev]

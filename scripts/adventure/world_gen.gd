@@ -238,10 +238,7 @@ func _generate(settings: Dictionary) -> Dictionary:
 		_place_obj({"type": "chest"}, Vector2i(w / 2, h / 2), 0, n, reach, rng.randf() < 0.4, 7)
 	for k in int(round(5 * area_scale)):
 		_place_obj({"type": "campfire"}, Vector2i(w / 2, h / 2), 0, n, reach, false, 7)
-	var arts := GameData.ARTIFACTS.keys()
-	arts.shuffle()
-	for k in mini(int(round(7 * area_scale)), arts.size()):
-		_place_obj({"type": "artifact", "artifact": arts[k]}, Vector2i(w / 2, h / 2), 0, n, reach, true, 9)
+	_place_artifacts(area_scale, n, reach)
 	var spells := GameData.SPELLS.keys()
 	for k in int(round(4 * area_scale)):
 		_place_obj({"type": "shrine", "spell": spells[rng.randi() % spells.size()]}, Vector2i(w / 2, h / 2), 0, n, reach, false, 8)
@@ -579,7 +576,38 @@ func _town_positions() -> Array:
 				_town_pos_cache.append(p)
 	return _town_pos_cache
 
-func _guard(o: Dictionary) -> void:
+## Artifacts by tier, as the classic map: the better, the rarer, the further from the towns and the harder guarded;
+## relics only on medium and larger maps, near the middle; one set's parts (two on large maps) spread far apart.
+func _place_artifacts(area_scale: float, n: int, reach: Dictionary) -> void:
+	var big := w >= 48
+	# [tier, how many, guard strength (0: none), keep this far from towns]
+	var plan := [["treasure", int(round(4 * area_scale)), 0.0, 5], ["minor", int(round(3 * area_scale)), 1.6, 8],
+		["major", int(round(2 * area_scale)), 2.4, 11]]
+	if big:
+		plan.append(["relic", 1 if rng.randf() < 0.6 or w >= 64 else 0, 3.4, 14])
+	for row in plan:
+		var pool: Array = GameData.artifacts_of(row[0])
+		for k in row[1]:
+			if pool.is_empty():
+				break
+			var a: String = pool.pop_at(rng.randi() % pool.size())
+			var center := Vector2i(w / 2, h / 2)
+			var rmax: int = mini(n, w / 5) if row[0] == "relic" else n
+			var o := _place_obj({"type": "artifact", "artifact": a}, center, 0, rmax, reach, false, row[3])
+			if not o.is_empty() and (row[2] > 0.0 or rng.randf() < 0.3):
+				_guard(o, maxf(1.0, row[2]))
+	if big:
+		var sets: Array = GameData.combinations()
+		for k in (2 if w >= 64 else 1):
+			if sets.is_empty():
+				break
+			var c: String = sets.pop_at(rng.randi() % sets.size())
+			for p in GameData.ARTIFACTS[c]["parts"]:
+				var o := _place_obj({"type": "artifact", "artifact": p}, Vector2i(w / 2, h / 2), 0, w, reach, false, 10)
+				if not o.is_empty():
+					_guard(o, 2.4 if GameData.ARTIFACTS[p]["tier"] == "major" else 1.6)
+
+func _guard(o: Dictionary, strength := 1.6) -> void:
 	var p: Vector2i = o["pos"]
 	# beside the entrance, not on it (the figure hid the door); the entrance is still in its zone of control
 	var cands := [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 0), Vector2i(-1, 0)]
@@ -588,7 +616,7 @@ func _guard(o: Dictionary) -> void:
 	for d in cands:
 		var q: Vector2i = p + d
 		if inside(q) and _passable(q) and not occupied.has(q) and terrain[idx(q)] != T_ROAD:
-			var m := {"type": "monster", "uid": GameState.next_uid(), "pos": q, "strength_bonus": 1.6}
+			var m := {"type": "monster", "uid": GameState.next_uid(), "pos": q, "strength_bonus": strength}
 			_fill_monster(m)
 			world["objects"][m["uid"]] = m
 			occupied[q] = m["uid"]

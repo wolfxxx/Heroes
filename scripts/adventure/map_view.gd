@@ -396,7 +396,17 @@ func _object_node(o: Dictionary) -> Node2D:
 		"campfire":
 			n.add_child(_sprite("map/campfire.png", Vector2(0, -4), 70))
 		"artifact":
-			n.add_child(_sprite("map/artifact.png", Vector2(0, -4), 64))
+			# (as the classic map: the artifact itself lies there, on a glow of its tier's colour)
+			var glow := _ArtifactGlow.new()
+			glow.col = GameData.ARTIFACT_TIERS[GameData.ARTIFACTS[o["artifact"]]["tier"]][1]
+			n.add_child(glow)
+			var s := Sprite2D.new()  # (tools/art/artifact_map_sprites.py: the item cut out of its painting, with a shadow)
+			s.texture = Assets.tex("map/art_%s.png" % o["artifact"], Vector2i(96, 96))
+			s.scale = Vector2.ONE * (54.0 / s.texture.get_height())
+			s.offset = Vector2(0, -s.texture.get_height() * 0.5 + 8)
+			s.position = Vector2(0, -2)
+			outline(s, 1.6)
+			n.add_child(s)
 		"mine":
 			n.add_child(_sprite("map/%s.png" % o["mine"], Vector2.ZERO, 3.1 * TILE))
 			if o["owner"] >= 0:
@@ -659,6 +669,15 @@ func set_hover(t: Vector2i) -> void:
 # ---------------------------------------------------------------------------------------------
 # Inner helper nodes
 # ---------------------------------------------------------------------------------------------
+## The ground under an artifact lying on the map: a soft shadow and a glow in its tier's colour.
+class _ArtifactGlow extends Node2D:
+	var col := Color.WHITE
+	func _draw() -> void:
+		draw_set_transform(Vector2(0, -4), 0, Vector2(1, 0.4))
+		draw_circle(Vector2.ZERO, 26, Color(0, 0, 0, 0.35))
+		for i in 4:
+			draw_circle(Vector2.ZERO, 30 - i * 6, Color(col, 0.1 + i * 0.06))
+
 class _RectNode extends Node2D:
 	var rect := Rect2()
 	func _draw() -> void:

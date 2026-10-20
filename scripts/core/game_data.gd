@@ -277,19 +277,84 @@ const DWELLING_NAMES := {
 # ---------------------------------------------------------------------------------------------
 # Artifacts
 # ---------------------------------------------------------------------------------------------
+## Artifacts in the classic's four tiers (treasure, minor, major, relic) plus combination artifacts. "bonus" holds
+## numbers summed over what a hero wears (GameState.hero_stat): attack defense power knowledge morale luck movement,
+## hp (every creature), speed (every creature), scout (sight radius), mana_day, gold_day, school_<air|fire|water|earth>
+## (+% damage of that school's spells), necromancy (+% raised, with the skill), growth1 (weekly growth of
+## first-level creatures in all the owner's towns). "flags" hold the rest (GameState.hero_flags): immune_school,
+## immune_spells, raise. A combination ("parts") is worn when all its parts are: they merge into it (as the classic's
+## combination artifacts), it fills all their slots, and it can be split back on the hero screen.
 const ARTIFACTS := {
-	"sword_of_valor": {"name": "Sword of Valor", "slot": "weapon", "bonus": {"attack": 3}, "desc": "+3 Attack"},
-	"shield_of_dawn": {"name": "Shield of Dawn", "slot": "shield", "bonus": {"defense": 3}, "desc": "+3 Defense"},
-	"helm_of_wisdom": {"name": "Helm of Wisdom", "slot": "head", "bonus": {"knowledge": 2}, "desc": "+2 Knowledge"},
-	"orb_of_power": {"name": "Orb of Power", "slot": "misc", "bonus": {"power": 3}, "desc": "+3 Spell Power"},
-	"boots_of_speed": {"name": "Boots of Speed", "slot": "feet", "bonus": {"movement": 600}, "desc": "+600 movement points"},
-	"ring_of_vitality": {"name": "Ring of Vitality", "slot": "ring", "bonus": {"hp": 1}, "desc": "+1 HP to all creatures"},
-	"clover_of_fortune": {"name": "Clover of Fortune", "slot": "misc", "bonus": {"luck": 1}, "desc": "+1 Luck"},
-	"crown_of_command": {"name": "Crown of Command", "slot": "head", "bonus": {"attack": 2, "defense": 2, "power": 2, "knowledge": 2}, "desc": "+2 to all skills"},
-	"cape_of_courage": {"name": "Cape of Courage", "slot": "cape", "bonus": {"morale": 1}, "desc": "+1 Morale"},
-	"amulet_of_insight": {"name": "Amulet of Insight", "slot": "neck", "bonus": {"power": 1, "knowledge": 1}, "desc": "+1 Spell Power, +1 Knowledge"},
-	"breastplate_of_ironbark": {"name": "Breastplate of Ironbark", "slot": "torso", "bonus": {"defense": 2}, "desc": "+2 Defense"},
+	# might
+	"soldiers_shortsword": {"name": "Soldier's Shortsword", "slot": "weapon", "tier": "treasure", "bonus": {"attack": 1}, "desc": "+1 Attack"},
+	"sword_of_valor": {"name": "Sword of Valor", "slot": "weapon", "tier": "minor", "bonus": {"attack": 3}, "desc": "+3 Attack"},
+	"ogre_hewn_cleaver": {"name": "Ogre-Hewn Cleaver", "slot": "weapon", "tier": "major", "bonus": {"attack": 5}, "desc": "+5 Attack"},
+	"oaken_buckler": {"name": "Oaken Buckler", "slot": "shield", "tier": "treasure", "bonus": {"defense": 1}, "desc": "+1 Defense"},
+	"shield_of_dawn": {"name": "Shield of Dawn", "slot": "shield", "tier": "minor", "bonus": {"defense": 3}, "desc": "+3 Defense"},
+	"ironwood_tower_shield": {"name": "Ironwood Tower Shield", "slot": "shield", "tier": "major", "bonus": {"defense": 5}, "desc": "+5 Defense"},
+	"quilted_gambeson": {"name": "Quilted Gambeson", "slot": "torso", "tier": "treasure", "bonus": {"defense": 1}, "desc": "+1 Defense"},
+	"breastplate_of_ironbark": {"name": "Breastplate of Ironbark", "slot": "torso", "tier": "minor", "bonus": {"defense": 2}, "desc": "+2 Defense"},
+	"ring_of_vitality": {"name": "Ring of Vitality", "slot": "ring", "tier": "major", "bonus": {"hp": 1}, "desc": "+1 health for every creature"},
+	"ring_of_swiftness": {"name": "Ring of Swiftness", "slot": "ring", "tier": "major", "bonus": {"speed": 1}, "desc": "+1 speed for every creature"},
+	"crown_of_command": {"name": "Crown of Command", "slot": "head", "tier": "major", "bonus": {"attack": 2, "defense": 2, "power": 2, "knowledge": 2}, "desc": "+2 to all four stats"},
+	# magic
+	"apprentices_circlet": {"name": "Apprentice's Circlet", "slot": "head", "tier": "treasure", "bonus": {"knowledge": 1}, "desc": "+1 Knowledge"},
+	"helm_of_wisdom": {"name": "Helm of Wisdom", "slot": "head", "tier": "minor", "bonus": {"knowledge": 2}, "desc": "+2 Knowledge"},
+	"amulet_of_insight": {"name": "Amulet of Insight", "slot": "neck", "tier": "minor", "bonus": {"power": 1, "knowledge": 1}, "desc": "+1 Spell Power, +1 Knowledge"},
+	"pendant_of_clarity": {"name": "Pendant of Clarity", "slot": "neck", "tier": "minor", "bonus": {"mana_day": 3}, "desc": "+3 mana each day"},
+	"orb_of_power": {"name": "Orb of Power", "slot": "misc", "tier": "minor", "bonus": {"power": 3}, "desc": "+3 Spell Power"},
+	"orb_of_tempests": {"name": "Orb of Tempests", "slot": "misc", "tier": "major", "bonus": {"school_air": 50}, "desc": "Air spells deal 50% more damage"},
+	"orb_of_embers": {"name": "Orb of Embers", "slot": "misc", "tier": "major", "bonus": {"school_fire": 50}, "desc": "Fire spells deal 50% more damage"},
+	"orb_of_tides": {"name": "Orb of Tides", "slot": "misc", "tier": "major", "bonus": {"school_water": 50}, "desc": "Water spells deal 50% more damage"},
+	"orb_of_bedrock": {"name": "Orb of Bedrock", "slot": "misc", "tier": "major", "bonus": {"school_earth": 50}, "desc": "Earth spells deal 50% more damage"},
+	# logistics and scouting
+	"travellers_boots": {"name": "Traveller's Boots", "slot": "feet", "tier": "treasure", "bonus": {"movement": 200}, "desc": "+200 movement points"},
+	"boots_of_speed": {"name": "Boots of Speed", "slot": "feet", "tier": "major", "bonus": {"movement": 600}, "desc": "+600 movement points"},
+	"wayfarers_cloak": {"name": "Wayfarer's Cloak", "slot": "cape", "tier": "treasure", "bonus": {"scout": 1}, "desc": "+1 scouting radius"},
+	"seers_spyglass": {"name": "Seer's Spyglass", "slot": "misc", "tier": "minor", "bonus": {"scout": 2}, "desc": "+2 scouting radius"},
+	# morale, luck and economy
+	"cape_of_courage": {"name": "Cape of Courage", "slot": "cape", "tier": "minor", "bonus": {"morale": 1}, "desc": "+1 Morale"},
+	"clover_of_fortune": {"name": "Clover of Fortune", "slot": "misc", "tier": "minor", "bonus": {"luck": 1}, "desc": "+1 Luck"},
+	"signet_of_coin": {"name": "Signet of Coin", "slot": "ring", "tier": "minor", "bonus": {"gold_day": 250}, "desc": "+250 gold each day"},
+	"bottomless_purse": {"name": "Bottomless Purse", "slot": "misc", "tier": "major", "bonus": {"gold_day": 750}, "desc": "+750 gold each day"},
+	"banner_of_the_muster": {"name": "Banner of the Muster", "slot": "misc", "tier": "relic", "bonus": {"growth1": 3}, "desc": "+3 weekly growth of first-level creatures in all your towns"},
+	# set pieces (they merge into the combinations below)
+	"dragonbone_blade": {"name": "Dragonbone Blade", "slot": "weapon", "tier": "major", "bonus": {"attack": 4}, "desc": "+4 Attack", "set": "dragonheart_arms"},
+	"dragonscale_shield": {"name": "Dragonscale Shield", "slot": "shield", "tier": "major", "bonus": {"defense": 4}, "desc": "+4 Defense", "set": "dragonheart_arms"},
+	"dragonskull_helm": {"name": "Dragonskull Helm", "slot": "head", "tier": "major", "bonus": {"attack": 2, "defense": 2}, "desc": "+2 Attack, +2 Defense", "set": "dragonheart_arms"},
+	"bone_crown": {"name": "Bone Crown", "slot": "head", "tier": "minor", "bonus": {"knowledge": 2}, "desc": "+2 Knowledge", "set": "mantle_of_the_lich_king"},
+	"gravecloak": {"name": "Gravecloak", "slot": "cape", "tier": "major", "bonus": {"necromancy": 10}, "desc": "+10% Necromancy", "set": "mantle_of_the_lich_king"},
+	"phylactery_of_ages": {"name": "Phylactery of Ages", "slot": "misc", "tier": "major", "bonus": {"power": 2}, "desc": "+2 Spell Power", "set": "mantle_of_the_lich_king"},
+	"sun_pendant": {"name": "Sun Pendant", "slot": "neck", "tier": "minor", "bonus": {"morale": 1}, "desc": "+1 Morale", "set": "seraphs_covenant"},
+	"seraphs_feather": {"name": "Seraph's Feather", "slot": "misc", "tier": "minor", "bonus": {"luck": 1}, "desc": "+1 Luck", "set": "seraphs_covenant"},
+	"sunsteel_cuirass": {"name": "Sunsteel Cuirass", "slot": "torso", "tier": "major", "bonus": {"defense": 3, "morale": 1}, "desc": "+3 Defense, +1 Morale", "set": "seraphs_covenant"},
+	# combinations
+	"dragonheart_arms": {"name": "Dragonheart Arms", "slot": "weapon", "tier": "combo",
+		"parts": ["dragonbone_blade", "dragonscale_shield", "dragonskull_helm"],
+		"bonus": {"attack": 8, "defense": 8}, "flags": {"immune_school": ["fire"]},
+		"desc": "+8 Attack, +8 Defense; the army takes no damage from Fire spells"},
+	"mantle_of_the_lich_king": {"name": "Mantle of the Lich King", "slot": "cape", "tier": "combo",
+		"parts": ["bone_crown", "gravecloak", "phylactery_of_ages"],
+		"bonus": {"power": 3, "knowledge": 3, "necromancy": 25}, "flags": {"raise": ["zombie"]},
+		"desc": "+3 Spell Power, +3 Knowledge, +25% Necromancy; Necromancy raises Zombies instead of Skeletons"},
+	"seraphs_covenant": {"name": "Seraph's Covenant", "slot": "torso", "tier": "combo",
+		"parts": ["sun_pendant", "seraphs_feather", "sunsteel_cuirass"],
+		"bonus": {"morale": 3, "luck": 2, "defense": 3}, "flags": {"immune_spells": ["curse", "weakness"]},
+		"desc": "+3 Morale, +2 Luck, +3 Defense; the army is immune to Curse and Weakness"},
 }
+## The tiers with their names and socket colours (hero screen, hover panels).
+const ARTIFACT_TIERS := {"treasure": ["Treasure", Color(0.72, 0.5, 0.3)], "minor": ["Minor", Color(0.8, 0.82, 0.86)],
+	"major": ["Major", Color(0.98, 0.8, 0.3)], "relic": ["Relic", Color(0.95, 0.35, 0.3)],
+	"combo": ["Combination", Color(0.75, 0.5, 1.0)]}
+
+## Artifacts found loose of a tier (set pieces are placed as sets; combinations are never found whole).
+static func artifacts_of(tier: String) -> Array:
+	return ARTIFACTS.keys().filter(func(a): return ARTIFACTS[a]["tier"] == tier and not ARTIFACTS[a].has("set"))
+
+## The combination artifacts.
+static func combinations() -> Array:
+	return ARTIFACTS.keys().filter(func(a): return ARTIFACTS[a].has("parts"))
+
 ## Where a hero wears artifacts (the classic paper-doll) and how many of each; the rest go into the backpack,
 ## where they give nothing.
 const ARTIFACT_SLOTS := {"head": 1, "cape": 1, "neck": 1, "weapon": 1, "shield": 1, "torso": 1, "ring": 2, "feet": 1,
@@ -342,8 +407,9 @@ static func loss_text(l: Dictionary) -> String:
 ## Starting bonus for the player's first hero (as the classics: gold, an artifact or resources).
 const START_BONUSES := {"gold": ["Gold", "+2500 gold"], "artifact": ["Artifact", "A random artifact"],
 	"resource": ["Resources", "+10 wood and ore"]}
-const BONUS_ARTIFACTS := ["sword_of_valor", "shield_of_dawn", "helm_of_wisdom", "orb_of_power", "boots_of_speed",
-	"ring_of_vitality", "clover_of_fortune", "cape_of_courage", "amulet_of_insight", "breastplate_of_ironbark"]
+## The New Game "random artifact" bonus: a minor one.
+const BONUS_ARTIFACTS := ["sword_of_valor", "shield_of_dawn", "helm_of_wisdom", "orb_of_power", "pendant_of_clarity",
+	"clover_of_fortune", "cape_of_courage", "amulet_of_insight", "breastplate_of_ironbark", "seers_spyglass", "signet_of_coin"]
 
 # ---------------------------------------------------------------------------------------------
 # Adventure map

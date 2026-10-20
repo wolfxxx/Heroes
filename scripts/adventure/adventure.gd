@@ -42,10 +42,11 @@ func _ready() -> void:
 				h["skills"].merge({"wisdom": 2, "offense": 1, "logistics": 3})
 				h["artifacts"] = []
 				h["backpack"] = []
-				for a in ["sword_of_valor", "shield_of_dawn", "helm_of_wisdom", "cape_of_courage", "amulet_of_insight",
-						"breastplate_of_ironbark", "ring_of_vitality", "boots_of_speed", "orb_of_power", "clover_of_fortune",
-						"crown_of_command", "helm_of_wisdom", "sword_of_valor", "ring_of_vitality", "ring_of_vitality",
-						"boots_of_speed", "breastplate_of_ironbark"]:
+				# (every tier, and a combination: the dragon set merges as its last part arrives)
+				for a in ["dragonbone_blade", "dragonscale_shield", "dragonskull_helm", "gravecloak", "pendant_of_clarity",
+						"sunsteel_cuirass", "ring_of_vitality", "signet_of_coin", "travellers_boots", "orb_of_embers",
+						"clover_of_fortune", "seers_spyglass", "banner_of_the_muster", "soldiers_shortsword",
+						"bone_crown", "sun_pendant", "boots_of_speed", "seraphs_feather"]:
 					GameState.give_artifact(h, a)  # (as found: worn while a slot is free, then the backpack)
 				h["max_movement"] = GameState.hero_max_movement(h)
 				h["movement"] = h["max_movement"]
@@ -449,9 +450,14 @@ func _tile_info(t: Vector2i):
 			var v := HoverInfo.box("Treasure Chest")
 			HoverInfo.line(v, "Keep the gold, or give it away for experience.")
 			return v
-		"artifact":
-			var v := HoverInfo.box("Artifact")
-			HoverInfo.line(v, "A magical item for your hero to carry.")
+		"artifact":  # (named, with its tier and effect, as the classic's right-click)
+			var d: Dictionary = GameData.ARTIFACTS[o["artifact"]]
+			var v := HoverInfo.box(d["name"])
+			var tr: Array = GameData.ARTIFACT_TIERS[d["tier"]]
+			HoverInfo.line(v, "%s artifact" % tr[0], tr[1])
+			HoverInfo.line(v, d["desc"])
+			if d.has("set"):
+				HoverInfo.line(v, "Part of the %s" % GameData.ARTIFACTS[d["set"]]["name"], Color(0.8, 0.65, 1.0))
 			return v
 		"mine":
 			var m: Dictionary = GameData.MINES[o["mine"]]
@@ -875,6 +881,11 @@ func _run_ai_turns() -> void:
 		if await _check_game_over():
 			return
 		_advance_player()
+		# (one frame per turn: with nothing to animate, e.g. a lone computer player left in an all-computer game, the
+		# days would otherwise spin within one frame and overflow the engine's message queue)
+		await get_tree().process_frame
+		if not is_inside_tree():
+			return
 	busy = false
 	hud.set_turn_label("")
 	await _start_human_turn()
