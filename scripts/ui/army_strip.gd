@@ -249,6 +249,12 @@ class _Arrow extends Control:
 		var c := size * 0.5 + Vector2(0, -60)
 		var pts := PackedVector2Array([c + Vector2(-48, -16), c + Vector2(8, -16), c + Vector2(8, -38), c + Vector2(50, 0),
 			c + Vector2(8, 38), c + Vector2(8, 16), c + Vector2(-48, 16)])
-		draw_colored_polygon(pts, Color(1.0, 0.82, 0.32))
+		# light gold above to amber below, a dark outline and a highlight along its top edge, as the frame's gilt
+		var cols := PackedColorArray()
+		for q in pts:
+			cols.append(Color(1.0, 0.9, 0.5).lerp(Color(0.78, 0.48, 0.12), clampf((q.y - c.y + 38.0) / 76.0, 0.0, 1.0)))
+		draw_polygon(pts, cols)
+		draw_line(pts[0] + Vector2(3, 3), pts[1] + Vector2(0, 3), Color(1, 0.97, 0.8, 0.8), 2.0, true)
+		draw_line(pts[2] + Vector2(2, 5), pts[3] + Vector2(-6, 0), Color(1, 0.97, 0.8, 0.7), 2.0, true)
 		pts.append(pts[0])
-		draw_polyline(pts, Color(0.35, 0.2, 0.05), 3.0, true)
+		draw_polyline(pts, Color(0.25, 0.13, 0.03), 4.0, true)

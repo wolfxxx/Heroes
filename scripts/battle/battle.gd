@@ -1434,7 +1434,7 @@ func _anim_spell(ev: Dictionary) -> void:
 			burst.bolt = true
 			burst.slant = 1.0 if (c.x > 960 and c.x < 1400) or c.x < 560 else -1.0  # (clear of the name plates)
 			burst.position = c + Vector2(0, 62)
-			_fx.add_child(burst)
+			_rings.add_child(burst)  # (behind the figures: the bolt passes behind the stacks between it and the sky)
 			p = c + Vector2(0, 40)
 		if fx == "holy":
 			p += Vector2(0, -20)  # a column rising from the feet: its ring sits at the bottom of the frame
@@ -2300,6 +2300,8 @@ class _QueueIcon extends Control:
 		if first:  # whose turn: a bright gold frame around the side colour
 			draw_rect(r.grow(-1), UI.GOLD, false, 3.0)
 			draw_rect(r.grow(-5), Color(1, 0.9, 0.5, 0.5), false, 1.5)
+		while fs > 12 and f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > size.x - 8:  # (a long name a size smaller)
+			fs -= 1
 		draw_string_outline(f, Vector2(0, size.y - 9), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, 5, Color(0, 0, 0, 0.9))
 		draw_string(f, Vector2(0, size.y - 9), txt, HORIZONTAL_ALIGNMENT_CENTER, size.x, fs, Color(1, 0.96, 0.85))
 
@@ -2444,14 +2446,14 @@ class _Burst extends Node2D:
 			# straight down onto the target, as the classic's bolt (a slant crossed the stacks around it)
 			var top_y := minf(-160.0, 215.0 - global_position.y)
 			var p := Vector2(0.0, top_y)
-			var a0 := 1.0 - t * 1.25
+			var a0 := clampf((0.8 - t) / 0.3, 0.0, 1.0)  # (solid while it flashes, then gone)
 			for c in [[-68.0, 10.0, 44.0], [-24.0, -10.0, 54.0], [28.0, -8.0, 52.0], [72.0, 10.0, 42.0], [-40.0, 20.0, 44.0],
 					[6.0, 22.0, 50.0], [46.0, 20.0, 42.0]]:
 				draw_set_transform(p + Vector2(c[0], c[1]), 0, Vector2(1, 0.62))
-				draw_circle(Vector2.ZERO, c[2], Color(0.1, 0.11, 0.16, a0))
+				draw_circle(Vector2.ZERO, c[2], Color(0.16, 0.17, 0.24) if a0 >= 1.0 else Color(0.16, 0.17, 0.24, a0))
 			for c in [[-34.0, 38.0, 38.0], [12.0, 42.0, 44.0], [52.0, 36.0, 30.0]]:  # its underside lit by the bolt
 				draw_set_transform(p + Vector2(c[0], c[1]), 0, Vector2(1, 0.28))
-				draw_circle(Vector2.ZERO, c[2], Color(0.62, 0.78, 1.0, 0.8 * maxf(0.0, 1.0 - t * 2.0)))
+				draw_circle(Vector2.ZERO, c[2], Color(0.7, 0.85, 1.0, 0.95 * maxf(0.0, 1.0 - t * 2.0)))
 			draw_set_transform(Vector2.ZERO)
 			var rng := RandomNumberGenerator.new()
 			rng.seed = get_instance_id()  # (the same zig-zag every frame of its flash)
@@ -2460,14 +2462,9 @@ class _Burst extends Node2D:
 			for i in 11:
 				q = q.lerp(Vector2.ZERO, 1.0 / (11 - i)) + Vector2(rng.randf_range(-34, 34), rng.randf_range(-10, 10)) * (1.0 if i < 10 else 0.0)
 				pts.append(q)
-			var fork := PackedVector2Array([pts[4]])
-			var f: Vector2 = pts[4]
-			for i in 4:
-				f += Vector2(slant * -30.0 + rng.randf_range(-14, 14), 34.0)
-				fork.append(f)
 			var a2 := maxf(0.0, 1.0 - t * 2.0)
-			for line in [pts, fork]:
-				var wk := 1.0 if line == pts else 0.6
+			for line in [pts]:
+				var wk := 1.0
 				draw_polyline(line, Color(0.45, 0.65, 1.0, 0.22 * a2), 40.0 * wk)  # outer glow
 				draw_polyline(line, Color(0.6, 0.8, 1.0, 0.55 * a2), 18.0 * wk)
 				draw_polyline(line, Color(0.88, 0.96, 1.0, a2), 9.0 * wk)

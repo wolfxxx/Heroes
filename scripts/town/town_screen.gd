@@ -127,14 +127,28 @@ func _build() -> void:
 	date.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(date)
 	for r in GameData.RESOURCES:
+		# each in a dark inset (grey ore and mercury on the brown wood were hard to see), the seven reaching to the date
+		var cell := PanelContainer.new()
+		var inset := StyleBoxFlat.new()
+		inset.bg_color = Color(0.06, 0.04, 0.025, 0.75)
+		inset.border_color = Color(UI.GOLD_DARK, 0.6)
+		inset.set_border_width_all(1)
+		inset.set_corner_radius_all(4)
+		inset.content_margin_left = 8
+		inset.content_margin_right = 8
+		cell.add_theme_stylebox_override("panel", inset)
+		cell.custom_minimum_size.x = 196 if r == "gold" else 168
+		var slot := Control.new()  # (the gap after it)
+		slot.custom_minimum_size.x = 26
 		var box := HBoxContainer.new()
 		box.add_theme_constant_override("separation", 4)
-		box.custom_minimum_size.x = 250 if r == "gold" else 218  # (the seven cells reach to the date)
-		box.add_child(UI.icon(Assets.res_icon(r), Vector2(46, 46)))  # (in the strip between the garrison and the frame)
+		cell.add_child(box)
+		box.add_child(UI.icon(Assets.res_icon(r), Vector2(42, 42)))  # (in the strip between the garrison and the frame)
 		var l := UI.label("0", 27, Color(1, 0.95, 0.82))
 		box.add_child(l)
 		_res_labels[r] = l
-		bar.add_child(box)
+		bar.add_child(cell)
+		bar.add_child(slot)
 
 func refresh() -> void:
 	_rebuild_buildings()
