@@ -461,17 +461,20 @@ func _empty_slot(h: float) -> Control:
 
 ## A hero in the list: portrait with its movement (green) and spell points (blue) as bars beside it, and the name.
 func _hero_card(h: Dictionary) -> Control:
+	var sel: bool = h["uid"] == world.get("selected_hero", -1)
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(COL_W, SLOT_H)
-	b.toggle_mode = true
-	b.button_pressed = h["uid"] == world.get("selected_hero", -1)
 	b.focus_mode = Control.FOCUS_NONE
-	b.tooltip_text = "%s, level %d %s\nMovement %d / %d, spell points %d / %d" % [h["name"], h["level"], h["class"],
+	b.tooltip_text = "%s, level %d %s\nMovement %d / %d, spell points %d / %d\nClick again to open the hero screen." % [h["name"], h["level"], h["class"],
 		h["movement"], h["max_movement"], h["mana"], GameState.max_mana(h)]
-	b.pressed.connect(func(): adv.select_hero(h["uid"]))
-	var on := UI.selected_plate(4)
-	b.add_theme_stylebox_override("pressed", on)
-	b.add_theme_stylebox_override("hover_pressed", on)
+	# (as the classic hero list: a click selects the hero, a click on the hero already selected opens its screen)
+	b.pressed.connect(func():
+		if h["uid"] == world.get("selected_hero", -1) and not adv.busy:
+			Audio.sfx("click", -6)
+			open_hero_screen(h)
+		else:
+			adv.select_hero(h["uid"]))
+	# (the carved button frame, as the town card and the panel's buttons; the hero selected has a gold edge)
 	# the face band of the portrait (the name is in the tooltip and the status window), then the two bars
 	var bw := 6.0
 	var p := TextureRect.new()
@@ -479,17 +482,32 @@ func _hero_card(h: Dictionary) -> Control:
 	p.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	p.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	p.clip_contents = true
-	p.position = Vector2(5, 5)
-	p.size = Vector2(COL_W - 10 - 2 * bw - 8, SLOT_H - 10)
+	p.position = Vector2(6, 6)
+	p.size = Vector2(COL_W - 12 - 2 * bw - 8, SLOT_H - 12)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(p)
+	var edge := UI._PicEdge.new()  # (the portrait's rim: gold when selected, light under the pointer)
+	edge.selected = sel
+	edge.inset = 6.0
+	edge.position = Vector2.ZERO
+	edge.size = Vector2(p.position.x * 2 + p.size.x, SLOT_H)
+	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(edge)
+	b.mouse_entered.connect(func():
+		p.modulate = Color(1.18, 1.14, 1.05) if not h.get("asleep", false) else p.modulate
+		edge.hover = true
+		edge.queue_redraw())
+	b.mouse_exited.connect(func():
+		p.modulate = Color.WHITE if not h.get("asleep", false) else Color(0.55, 0.55, 0.65)
+		edge.hover = false
+		edge.queue_redraw())
 	var x := p.position.x + p.size.x + 3
 	for bar in [[float(h["movement"]) / maxf(1.0, h["max_movement"]), Color(0.35, 0.82, 0.3)],
 			[float(h["mana"]) / maxf(1.0, GameState.max_mana(h)), Color(0.35, 0.58, 1.0)]]:
 		var c := _bar(bar[0], bar[1], bw)
 		c.vertical = true
-		c.position = Vector2(x, 5)
-		c.size = Vector2(bw, SLOT_H - 10)
+		c.position = Vector2(x, 6)
+		c.size = Vector2(bw, SLOT_H - 12)
 		b.add_child(c)
 		x += bw + 3
 	if h.get("asleep", false):  # dimmed, with the moon over the portrait

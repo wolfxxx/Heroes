@@ -202,12 +202,12 @@ func refresh() -> void:
 		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		row2.add_child(l)
 	else:
-		var p := TextureButton.new()
-		p.texture_normal = Assets.hero_portrait(hero["id"])
-		p.ignore_texture_size = true
-		p.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-		p.custom_minimum_size = Vector2(92, 92)
-		p.tooltip_text = "%s, level %d %s" % [hero["name"], hero["level"], hero["class"]]
+		var p := UI.pic_button(Assets.hero_portrait(hero["id"]), Vector2(92, 92))  # (the carved frame: it opens the hero)
+		p.tooltip_text = "%s, level %d %s\nClick to open the hero screen." % [hero["name"], hero["level"], hero["class"]]
+		p.pressed.connect(func():  # (the visiting hero's screen, as on the adventure map: artifacts, skills, army)
+			Audio.sfx("click", -6)
+			await HeroScreen.open(self, hero, false).closed
+			refresh())
 		row2.add_child(p)
 		var hs := ArmyStrip.new()
 		hs.upgrade_town = town

@@ -149,6 +149,39 @@ static func button(text: String, cb: Callable = Callable(), size := 22) -> Butto
 		b.pressed.connect(cb)
 	return b
 
+## A picture set in the carved button frame (as the panel's other buttons), brighter under the pointer; `selected`
+## adds a gold edge. The picture is inset `inset` px and covers its area.
+static func pic_button(tex: Texture2D, size: Vector2, inset := 6.0, selected := false) -> Button:
+	var b := Button.new()
+	b.custom_minimum_size = size
+	b.focus_mode = Control.FOCUS_NONE
+	var pic := TextureRect.new()
+	pic.texture = tex
+	pic.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pic.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	pic.clip_contents = true
+	pic.position = Vector2(inset, inset)
+	pic.size = size - Vector2(inset, inset) * 2.0
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(pic)
+	var edge := _PicEdge.new()
+	edge.selected = selected
+	edge.inset = inset
+	edge.set_anchors_preset(Control.PRESET_FULL_RECT)
+	edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(edge)
+	b.mouse_entered.connect(func():
+		pic.modulate = Color(1.18, 1.14, 1.05)
+		edge.hover = true
+		edge.queue_redraw())
+	b.mouse_exited.connect(func():
+		pic.modulate = Color.WHITE
+		edge.hover = false
+		edge.queue_redraw())
+	b.set_meta("pic", pic)
+	b.set_meta("edge", edge)
+	return b
+
 static func icon(tex: Texture2D, size := Vector2(48, 48)) -> TextureRect:
 	var r := TextureRect.new()
 	r.texture = tex
@@ -175,3 +208,17 @@ static func count_word(n: int) -> String:
 	if n < 500: return "A swarm of"
 	if n < 1000: return "Zounds of"
 	return "A legion of"
+
+## The rim drawn over a pic_button's picture: a thin dark line inside the carved frame, gold when selected, light
+## under the pointer.
+class _PicEdge extends Control:
+	var selected := false
+	var hover := false
+	var inset := 6.0
+	func _draw() -> void:
+		var r := Rect2(Vector2(inset, inset), size - Vector2(inset, inset) * 2.0)
+		draw_rect(r, Color(0.08, 0.05, 0.02, 0.9), false, 2.0)
+		if selected:
+			draw_rect(r.grow(1), Color(1.0, 0.84, 0.38), false, 3.0)
+		elif hover:
+			draw_rect(r.grow(1), Color(1.0, 0.92, 0.7, 0.7), false, 2.0)

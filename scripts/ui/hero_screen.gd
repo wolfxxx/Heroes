@@ -51,9 +51,10 @@ static func _morale(h: Dictionary) -> Array:
 		return [0, why + "\nUndead are not affected by morale."]
 	return [v, why]
 
-static func open(owner: Node, h: Dictionary) -> Modal:
+static func open(owner: Node, h: Dictionary, can_dismiss := true) -> Modal:
 	var m := Modal.custom(owner, "", 1240)
 	m.set_meta("bp", 0)  # (the backpack's scroll)
+	m.set_meta("can_dismiss", can_dismiss)
 	_fill(m, owner, h)
 	m.set_meta("default", "close")
 	m.set_meta("cancel", "close")
@@ -170,7 +171,7 @@ static func _fill(m: Modal, owner: Node, h: Dictionary) -> void:
 	right.add_child(_doll(owner, h, redo))
 	right.add_child(_backpack(m, h, redo))
 	right.add_child(_formation(h, redo))
-	m.add_buttons([["Close", "close"], ["Dismiss Hero", "dismiss"]])
+	m.add_buttons([["Close", "close"], ["Dismiss Hero", "dismiss"]] if m.get_meta("can_dismiss", true) else [["Close", "close"]])
 
 ## A small labelled meter: title, value and a thin bar.
 ## A labelled meter: its name over the value in large figures, a bar under them (as the classic screen's boxes).

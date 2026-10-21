@@ -24,6 +24,12 @@ the look and feel of HoMM3, and each round fixes what the judge found.
   it (scores in section 7). Next step of the plan: the AI work (section 8).
 - Found and fixed on the way: the all-computer simulation could overflow Godot's message queue once one computer
   player had beaten the others (the AI turn loop never waited a frame); `_run_ai_turns` now waits one frame per turn.
+- User request (2026-10-21, committed and pushed): clicking the selected hero's portrait in the adventure panel's hero
+  list opens the hero screen, as the classic list does (a click on another hero still selects it first);
+  `AdventureHUD._hero_card`. In a town, clicking the visiting hero's portrait opens the same screen (without its
+  Dismiss button: dismissing needs the adventure rules; `HeroScreen.open(owner, h, can_dismiss)`). Both portraits
+  now look like buttons: the carved button frame (as the town card and the panel's buttons), brighter with a light
+  rim under the pointer, a gold rim on the selected hero (`UI.pic_button`, `UI._PicEdge`).
 - Round 47 (battle readability) committed and pushed; judge 47 not run yet. Root cause of the siege-gate knot found: while a stack's blow is
   still being animated the rules have already moved on (`L.current()` is the next stack), so the see-through fade,
   the halo and the stack's emphasis followed the wrong stack. `_see_through` now uses the stack the screen shows

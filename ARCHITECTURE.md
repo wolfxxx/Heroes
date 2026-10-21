@@ -13,6 +13,7 @@ Design resolution 1920x1080, stretch mode canvas_items/expand. All UI coordinate
 
 ## Shared classes
 - `UI` (scripts/ui/ui.gd) — theme + widget factory. Set `theme = UI.theme()` on your root Control.
+  `UI.pic_button(tex, size)` makes a clickable picture in the carved button frame with a hover highlight.
 - `Modal` (scripts/ui/modal.gd) — awaitable dialogs: `var r = await Modal.choice(self, title, text, options).closed`.
 - `ArmyStrip` (scripts/ui/army_strip.gd) — 7 army slots; strips sharing a group dict exchange stacks.
 - `TownLogic` (scripts/town/town_logic.gd) — town/player rules + dict schemas (READ ITS HEADER).
