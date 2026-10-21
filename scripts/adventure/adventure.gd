@@ -134,9 +134,9 @@ static func _shot_artifacts(w: Dictionary) -> void:
 	var taken := {}
 	for o in w["objects"].values():
 		taken[o["pos"]] = true
-	for t in w["towns"].values():
-		for dy in range(-3, 2):
-			for dx in range(-3, 4):
+	for t in w["towns"].values():  # (clear of the castle and its towers)
+		for dy in range(-5, 2):
+			for dx in range(-4, 5):
 				taken[t["pos"] + Vector2i(dx, dy)] = true
 	var picks := ["banner_of_the_muster", "orb_of_embers", "cape_of_courage", "soldiers_shortsword", "dragonskull_helm"]
 	for r in range(2, 7):

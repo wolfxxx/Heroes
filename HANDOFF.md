@@ -2,7 +2,7 @@
 
 Read this first, then `ARCHITECTURE.md` (code map), `ASSETS.md` (every asset path and the art pipeline) and
 `CREDITS.md`. This file is written so that another person or another AI assistant can pick the work up exactly
-where it stopped. Last updated 2026-10-20 (round 46, judge 45 repairs, committed and pushed; judge 46 run), branch `main`, remote
+where it stopped. Last updated 2026-10-20 (round 47, battle readability, committed and pushed; judge 47 not run yet), branch `main`, remote
 `https://github.com/wolfxxx/Heroes.git` (public repo).
 
 ## 1. The project in one paragraph
@@ -24,12 +24,23 @@ the look and feel of HoMM3, and each round fixes what the judge found.
   it (scores in section 7). Next step of the plan: the AI work (section 8).
 - Found and fixed on the way: the all-computer simulation could overflow Godot's message queue once one computer
   player had beaten the others (the AI turn loop never waited a frame); `_run_ai_turns` now waits one frame per turn.
+- Round 47 (battle readability) committed and pushed; judge 47 not run yet. Root cause of the siege-gate knot found: while a stack's blow is
+  still being animated the rules have already moved on (`L.current()` is the next stack), so the see-through fade,
+  the halo and the stack's emphasis followed the wrong stack. `_see_through` now uses the stack the screen shows
+  acting (`_grid.active`). Also: that stack is drawn over its neighbours while it acts (`z_index` 2), never gets
+  feet-holes cut in itself, and a big figure just behind it fades to 0.3; a struck stack no longer fades the figures
+  in front of it (its ring flare and label mark it — those fades made living figures look like corpses); corpses
+  mid-grey (0.74) and slightly translucent; the lightning cloud dropped — the bolt falls from the sky just under the
+  turn queue, behind the figures it passes (wherever the cloud formed it sat on another stack); the showcase
+  artifacts kept further from the castle (the cape read as a flag on its tower). Checked over several siege runs:
+  the active stack is on top and lit in each; when it lunges into a big target the two still overlap (the attack
+  pose itself), and the behind-fade shows in some runs and not others (it eases in over a fraction of a second).
 - Round 46 committed and pushed, judge 46 run on it: the adventure_artifacts regression fixed (artifacts skip only tiles right under a
   tree, and the stumps, logs and flowers right beside each are removed instead, so all five show again); corpses
   grey and low in contrast (the outline shader's saturation at 0.25 on death); the hero screen's Formation toggle dims
   the option not chosen. The judge 45 "fade did not trigger" finding was checked with a debug print on that siege
-  frame: battle timing varies from run to run, so the judge's frame (Vampires buried behind the Angel) does not recur
-  in a new run — in the re-run the Vampires stand clear, lit by their halo. The rule was left as it is.
+  frame: battle timing varies from run to run; in that re-run the Vampires stood clear, so the rule was left as it is.
+  (Judge 46 then saw the knot again in its own run: it recurs in some runs — still open, see section 8.)
 - Round 45 committed and pushed, judge 45 run on it: judge 44 fixes — a big figure just behind the stack whose turn it is fades too
   (`_see_through`, the 6th info field), fades a little lighter (0.55); corpses darker and greyer; a spell's log line
   shows with its banner (`_flush_log` in `_anim_spell`); the combination's greyed copy brighter; the showcase
@@ -162,11 +173,26 @@ magenta key for pink fringes (recolour them, as was done for the Luck clover).
 | 43 | 9.2 | 9.4 | 9.4 | 9.7 | 8.9 | 9.3 |
 | 44 | 9.2 | 9.4 | 9.4 | 9.7 | 8.9 | 9.3 |
 | 45 | 9.2 | 9.3 | 9.4 | 9.7 | 9.0 | 9.3 |
+| 46 | 9.2 | 9.4 | 9.4 | 9.7 | 9.1 | 9.4 |
 
 Trend: gains have flattened at 9.2 for three rounds. Battle is the weakest area; the next big step most likely comes
 from battle (crowded siege melees, the lightning effect) or from new gameplay (section 8), not more small polish.
 
 ## 8. What's next
+
+### Open findings from judge 46 (overall 9.4 — a new high; battle 9.1)
+1. The siege-gate knot DID recur in judge 46's run (Vampires, whose turn it is, lying across the Angel; Ghosts on the
+   Angel's head; Bone Dragon over the Cavaliers). Round 46's note that it "does not recur" was wrong: it recurs in
+   some runs, not all. Needs a real fix (e.g. keep a stack's figure from overlapping a neighbour's, or a stronger
+   fade/outline for the stack in play), checked over several runs.
+2. In battle_siege_haven the living Bone Dragon and the Angel are drawn semi-transparent while the stack in play is far
+   away; they now look like the grey corpses. Find which fade rule fires there.
+3. Corpses are too dark (charcoal): raise them to mid-grey near the ground's brightness.
+4. adventure_artifacts: the cape lies right behind the castle's tallest tower and reads as a flag on it.
+5. Lightning: the cloud forms over the top-row stack; the bolt passes two stacks to reach its target.
+6. adventure_overview: about 20 wandering monsters on one screen — denser than HoMM3.
+7. battle_spellbook: the two page headings differ in size and colour.
+8. hero_screen: the dimmed backpack arrows nearly vanish.
 
 ### Open findings from judge 45 (overall 9.3; battle up to 9.0, adventure down to 9.3)
 Landed: spell log line with its banner, darker corpses, recognisable greyed combination copy.

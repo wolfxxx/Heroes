@@ -1395,7 +1395,7 @@ func _anim_death(st: Dictionary) -> void:
 		var home: Vector2 = s.get_meta("home", Vector2.ZERO)
 		s.position = home + Vector2(0, -16)
 		var tw0 := s.create_tween().set_parallel(true)
-		tw0.tween_property(s, "modulate", Color(0.5, 0.5, 0.5), 0.5)  # (dark: never read as a living stack)
+		tw0.tween_property(s, "modulate", Color(0.74, 0.73, 0.7, 0.92), 0.5)  # (grey, sitting back: never a living stack)
 		var cm := s.material as ShaderMaterial
 		if cm:  # (and grey, low in contrast: the classic's dull heaps)
 			cm.set_shader_parameter("saturation", 0.25)
@@ -1739,11 +1739,13 @@ func _follow_rings() -> void:
 
 ## Where a figure in front rises well over a stack standing behind it (the row above), it turns see-through around
 ## that stack's feet: the one behind keeps its ring, legs and badge readable instead of seeming to stand on the other.
-## The stack in play (the active one, the one under the pointer, one being struck) shows whole: a figure that covers
+## The stack in play (the active one, the one under the pointer) shows whole: a figure that covers
 ## much of it fades evenly over its whole body (never one in play itself).
 func _see_through() -> void:
 	var focus := {}
-	var cur = L.current()
+	# (the stack the screen shows acting: while its blow is still being animated the rules have already moved on to
+	# the next stack, and the fade, halo and draw-on-top followed that one instead)
+	var cur = _grid.active if _grid and not _grid.active.is_empty() else L.current()
 	if cur != null:
 		focus[cur["uid"]] = true
 	var hs = L.stack_at(_hover) if _hover.x >= 0 else null
@@ -1753,9 +1755,8 @@ func _see_through() -> void:
 	var info := []
 	for k in units:
 		var n: Node2D = units[k]
+		# (a struck stack is marked by its ring's flare and its label, not by fading the figures in front of it)
 		if n.get_node("Badge").st.get("alive", false):
-			if _ring(n).hit_until > now:
-				focus[k] = true
 			info.append([n, n.global_position, float(n.get_meta("top", 120.0)), HEX_W * (0.95 if L.is_wide(n.get_node("Badge").st) else 0.5), focus.has(k),
 				cur != null and cur["uid"] == k])
 	for k in units:
@@ -1771,7 +1772,7 @@ func _see_through() -> void:
 				# around that stack's figure, which drowned in them; it fades too)
 				if bk != f and bk[5] and not f[4] and -dy >= 20.0 and -dy < bk[2] * 0.9 and f[2] > bk[2] * 1.15 \
 						and absf(f[1].x - bk[1].x) < (f[3] + bk[3]) * 0.6:
-					fade = 0.55
+					fade = 0.3  # (much fainter than a figure in front: its whole bulk is around the stack in play)
 					continue
 				if bk == f or dy < 20.0 or f[2] - dy < 36.0 or absf(f[1].x - bk[1].x) > (f[3] + bk[3]) * 0.75:
 					continue
@@ -1779,7 +1780,7 @@ func _see_through() -> void:
 					# (it covers a good part of the stack in play: well up its body and across its middle)
 					if f[2] - dy >= 0.3 * bk[2] and absf(f[1].x - bk[1].x) < (f[3] + bk[3]) * 0.7:
 						fade = 0.55
-				elif holes.size() < 4:
+				elif holes.size() < 4 and not f[4]:  # (never holes in the stack in play itself: it shows whole)
 					holes.append(Vector4(bk[1].x, bk[1].y - 26.0, bk[3] * 0.95, 52.0))
 		var m := n.get_node("Sprite").material as ShaderMaterial
 		if m == null:
@@ -1789,6 +1790,7 @@ func _see_through() -> void:
 		var act: bool = cur != null and cur["uid"] == k
 		if act:
 			m.set_shader_parameter("team", Color(1.0, 0.93, 0.6, 0.55 + 0.4 * sin(now * 0.006)))
+		n.z_index = 2 if act else 0  # (over its neighbours while it is its turn: a crowd never buries it)
 		if n.get_meta("lit", false) != act:
 			n.set_meta("lit", act)
 			if not act:
@@ -2465,20 +2467,12 @@ class _Burst extends Node2D:
 		if bolt and t < 0.8:  # (the cloud lingers a little after the bolt)
 			# (from a dark storm cloud just under the turn queue: from higher up it seemed to come out of the queue's frame)
 			# straight down onto the target, as the classic's bolt (a slant crossed the stacks around it)
-			var top_y := minf(-160.0, 215.0 - global_position.y)
-			var p := Vector2(0.0, top_y)
-			var a0 := clampf((0.8 - t) / 0.3, 0.0, 1.0)  # (solid while it flashes, then gone)
-			for c in [[-68.0, 10.0, 44.0], [-24.0, -10.0, 54.0], [28.0, -8.0, 52.0], [72.0, 10.0, 42.0], [-40.0, 20.0, 44.0],
-					[6.0, 22.0, 50.0], [46.0, 20.0, 42.0]]:
-				draw_set_transform(p + Vector2(c[0], c[1]), 0, Vector2(1, 0.62))
-				draw_circle(Vector2.ZERO, c[2], Color(0.16, 0.17, 0.24) if a0 >= 1.0 else Color(0.16, 0.17, 0.24, a0))
-			for c in [[-34.0, 38.0, 38.0], [12.0, 42.0, 44.0], [52.0, 36.0, 30.0]]:  # its underside lit by the bolt
-				draw_set_transform(p + Vector2(c[0], c[1]), 0, Vector2(1, 0.28))
-				draw_circle(Vector2.ZERO, c[2], Color(0.7, 0.85, 1.0, 0.95 * maxf(0.0, 1.0 - t * 2.0)))
-			draw_set_transform(Vector2.ZERO)
+			# straight down from the sky (just under the turn queue) onto the target, as the classic's bolt; no cloud:
+			# wherever it formed it sat on another stack. The bolt is on the rings layer, behind the figures it passes.
+			var p := Vector2(0.0, minf(-120.0, 215.0 - global_position.y))
 			var rng := RandomNumberGenerator.new()
 			rng.seed = get_instance_id()  # (the same zig-zag every frame of its flash)
-			var pts := PackedVector2Array([p + Vector2(0, 24)])
+			var pts := PackedVector2Array([p])
 			var q: Vector2 = pts[0]
 			for i in 11:
 				q = q.lerp(Vector2.ZERO, 1.0 / (11 - i)) + Vector2(rng.randf_range(-34, 34), rng.randf_range(-10, 10)) * (1.0 if i < 10 else 0.0)
